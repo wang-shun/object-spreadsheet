@@ -166,20 +166,29 @@ class ViewHlist
 class View
   constructor: (@domain, @mainSection) ->
 
+  permuteColumns: (grid, header, colPerm) -> [
+    ((row[i] for i in colPerm) for row in grid)
+    (header[i] for i in colPerm)
+  ]
+
   hotConfig: ->
     vlist = @mainSection.prerenderVlist(@domain)
     grid = @mainSection.renderVlist(vlist, vlist.minHeight)
+    header = @mainSection.columnNames
+    # TODO allow custom column permutations
+    colPerm = (i for _,i in header)[1..]
+    [grid, header] = @permuteColumns grid, header, colPerm
     d = {
       readOnly: true
       data: ((cell.value for cell in row) for row in grid)
-      colHeaders: @mainSection.columnNames
+      colHeaders: header
       # Separator columns are 8 pixels wide.  Others use default width.
-      colWidths: (for n in @mainSection.columnNames
+      colWidths: (for n in header
                     if n then undefined else 8)
       afterGetColHeader: (col, TH) =>
-        if @mainSection.columnNames[col+1] == ''
+        if header[col+1] == ''
           ($ TH) .addClass 'incomparable'
-      columns: (for n in @mainSection.columnNames
+      columns: (for n in header
                   if n then {} else {className: 'incomparable'})\
                [1..] .concat [{}]
       autoColumnSize: true
