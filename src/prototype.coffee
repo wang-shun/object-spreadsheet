@@ -162,12 +162,18 @@ class View
     vlist = @mainSection.prerenderVlist(@domain)
     grid = @mainSection.renderVlist(vlist, vlist.minHeight)
     d = {
-      data: ((cell.value for cell in row) for row in grid),
-      colHeaders: @mainSection.columnNames,
+      data: ((cell.value for cell in row) for row in grid)
+      colHeaders: @mainSection.columnNames
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for n in @mainSection.columnNames
-                    if n then undefined else 8),
-      autoColumnSize: true,
+                    if n then undefined else 8)
+      afterGetColHeader: (col, TH) =>
+        if @mainSection.columnNames[col+1] == ''
+          ($ TH) .addClass 'incomparable'
+      columns: (for n in @mainSection.columnNames
+                  if n then {} else {className: 'incomparable'})\
+               [1..] .concat [{}]
+      autoColumnSize: true
       mergeCells: [].concat((
         for row,i in grid
           for cell,j in row when cell.rowspan != 1 || cell.colspan != 1
@@ -211,4 +217,3 @@ v = new View(
 $ () ->
   x = $ '#Person'
   new Handsontable x[0], v.hotConfig()
-  #x.append ($ "<p>") .text (table.teacher.grouping())
