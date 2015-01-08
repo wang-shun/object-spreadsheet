@@ -21,6 +21,10 @@ class Table extends Array
                @type, @fieldInfos[idx].type,
                @fieldInfos[idx].singular, @fieldInfos[idx].unique)
 
+  cross: (that) ->
+    pairs = [].concat([x,y] for x in @domain() for y in that.domain()...)
+    new BinRel pairs, @type, that.type, false, false
+
   domain: -> i for _,i in @
   id: -> new BinRel(([i,i] for _,i in @), @type, @type, true, true)
 
@@ -216,9 +220,10 @@ class Dataset
     @typeInfos[table.type].domain = table.domain()
     for fieldInfo in table.fieldInfos
       relation = table.proj(fieldInfo.name)
-      @addForwardRelation(fieldInfo.name, relation)
+      relationName = "#{table.type}:#{fieldInfo.name}"
+      @addForwardRelation(relationName, relation)
       xpose = relation.xpose()
-      xposeName = "~#{table.type}:#{fieldInfo.name}"
+      xposeName = "~#{relationName}"
       @addForwardRelation(xposeName, xpose)
 
 tables = [
@@ -294,12 +299,19 @@ tables = [
   ]
 ]
 
+
 dataset = new Dataset()
 for table in tables
   dataset.addTable(table)
 
-# TODO: Let the user choose any startType that has a domain.
-startType = 'Person'
+# Add a dummy table "Unit" with a full relation to every other table
+Unit = new Table 'Unit', [], [[]]
+dataset.addTable Unit
+for table in tables
+  dataset.addForwardRelation(table.type, Unit.cross table)
+
+# This lets the user navigate to any of the other tables :)
+startType = 'Unit'
 
 defaultSelections = {
   'name': {}
