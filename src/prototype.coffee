@@ -304,7 +304,10 @@ startType = 'Person'
 defaultSelections = {
   'name': {}
   '~Section:teacher': {
-    'class': {}
+    'class': {
+      'code': {}
+      'name': {}
+    }
     '~Enrollment:section': {
       'student': {
         'name': {}
