@@ -172,6 +172,12 @@ class View
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for n in @mainSection.columnNames
                     if n then undefined else 8)
+      afterGetColHeader: (col, TH) =>
+        if @mainSection.columnNames[col+1] == ''
+          ($ TH) .addClass 'incomparable'
+      columns: (for n in @mainSection.columnNames
+                  if n then {} else {className: 'incomparable'})\
+               [1..] .concat [{}]
       autoColumnSize: true
       mergeCells: [].concat((
         for row,i in grid
@@ -389,4 +395,3 @@ $ () ->
   # Have not gotten this to work yet.
   #applySelections(vdtRoot(), defaultSelections)
   rebuildView()
-  #x.append ($ "<p>") .text (table.teacher.grouping())
