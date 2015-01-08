@@ -1,11 +1,11 @@
 class FieldInfo
 
-  constructor: (@name, @singular, @unique) ->
+  constructor: (@name, @type, @singular, @unique) ->
 
 
 class Table extends Array
 
-  constructor: (@fieldInfos, iterable) ->
+  constructor: (@type, @fieldInfos, iterable) ->
     @push x for x in iterable
     p = {}
     for x in @fieldInfos
@@ -18,10 +18,11 @@ class Table extends Array
   proj: (colname) ->
     idx = @colidx colname
     new BinRel(([i,row[idx]] for row,i in @),
+               @type, @fieldInfos[idx].type,
                @fieldInfos[idx].singular, @fieldInfos[idx].unique)
 
   domain: -> i for _,i in @
-  id: -> new BinRel(([i,i] for _,i in @), true, true)
+  id: -> new BinRel(([i,i] for _,i in @), @type, @type, true, true)
 
 
 class BinRel extends Array
@@ -29,20 +30,23 @@ class BinRel extends Array
   # "Singular" means the schema requires that for each x,
   # there's at most one y such that (x,y) is in the relation.
   # "Unique": other way around.  Better terms welcomed.
-  constructor: (iterable, @singular, @unique) ->
+  constructor: (iterable, @leftType, @rightType, @singular, @unique) ->
     @push x for x in iterable
 
   proj: (colidx) -> (x[colidx] for x in @)
 
   domain: -> @proj 0
-  id: -> new BinRel([x,x] for x in @domain, true, true)
+  id: -> new BinRel([x,x] for x in @domain, @leftType, @leftType, true, true)
 
-  xpose: -> new BinRel([y,x] for [x,y] in @, @unique, @singular)
+  xpose: -> new BinRel([y,x] for [x,y] in @,
+    @rightType, @leftType, @unique, @singular)
 
   comp: (that) ->
+    # assert @rightType == that.leftType
     prod = []
     prod.push [r,s] for r in @ for s in that
     new BinRel(([r[0],s[1]] for [r,s] in prod when r[1]==s[0]),
+               @leftType, that.rightType,
                @singular && that.singular, @unique && that.unique)
 
   lookup: (key) ->
@@ -162,12 +166,13 @@ class View
     vlist = @mainSection.prerenderVlist(@domain)
     grid = @mainSection.renderVlist(vlist, vlist.minHeight)
     d = {
-      data: ((cell.value for cell in row) for row in grid),
-      colHeaders: @mainSection.columnNames,
+      readOnly: true
+      data: ((cell.value for cell in row) for row in grid)
+      colHeaders: @mainSection.columnNames
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for n in @mainSection.columnNames
-                    if n then undefined else 8),
-      autoColumnSize: true,
+                    if n then undefined else 8)
+      autoColumnSize: true
       mergeCells: [].concat((
         for row,i in grid
           for cell,j in row when cell.rowspan != 1 || cell.colspan != 1
@@ -176,39 +181,212 @@ class View
     }
     d
 
+class TypeInfo
+  constructor: ->
+    # list to be set later for object types; will remain null for primitive types
+    @domain = null
+    # dict (name -> BinRel)
+    @relations = {}
 
-Person = new Table [new FieldInfo("name", true, true)], [
-  ["Daniel Jackson"]
-  ["Jonathan Edwards"]
-  ["Hefty"]
-  ["Brainy"]
-  ["Clumsy"]
-  ["Greedy"]
-  ["Jokey"]
-  ["Chef"]
-  ["Vanity"]
+class Dataset
+  constructor: ->
+    # type name (string) -> TypeInfo
+    # By convention, primitive types are lowercase ('string', 'bool', 'int',
+    # 'real', 'datetime', whatever seems appropriate) and object types are
+    # capitalized.
+    @typeInfos = {}
+
+  createTypeIfNecessary: (type) ->
+    @typeInfos[type] ?= new TypeInfo()
+
+  addForwardRelation: (name, relation) ->
+    @createTypeIfNecessary(relation.leftType)
+    # Assert no collision?
+    @typeInfos[relation.leftType].relations[name] = relation
+
+  addTable: (table) ->
+    @createTypeIfNecessary(table.type)
+    # Assert not already set?
+    @typeInfos[table.type].domain = table.domain()
+    for fieldInfo in table.fieldInfos
+      relation = table.proj(fieldInfo.name)
+      @addForwardRelation(fieldInfo.name, relation)
+      xpose = relation.xpose()
+      xposeName = "~#{table.type}:#{fieldInfo.name}"
+      @addForwardRelation(xposeName, xpose)
+
+tables = [
+  # TODO: Add subclasses of Person (Student, Teacher, Parent).
+  new Table 'Person', [
+    new FieldInfo("name", "string", true, true)
+  ], [
+    ["Daniel Jackson"]
+    ["Jonathan Edwards"]
+    ["Matt McCutchen"]
+    ["Michael McCutchen"]
+    ["Shachar Itzhaky"]
+    ["Rosemary McCutchen"]
+    ["Parent Itzhaky"]
+  ]
+
+  new Table 'Class', [
+    new FieldInfo("code", "string", true, true)
+    new FieldInfo("name", "string", true, true)
+  ], [
+    ['6.170', 'Software Studio']
+    ['6.*+~', 'Alloy']
+    ['6.:::', 'Managed Time']
+  ]
+
+  # Since this level of indirection would exist in a real application and helps to
+  # exercise our support for hierarchy, we include it.  A real application would
+  # add "term" and "meeting time" fields among others, but these are not currently
+  # an important part of our demonstration.
+  new Table 'Section', [
+    new FieldInfo("class", "Class", true, false)
+    new FieldInfo("teacher", "Person", true, false)
+  ], [
+    [0, 0]
+    [1, 0]
+    [2, 1]
+  ]
+
+  new Table 'Enrollment', [
+    new FieldInfo("student", "Person", true, false)
+    new FieldInfo("section", "Section", true, false)
+  ], [
+    [2, 2]
+    [2, 0]
+    [2, 1]
+    [3, 0]
+    [4, 1]
+  ]
+
+  # TODO: Uniqueness constraint on (teacher, time) pair
+  new Table 'Slot', [
+    new FieldInfo("teacher", "Person", true, false)
+    new FieldInfo("time", "datetime", true, false)
+  ], [
+    [0, '2014-12-16 13:00']
+    [0, '2014-12-16 13:15']
+    [0, '2014-12-16 13:30']
+    [0, '2014-12-16 13:45']
+    [1, '2014-12-16 13:00']
+    [1, '2014-12-16 14:00']
+  ]
+
+  # TODO: Constraint enrollment.section.teacher == slot.teacher
+  new Table 'Meeting', [
+    new FieldInfo("enrollment", "Enrollment", true, true)
+    new FieldInfo("slot", "Slot", true, true)
+  ], [
+    [0, 4]
+    [1, 1]
+    [2, 2]
+    [3, 3]
+    [4, 0]
+  ]
 ]
 
-Teacher_Student = new BinRel [
-  [0,2], [0,3], [0,4]
-  [1,5], [1,6], [1,7], [1,8]
-], false, false
+dataset = new Dataset()
+for table in tables
+  dataset.addTable(table)
 
-# Meaningless data that serves to demonstrate a separator column.
-Teacher_Slot = new BinRel [
-  [0, '1-2'], [0, '2-3']
-  [1, '3-4'], [1, '4-5']
-], false, false
+# TODO: Let the user choose any startType that has a domain.
+startType = 'Person'
 
-v = new View(
-  Person.domain(),
-  new ViewSection("ID", [
-    new ViewField(Person.name, new ViewSection("teacher", [])),
-    new ViewField(Teacher_Student.comp(Person.name), new ViewSection("student", []))
-    new ViewField(Teacher_Slot, new ViewSection("slot", []))
-  ]))
+defaultSelections = {
+  'name': {}
+  '~Section:teacher': {
+    'class': {}
+    '~Enrollment:section': {
+      'student': {
+        'name': {}
+      }
+      '~Meeting:enrollment': {
+        'slot': {
+          'time': {}
+        }
+      }
+    }
+  }
+}
+
+viewDefTree = null
+
+vdtRoot = () -> viewDefTree.get_node('#')
+vdtChildren = (node) ->
+  viewDefTree.get_node(child_id) for child_id in node.children
+
+viewHOT = null
+
+generateViewSection = (type, firstColumnName, node) ->
+  new ViewSection(
+    firstColumnName,
+    for child in vdtChildren(node) when child.state.selected
+      new ViewField(dataset.typeInfos[type].relations[child.original.user_relationName],
+                    generateViewSection(child.original.user_type,
+                                        child.original.user_relationName, child))
+  )
+
+rebuildView = () ->
+  if viewHOT
+    viewHOT.destroy()
+  viewDef = new View(dataset.typeInfos[startType].domain,
+                     generateViewSection(startType, startType, vdtRoot()))
+  viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
+  window.viewHOT = viewHOT  # debug
+
+applySelections = (node, selData) ->
+  console.log('applySelections', vdtChildren(node))
+  viewDefTree.load_node(node, ->
+    #console.log('applySelections called back', vdtChildren(node))
+    console.log('applySelections called back', vdtChildren(node))
+    for child in vdtChildren(node)
+      childSelData = selData[child.original.user_relationName]
+      # changed.jstree is suppressed; caller is expected to rebuildView once.
+      if childSelData
+        console.log('about to select', child)
+        viewDefTree.select_node(child, true)
+        applySelections(child, childSelData)
+      else
+        viewDefTree.deselect_node(child, true)  # Removes descendants
+  )
 
 $ () ->
-  x = $ '#Person'
-  new Handsontable x[0], v.hotConfig()
+  viewDefTreeHost = $('#ViewDefTree')
+  viewDefTreeHost.jstree({
+    plugins: ['checkbox']
+    core: {
+      data: (node, cb) ->
+        childrenData =
+          if node.id != '#' && !node.state.selected
+            []
+          else
+            type = if node.id == '#' then startType else node.original.user_type
+            for name, relation of dataset.typeInfos[type].relations
+              {
+                user_relationName: name
+                user_type: relation.rightType
+                text: "#{name} (#{relation.rightType})"
+              }
+        console.log('Loading node', node, childrenData)
+        cb.call(this, childrenData)
+    }
+    checkbox: {
+      three_state: false
+    }
+  }).on('select_node.jstree', (e, data) ->
+    console.log('select_node', data.node)
+    viewDefTree.refresh_node(data.node)
+  ).on('deselect_node.jstree', (e, data) ->
+    viewDefTree.refresh_node(data.node)
+  ).on('changed.jstree', (e) ->
+    rebuildView()
+  )
+  viewDefTree = viewDefTreeHost.jstree()  # Weird API in Matt's opinion
+  window.viewDefTree = viewDefTree
+  # Have not gotten this to work yet.
+  #applySelections(vdtRoot(), defaultSelections)
+  rebuildView()
   #x.append ($ "<p>") .text (table.teacher.grouping())
