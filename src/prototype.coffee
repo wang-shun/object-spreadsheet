@@ -346,20 +346,20 @@ rebuildView = () ->
   viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
   window.viewHOT = viewHOT  # debug
 
+# Asynchronous!  If we wanted to rebuildView once at the end, we'd need to
+# learn how to trigger it once all the callbacks are done.  For now we'll just
+# leave this looking goofy.
 applySelections = (node, selData) ->
-  console.log('applySelections', vdtChildren(node))
-  viewDefTree.load_node(node, ->
-    #console.log('applySelections called back', vdtChildren(node))
-    console.log('applySelections called back', vdtChildren(node))
+  viewDefTree.load_node(node, () ->
+    node = viewDefTree.get_node(node.id)  # loading invalidates references
     for child in vdtChildren(node)
       childSelData = selData[child.original.user_relationName]
       # changed.jstree is suppressed; caller is expected to rebuildView once.
       if childSelData
-        console.log('about to select', child)
-        viewDefTree.select_node(child, true)
+        viewDefTree.select_node(child)
         applySelections(child, childSelData)
       else
-        viewDefTree.deselect_node(child, true)  # Removes descendants
+        viewDefTree.deselect_node(child)  # Removes descendants
   )
 
 $ () ->
@@ -379,14 +379,12 @@ $ () ->
                 user_type: relation.rightType
                 text: "#{name} (#{relation.rightType})"
               }
-        console.log('Loading node', node, childrenData)
         cb.call(this, childrenData)
     }
     checkbox: {
       three_state: false
     }
   }).on('select_node.jstree', (e, data) ->
-    console.log('select_node', data.node)
     viewDefTree.refresh_node(data.node)
   ).on('deselect_node.jstree', (e, data) ->
     viewDefTree.refresh_node(data.node)
@@ -395,6 +393,5 @@ $ () ->
   )
   viewDefTree = viewDefTreeHost.jstree()  # Weird API in Matt's opinion
   window.viewDefTree = viewDefTree
-  # Have not gotten this to work yet.
-  #applySelections(vdtRoot(), defaultSelections)
   rebuildView()
+  applySelections(vdtRoot(), defaultSelections)
