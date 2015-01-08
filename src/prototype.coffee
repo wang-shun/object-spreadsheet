@@ -237,7 +237,7 @@ tables = [
     ["Michael McCutchen"]
     ["Shachar Itzhaky"]
     ["Rosemary McCutchen"]
-    ["Parent Itzhaky"]
+    ["Yoram Itzhaky"]
   ]
 
   new Table 'Class', [
@@ -314,19 +314,21 @@ for table in tables
 startType = 'Unit'
 
 defaultSelections = {
-  'name': {}
-  '~Section:teacher': {
-    'class': {
-      'code': {}
-      'name': {}
-    }
-    '~Enrollment:section': {
-      'student': {
-        'name': {}
+  'Person': {
+    'Person:name': {}
+    '~Section:teacher': {
+      'Section:class': {
+        'Class:code': {}
+        'Class:name': {}
       }
-      '~Meeting:enrollment': {
-        'slot': {
-          'time': {}
+      '~Enrollment:section': {
+        'Enrollment:student': {
+          'Person:name': {}
+        }
+        '~Meeting:enrollment': {
+          'Meeting:slot': {
+            'Slot:time': {}
+          }
         }
       }
     }
