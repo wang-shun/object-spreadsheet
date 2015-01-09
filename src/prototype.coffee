@@ -344,77 +344,82 @@ defaultSelections = {
   }
 }
 
-viewDefTree = null
+# Above this point: model and some rendering-related code but no references to UI elements
+# Below this point: UI code.
 
-vdtRoot = () -> viewDefTree.get_node('#')
-vdtChildren = (node) ->
-  viewDefTree.get_node(child_id) for child_id in node.children
+if Meteor.isClient
 
-viewHOT = null
+  viewDefTree = null
 
-generateViewSection = (type, firstColumnName, node) ->
-  new ViewSection(
-    firstColumnName,
-    for child in vdtChildren(node) when child.state.selected
-      new ViewField(dataset.typeInfos[type].relations[child.original.user_relationName],
-                    generateViewSection(child.original.user_type,
-                                        child.original.user_relationName, child))
-  )
+  vdtRoot = () -> viewDefTree.get_node('#')
+  vdtChildren = (node) ->
+    viewDefTree.get_node(child_id) for child_id in node.children
 
-rebuildView = () ->
-  if viewHOT
-    viewHOT.destroy()
-  viewDef = new View(dataset.typeInfos[startType].domain,
-                     generateViewSection(startType, startType, vdtRoot()))
-  viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
-  window.viewHOT = viewHOT  # debug
+  viewHOT = null
 
-# Asynchronous!  If we wanted to rebuildView once at the end, we'd need to
-# learn how to trigger it once all the callbacks are done.  For now we'll just
-# leave this looking goofy.
-applySelections = (node, selData) ->
-  viewDefTree.load_node(node, () ->
-    node = viewDefTree.get_node(node.id)  # loading invalidates references
-    for child in vdtChildren(node)
-      childSelData = selData[child.original.user_relationName]
-      # changed.jstree is suppressed; caller is expected to rebuildView once.
-      if childSelData
-        viewDefTree.select_node(child)
-        applySelections(child, childSelData)
-      else
-        viewDefTree.deselect_node(child)  # Removes descendants
-  )
+  generateViewSection = (type, firstColumnName, node) ->
+    new ViewSection(
+      firstColumnName,
+      for child in vdtChildren(node) when child.state.selected
+        new ViewField(dataset.typeInfos[type].relations[child.original.user_relationName],
+                      generateViewSection(child.original.user_type,
+                                          child.original.user_relationName, child))
+    )
 
-$ () ->
-  viewDefTreeHost = $('#ViewDefTree')
-  viewDefTreeHost.jstree({
-    plugins: ['checkbox']
-    core: {
-      data: (node, cb) ->
-        childrenData =
-          if node.id != '#' && !node.state.selected
-            []
-          else
-            type = if node.id == '#' then startType else node.original.user_type
-            for name, relation of dataset.typeInfos[type].relations
-              {
-                user_relationName: name
-                user_type: relation.rightType
-                text: "#{name} (#{relation.rightType})"
-              }
-        cb.call(this, childrenData)
-    }
-    checkbox: {
-      three_state: false
-    }
-  }).on('select_node.jstree', (e, data) ->
-    viewDefTree.refresh_node(data.node)
-  ).on('deselect_node.jstree', (e, data) ->
-    viewDefTree.refresh_node(data.node)
-  ).on('changed.jstree', (e) ->
+  rebuildView = () ->
+    if viewHOT
+      viewHOT.destroy()
+    viewDef = new View(dataset.typeInfos[startType].domain,
+                       generateViewSection(startType, startType, vdtRoot()))
+    viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
+    window.viewHOT = viewHOT  # debug
+
+  # Asynchronous!  If we wanted to rebuildView once at the end, we'd need to
+  # learn how to trigger it once all the callbacks are done.  For now we'll just
+  # leave this looking goofy.
+  applySelections = (node, selData) ->
+    viewDefTree.load_node(node, () ->
+      node = viewDefTree.get_node(node.id)  # loading invalidates references
+      for child in vdtChildren(node)
+        childSelData = selData[child.original.user_relationName]
+        # changed.jstree is suppressed; caller is expected to rebuildView once.
+        if childSelData
+          viewDefTree.select_node(child)
+          applySelections(child, childSelData)
+        else
+          viewDefTree.deselect_node(child)  # Removes descendants
+    )
+
+  $ () ->
+    viewDefTreeHost = $('#ViewDefTree')
+    viewDefTreeHost.jstree({
+      plugins: ['checkbox']
+      core: {
+        data: (node, cb) ->
+          childrenData =
+            if node.id != '#' && !node.state.selected
+              []
+            else
+              type = if node.id == '#' then startType else node.original.user_type
+              for name, relation of dataset.typeInfos[type].relations
+                {
+                  user_relationName: name
+                  user_type: relation.rightType
+                  text: "#{name} (#{relation.rightType})"
+                }
+          cb.call(this, childrenData)
+      }
+      checkbox: {
+        three_state: false
+      }
+    }).on('select_node.jstree', (e, data) ->
+      viewDefTree.refresh_node(data.node)
+    ).on('deselect_node.jstree', (e, data) ->
+      viewDefTree.refresh_node(data.node)
+    ).on('changed.jstree', (e) ->
+      rebuildView()
+    )
+    viewDefTree = viewDefTreeHost.jstree()  # Weird API in Matt's opinion
+    window.viewDefTree = viewDefTree
     rebuildView()
-  )
-  viewDefTree = viewDefTreeHost.jstree()  # Weird API in Matt's opinion
-  window.viewDefTree = viewDefTree
-  rebuildView()
-  applySelections(vdtRoot(), defaultSelections)
+    applySelections(vdtRoot(), defaultSelections)
