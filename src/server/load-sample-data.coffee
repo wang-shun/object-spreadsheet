@@ -237,8 +237,6 @@ sampleData = {
   ])
 }
 
-Columns = new Mongo.Collection('columns')
-
 loadSampleData = () ->
   isSpecial = (s) -> /^_/.test(s)
 

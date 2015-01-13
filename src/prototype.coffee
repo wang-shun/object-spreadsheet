@@ -1,3 +1,4 @@
+###
 class FieldInfo
 
   constructor: (@name, @type, @singular, @unique) ->
@@ -27,46 +28,25 @@ class Table extends Array
 
   domain: -> i for _,i in @
   id: -> new BinRel(([i,i] for _,i in @), @type, @type, true, true)
+###
 
+class RSRel extends Array
 
-class BinRel extends Array
-
-  # "Singular" means the schema requires that for each x,
-  # there's at most one y such that (x,y) is in the relation.
-  # "Unique": other way around.  Better terms welcomed.
-  constructor: (iterable, @leftType, @rightType, @singular, @unique) ->
+  # Now the iterable should return [parentCellId, [value, childCellId]].
+  ## "Singular" means the schema requires that for each x,
+  ## there's at most one y such that (x,y) is in the relation.
+  ## "Unique": other way around.  Better terms welcomed.
+  constructor: (iterable
+                #, @leftType, @rightType, @singular, @unique
+  ) ->
     @push x for x in iterable
 
-  proj: (colidx) -> (x[colidx] for x in @)
-
-  domain: -> @proj 0
-  id: -> new BinRel([x,x] for x in @domain, @leftType, @leftType, true, true)
-
-  xpose: -> new BinRel([y,x] for [x,y] in @,
-    @rightType, @leftType, @unique, @singular)
-
-  comp: (that) ->
-    # assert @rightType == that.leftType
-    prod = []
-    prod.push [r,s] for r in @ for s in that
-    new BinRel(([r[0],s[1]] for [r,s] in prod when r[1]==s[0]),
-               @leftType, that.rightType,
-               @singular && that.singular, @unique && that.unique)
+  # TODO: Implement something like this again when ready.
+  #xpose: -> new BinRel([y,x] for [x,y] in @,
+  #  @rightType, @leftType, @unique, @singular)
 
   lookup: (key) ->
     r[1] for r in @ when r[0] == key
-
-  grouping: ->
-    runs @proj 1
-
-  runs = (arr) ->
-    prev = [undefined, -1]
-    strip = (1 for x in arr)
-    for i in [strip.length-2..0] by -1
-      if arr[i] == arr[i+1]
-        strip[i] = strip[i+1] + 1
-        strip[i+1] = 0
-    strip
 
 
 class ViewField
@@ -75,7 +55,7 @@ class ViewField
 
 class ViewSection
 
-  constructor: (firstColumnName, @fields) ->
+  constructor: (firstColumnName, @firstColumnType, @fields) ->
     # Currently, we always have the original value in the first column.
     @columnNames = [firstColumnName]
     @leftEdgeSingular = true
@@ -105,19 +85,26 @@ class ViewSection
     minHeight = 1
     items = []
     for field in @fields
-      fieldValues = field.relation.lookup(value)
+      fieldValues = field.relation.lookup(value[1])
       if field.relation.singular
         item = field.subsection.prerenderHlist(fieldValues[0])
         minHeight = Math.max(minHeight, item.minHeight)
       else
         item = field.subsection.prerenderVlist(fieldValues)
-        # Ensure that a plural field with only one value is followed by at least
-        # one blank row so the user can tell it is plural.  We currently don't
-        # provide a visual distinction between empty singular and plural fields.
-        minHeight = Math.max(minHeight,
-                             item.minHeight + (fieldValues.length == 1))
+        # Disable this behavior until we know which fields are singular again.
+        ## Ensure that a plural field with only one value is followed by at least
+        ## one blank row so the user can tell it is plural.  We currently don't
+        ## provide a visual distinction between empty singular and plural fields.
+        #minHeight = Math.max(minHeight,
+        #                     item.minHeight + (fieldValues.length == 1))
+        minHeight = Math.max(minHeight, item.minHeight)
       items.push(item)
-    new ViewHlist(minHeight, value, items)
+    # TODO: More type-specific rendering?
+    displayValue =
+      if @firstColumnType == '_unit' then 'X'
+      else if @firstColumnType == '_token' then '*'
+      else value[0]
+    new ViewHlist(minHeight, displayValue, items)
 
   renderVlist: (vlist, height) ->
     grid = []
@@ -200,6 +187,7 @@ class View
     }
     d
 
+###
 class TypeInfo
   constructor: ->
     # list to be set later for object types; will remain null for primitive types
@@ -344,20 +332,24 @@ defaultSelections = {
     }
   }
 }
+###
 
 # Above this point: model and some rendering-related code but no references to UI elements
 # Below this point: UI code.
 
 if Meteor.isClient
 
+  ###
   viewDefTree = null
 
   vdtRoot = () -> viewDefTree.get_node('#')
   vdtChildren = (node) ->
     viewDefTree.get_node(child_id) for child_id in node.children
+  ###
 
   viewHOT = null
 
+  ###
   generateViewSection = (type, firstColumnName, node) ->
     new ViewSection(
       firstColumnName,
@@ -390,8 +382,44 @@ if Meteor.isClient
         else
           viewDefTree.deselect_node(child)  # Removes descendants
     )
+  ###
+
+  generateViewSection = (column) ->
+    new ViewSection(
+      column.name ? column.cellName ? '',
+      column.type,
+      for childColumn in Columns.find({parent: column._id},
+                                      {sort: ['orderToken']}).fetch()
+        new ViewField(
+          new RSRel(
+            for childCellId, childCell of childColumn.cells
+              [childCell.parent, [childCell.value, childCellId]]
+          ),
+          generateViewSection(childColumn))
+    )
+
+  # TODO: Reading columns directly from the database each time we want them
+  # works for now, but we may want to (1) introduce a model class to hold
+  # generally useful methods and (2) maintain a server-wide cache that can
+  # assign stable IDs to computed cells for use in the server's runtime data
+  # structures without having to write the cells to the database and clean them
+  # up on server shutdown.  If a stable ID is only needed by a particular
+  # client (e.g., to identify a cell selected by the user), and we want it to
+  # survive a server restart but not leak if the client fails to reconnect, then
+  # things become complicated; the client may just have to store the whole path
+  # to the cell in this case.
+  rebuildView = () ->
+    if viewHOT
+      viewHOT.destroy()
+    viewDef = new View([[null, '_unit']],
+                       # Type _unit is not really correct but is OK since
+                       # we don't display the first column.
+                       generateViewSection({_id: '_unit', type: '_unit'}))
+    viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
+    window.viewHOT = viewHOT  # debug
 
   $ () ->
+    ###
     viewDefTreeHost = $('#ViewDefTree')
     viewDefTreeHost.jstree({
       plugins: ['checkbox']
@@ -424,3 +452,5 @@ if Meteor.isClient
     window.viewDefTree = viewDefTree
     rebuildView()
     applySelections(vdtRoot(), defaultSelections)
+    ###
+    Tracker.autorun(rebuildView)
