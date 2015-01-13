@@ -17,7 +17,7 @@ class Table extends Array
 
   proj: (colname) ->
     idx = @colidx colname
-    new BinRel(([i,row[idx]] for row,i in @),
+    new BinRel(([i,row[idx]] for row,i in @ when row[idx] != null),
                @type, @fieldInfos[idx].type,
                @fieldInfos[idx].singular, @fieldInfos[idx].unique)
 
@@ -239,14 +239,15 @@ tables = [
   # TODO: Add subclasses of Person (Student, Teacher, Parent).
   new Table 'Person', [
     new FieldInfo("name", "string", true, true)
+    new FieldInfo("parent", "Person", true, false)
   ], [
-    ["Daniel Jackson"]
-    ["Jonathan Edwards"]
-    ["Matt McCutchen"]
-    ["Michael McCutchen"]
-    ["Shachar Itzhaky"]
-    ["Rosemary McCutchen"]
-    ["Yoram Itzhaky"]
+    ["Daniel Jackson", null]
+    ["Jonathan Edwards", null]
+    ["Matt McCutchen", 5]
+    ["Michael McCutchen", 5]
+    ["Shachar Itzhaky", 6]
+    ["Rosemary McCutchen", null]
+    ["Yoram Itzhaky", null]
   ]
 
   new Table 'Class', [
