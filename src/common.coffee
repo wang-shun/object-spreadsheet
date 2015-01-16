@@ -1,3 +1,5 @@
+@typeIsPrimitive = (type) -> /^_/.test(type)
+
 @rootColumnId = '_unit'
 
 # Multisets unsupported for now: twindex removed.
@@ -27,7 +29,7 @@
 #@content: TypedSet if state is SUCCESS, otherwise null
 
 # TypedSet:
-#@type: column ID or primitive
+#@type: column ID or primitive, or null if we don't know because the set is empty.
 #@elements: array, no duplicates (for now), order is not meaningful
 
 @FAMILY_DATA_COLLECTION = 'familyData'
@@ -38,6 +40,10 @@
 
 # We can only define this in one file.
 @Columns = new Mongo.Collection(COLUMN_COLLECTION)
+
+# {_id: formula column ID, _type: type}
+@FORMULA_COLUMN_TYPE_COLLECTION = 'formulaColumnType'
+@FORMULA_COLUMN_TYPE_MIXED = '_mixed'
 
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...

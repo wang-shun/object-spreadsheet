@@ -7,6 +7,10 @@ class Model
   #@state: EJSONKeyedMapToSet<QFamilyId, value>
   #@familyCache: EJSONKeyedMap<QFamilyId, CacheEntry>
   #@columns: EJSONKeyedMap<ColumnId, Column>
+  #@formulaColumnType: EJSONKeyedMap<ColumnId, type>.
+  #  A column ID will be absent if no evaluated family has a known type, i.e.,
+  #  there are no evaluated families or all evaluated families are empty with
+  #  unknown type.
 
   initializeColumnTempData: (col) ->
     col.childByName = new EJSONKeyedMap()
@@ -82,7 +86,7 @@ class Model
     return @columns.get(columnId)
 
   parseTypeStr: (s) ->
-    if /^_/.test(s)
+    if typeIsPrimitive(s)
       return s
     else
       colId = rootColumnId
@@ -203,7 +207,7 @@ class Model
     col = @columns.get(qFamilyId.columnId)
     if col.formula?
       vars = new EJSONKeyedMap()
-      vars.set('this', {type: qFamilyId.columnId, elements: [qFamilyId.cellId]})
+      vars.set('this', {type: col.parent, elements: [qFamilyId.cellId]})
       return evaluateFormula(this, vars, col.formula)
     else
       # State column (there are no domain columns yet)
@@ -217,6 +221,19 @@ class Model
       try
         ce.content = @evaluateFamily1(qFamilyId)
         ce.state = FAMILY_SUCCESS
+
+        if @columns.get(qFamilyId.columnId).formula?
+          # Update formulaColumnType
+          oldFCT = @formulaColumnType.get(qFamilyId.columnId)
+          if ce.content.type? && ce.content.type != oldFCT
+            if oldFCT?
+              for publisher in @publishers
+                @unpublishFormulaColumnType(qFamilyId.columnId, publisher)
+            newFCT = if oldFCT? then FORMULA_COLUMN_TYPE_MIXED else ce.content.type
+            @formulaColumnType.set(qFamilyId.columnId, newFCT)
+            for publisher in @publishers
+              @publishFormulaColumnType(qFamilyId.columnId, publisher)
+
       catch e
         if e instanceof EvaluationError
           ce.state = FAMILY_ERROR
@@ -244,14 +261,13 @@ class Model
     if @familyCache?
       return  # already valid
     @familyCache = new EJSONKeyedMap()
+    @formulaColumnType = new EJSONKeyedMap()
 
     evaluateSubtree = (qCellId) =>
       col = @columns.get(qCellId.columnId)
       for childColId in col.children
         ce = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
         if ce.state == FAMILY_SUCCESS
-          unless ce.content.elements?
-            console.log('OOPS', qCellId, ce)
           for value in ce.content.elements
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             evaluateSubtree(childQCellId)
@@ -263,6 +279,18 @@ class Model
     for qFamilyId in @familyCache.keys()
       for publisher in @publishers
         @publishFamily(qFamilyId, publisher)
+
+  unpublishFormulaColumnType: (columnId, publisher) ->
+    publisher.removed(FORMULA_COLUMN_TYPE_COLLECTION, columnId)
+
+  publishFormulaColumnType: (columnId, publisher) ->
+    publisher.added(FORMULA_COLUMN_TYPE_COLLECTION, columnId,
+                    {type: @formulaColumnType.get(columnId)})
+
+  # I (Matt) believe that each formula column should have a single type, but
+  # right now it is determined only during formula evaluation and not stored in
+  # the column object.  So this is how you get it.
+  getFormulaColumnType: (columnId) -> @formulaColumnType.get(columnId)
 
   unpublishFamily: (qFamilyId, publisher) ->
     publisher.removed(FAMILY_DATA_COLLECTION, EJSON.stringify(qFamilyId))
@@ -288,7 +316,14 @@ class Model
         for publisher in @publishers
           @unpublishFamily(qFamilyId, publisher)
       @familyCache = null
+      for columnId in @formulaColumnType.keys()
+        for publisher in @publishers
+          @unpublishFormulaColumnType(columnId, publisher)
+      @formulaColumnType = null
 
+  # CLEANUP: Rewrite this to keep a set of published objects from all
+  # collections.  Then we can replay them to a new publisher and write a wrapper
+  # to publish/unpublish an object to all publishers.
   addPublisher: (publisher) ->
     @publishers.push(publisher)
     for columnId in @columns.keys()
@@ -296,6 +331,8 @@ class Model
     if @familyCache?
       for qFamilyId in @familyCache.keys()
         @publishFamily(qFamilyId, publisher)
+      for columnId in @formulaColumnType.keys()
+        @publishFormulaColumnType(columnId, publisher)
     publisher.ready()
 
   removePublisher: (publisher) ->

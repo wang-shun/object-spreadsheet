@@ -215,5 +215,6 @@ rebuildView = () ->
 Meteor.startup () ->
   # Load order...
   @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
+  @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
   Tracker.autorun(rebuildView)
