@@ -1,13 +1,3 @@
-EJSONtoMongoFieldName = (x) ->
-  # JSON may contain '.', which is special in Mongo field names, as part of a
-  # floating point or string literal.  We need to escape it somehow.  '!' should
-  # only appear as a character in a string literal, so if we replace it by its
-  # escaped form, then we can use '!' to represent '.'.
-  EJSON.stringify(x).replace('!', '\\x21').replace('.', '!')
-
-EJSONfromMongoFieldName = (f) ->
-  EJSON.parse(f.replace('!', '.'))
-
 @rootColumnId = '_unit'
 
 # Multisets unsupported for now: twindex removed.
@@ -17,84 +7,40 @@ EJSONfromMongoFieldName = (f) ->
 @cellIdChild = (cellId, value) -> cellId.concat([value])
 @cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
 
-# Now that we're no longer using custom classes, we might be able to use plain
-# JSON, but we've written this already...
-
-class EJSONKeyedMap
-  constructor: ->
-    # Future: Change to ECMAScript 6 Map when supported by all relevant JS
-    # engines and CoffeeScript.
-    @obj = {}
-  wrapKey = (k) -> 'map_' + EJSON.stringify(k)
-  unwrapKey = (k) ->
-    try
-      EJSON.parse(k.substr(4))
-    catch e
-      console.log('unwrapKey failed on', k)
-      throw e
-
-  get: (k) -> @obj[wrapKey(k)]
-  set: (k, v) -> @obj[wrapKey(k)] = v
-  delete: (k) -> delete @obj[wrapKey(k)]
-  keys: -> unwrapKey(wk) for wk of @obj
-
-class EJSONKeyedSet
-  constructor: ->
-    @map = new EJSONKeyedMap()
-  has: (x) -> !!@map.get(x)
-  add: (x) -> @map.set(x, true)
-  delete: (x) -> @map.delete(x)
-  elements: -> @map.keys()
-
-class EJSONKeyedMapToSet
-  constructor: ->
-    @map = new EJSONKeyedMap()
-  add: (k, v) ->
-    s = @map.get(k)
-    unless s?
-      s = new EJSONKeyedSet()
-      @map.set(k, s)
-    s.add(v)
-  delete: (k, v) ->
-    s = @map.get(k)
-    if s?
-      s.delete(v)
-      if s.elements().length == 0
-        @map.delete(k)
-  elementsFor: (k) -> @map.get(k)?.elements() ? []
-
 # Column:
-  #@parent: column ID
-  #@children: array of column IDs, now in the user's desired order
-  #@childByName: EJSONKeyedMap<name, column ID>
-  #@orderToken: string (for now) or null
-  #@name: string or null
-  #@type: column ID
-  #@cellName: string or null
-  #@formula: some JSON data structure, or null
+#@parent: column ID
+#@children: array of column IDs, now in the user's desired order
+#@childByName: EJSONKeyedMap<name, column ID>
+#@name: string or null
+#@type: column ID or primitive; null for formula columns
+#@cellName: string or null
+#@formula: some JSON data structure, or null
 
-class EvaluationError
+# TypedSet:
+#@type: column ID or primitive
+#@elements: array, no duplicates (for now), order is not meaningful
+
+class @EvaluationError
 
 # The client should not need most of this code, but I don't want to fight with
 # the load order right now. ~ Matt
 
 @FAMILY_DATA_COLLECTION = 'familyData'
 @COLUMN_COLLECTION = 'columns'
+FAMILY_IN_PROGRESS = 1  # should not be seen by the client
+@FAMILY_SUCCESS = 2
+@FAMILY_ERROR = 3
 
 class Model
 
   # TODO: Indicate which methods are intended to be public!
 
   class CacheEntry  # local
-    @IN_PROGRESS: 1
-    @SUCCESS: 2
-    @ERROR: 3
-
     constructor: () ->
-      @state = CacheEntry.IN_PROGRESS
+      @state = FAMILY_IN_PROGRESS
       # Only needed if we want to revalidate existing results.
       #@deps = []  # array of QFamilyId
-      @content = null  # list of values, no duplicates (for now)
+      @content = null  # TypedSet
 
   #@state: EJSONKeyedMapToSet<QFamilyId, value>
   #@familyCache: EJSONKeyedMap<QFamilyId, CacheEntry>
@@ -133,7 +79,7 @@ class Model
       @columns.set(col._id, col)
       for cellIdStr of col.cells ? {}
         cellId = EJSONfromMongoFieldName(cellIdStr)
-        @state.add({columnId: col._id, parentCellId: cellIdParent(cellId)},
+        @state.add({columnId: col._id, cellId: cellIdParent(cellId)},
                    cellIdLastStep(cellId))
       # Don't store a duplicate copy.  So, careful about writing col back to DB.
       delete col.cells
@@ -155,9 +101,10 @@ class Model
     # Now go back and link things up.
     for colId in @columns.keys()
       col = @columns.get(colId)
-      # XXX: Validate each column (except root) has exactly one parent.
-      for childId in col.children
-        @columns.get(childId).parent = colId
+      # Oops, the DB already stores parents.  Future: Validate.
+      ## XXX: Validate each column (except root) has exactly one parent.
+      #for childId in col.children
+      #  @columns.get(childId).parent = colId
       if colId != rootColumnId
         # XXX: Assert parent existence
         @registerColumnWithParent(col)
@@ -186,6 +133,14 @@ class Model
     # Future: specify order rather than always at the end
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
+    parentCol = @columns.get(parentId)
+    if !formula? && parentCol.formula?
+      throw new Error('Creating a state column as child of a formula column is currently not allowed.')
+    if formula? && type?
+      # For now, with dynamic typing.  This might change.
+      throw new Error('Cannot specify type for a formula column')
+    if !formula? && !type?
+      throw new Error('Must specify type for a state column')
     @invalidateCache()
     thisId = Random.id()
     col = {
@@ -216,26 +171,62 @@ class Model
 
     return thisId
 
+  renameColumn: (columnId, name, cellName) ->
+    col = @columns.get(columnId)
+    parentId = col.parent
+    parentCol = @columns.get(parentId)
+    @unregisterColumnWithParent(col)
+    col.name = name
+    col.cellName = cellName
+    @registerColumnWithParent(col)
+    Columns.update(columnId, {$set: {name: name, cellName: cellName}})
+    for publisher in @publishers
+      @unpublishColumn(columnId, publisher)
+      @publishColumn(columnId, publisher)
+      @unpublishColumn(parentId, publisher)
+      @publishColumn(parentId, publisher)
+
+  # Future: API to move and copy groups of columns.  This is an order of
+  # magnitude more complicated.
+
+  changeFormula: (columnId, formula) ->
+    col = @columns.get(columnId)
+    unless col.formula?
+      throw new Error('Can only changeFormula on a formula column!')
+    @invalidateCache()
+    col.formula = formula
+    Columns.update(columnId, {$set: {formula: formula}})
+    for publisher in @publishers
+      @unpublishColumn(columnId, publisher)
+      @publishColumn(columnId, publisher)
+
   deleteColumn: (columnId) ->
     # Assert not root
     col = @columns.get(columnId)
     if col.children.length
-      throw new Error('Unimplemented: Deleting a column with children')
+      throw new Error('Please delete all child columns first.')
     # Assert col.childByName also empty
     unless col.formula?
-      throw new Error('Unimplemented: Deleting a state column')
-    parentCol = @columns.get(col.parent)
+      for k in @state.keys()
+        # XXX: Slow; the data structure should let us query a column.
+        if EJSON.equals(k.columnId, columnId)
+          throw new Error('Please delete all state cells first.')
+    parentId = col.parent
+    parentCol = @columns.get(parentId)
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
+    Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     @unregisterColumnWithParent(col)
     @columns.delete(columnId)
     Columns.remove(columnId)
     for publisher in @publishers
       @unpublishColumn(columnId, publisher)
+      @unpublishColumn(parentId, publisher)
+      @publishColumn(parentId, publisher)
 
-  # Future: API to reorder tokens
+  # Future: Token order and API to change it
   writeState: (qFamilyId, value, present) ->
     # Future: Validate everything.
-    cellId = cellIdChild(qFamilyId.parentCellId, value)
+    cellId = cellIdChild(qFamilyId.cellId, value)
     @invalidateCache()
     mongoUpdateThing = {}
     mongoUpdateThing['cells.' + EJSONtoMongoFieldName(cellId)] = true
@@ -249,11 +240,12 @@ class Model
   evaluateFamily1: (qFamilyId) ->
     col = @columns.get(qFamilyId.columnId)
     if col.formula?
-      # TODO: Evaluate formula
-      return []
+      vars = new EJSONKeyedMap()
+      vars.set('this', {type: qFamilyId.columnId, elements: [qFamilyId.cellId]})
+      return evaluateFormula(this, vars, col.formula)
     else
       # State column (there are no domain columns yet)
-      return @state.elementsFor(qFamilyId)
+      return {type: col.type, elements: @state.elementsFor(qFamilyId)}
 
   evaluateFamily: (qFamilyId) ->
     ce = @familyCache.get(qFamilyId)
@@ -262,10 +254,10 @@ class Model
       @familyCache.set(qFamilyId, ce)
       try
         ce.content = @evaluateFamily1(qFamilyId)
-        ce.state = CacheEntry.SUCCESS
+        ce.state = FAMILY_SUCCESS
       catch e
         if e instanceof EvaluationError
-          ce.state = CacheEntry.ERROR
+          ce.state = FAMILY_ERROR
         else
           throw e
 
@@ -273,10 +265,10 @@ class Model
 
   readFamilyForFormula: (qFamilyId) ->
     ce = @evaluateFamily(qFamilyId)
-    if ce.state == CacheEntry.SUCCESS
+    if ce.state == FAMILY_SUCCESS
       return ce.content
     else
-      # Includes CacheEntry.IN_PROGRESS, which means a newly detected cycle.
+      # Includes FAMILY_IN_PROGRESS, which means a newly detected cycle.
       # Future: 'Reference to CELL, which failed', precise cycle detection with
       # different message.
       throw new EvaluationError()
@@ -294,9 +286,11 @@ class Model
     evaluateSubtree = (qCellId) =>
       col = @columns.get(qCellId.columnId)
       for childColId in col.children
-        ce = @evaluateFamily({columnId: childColId, parentCellId: qCellId.cellId})
-        if ce.state == CacheEntry.SUCCESS
-          for value in ce.content
+        ce = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
+        if ce.state == FAMILY_SUCCESS
+          unless ce.content.elements?
+            console.log('OOPS', qCellId, ce)
+          for value in ce.content.elements
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             evaluateSubtree(childQCellId)
 
@@ -312,8 +306,9 @@ class Model
     publisher.removed(FAMILY_DATA_COLLECTION, EJSON.stringify(qFamilyId))
 
   publishFamily: (qFamilyId, publisher) ->
+    # Everything in the CacheEntry is OK to publish.
     publisher.added(FAMILY_DATA_COLLECTION, EJSON.stringify(qFamilyId),
-                    {content: @familyCache.get(qFamilyId).content})
+                    @familyCache.get(qFamilyId))
 
   unpublishColumn: (columnId, publisher) ->
     publisher.removed(COLUMN_COLLECTION, columnId)
@@ -356,3 +351,25 @@ if Meteor.isServer
     @onStop(() -> model.removePublisher(this))
     model.addPublisher(this)
   )
+  Meteor.methods({
+    # The model methods do not automatically evaluate so that we can do bulk
+    # changes from the server side, but for now we always evaluate after each
+    # change from the client.  It would be a little harder for the client itself
+    # to request this via another method (it would require a callback).
+    # Future: validation!
+    defineColumn: (parentId, name, type, cellName, formula) ->
+      model.defineColumn(parentId, name, type, cellName, formula)
+      model.evaluateAll()
+    renameColumn: (columnId, name, cellName) ->
+      model.renameColumn(columnId, name, cellName)
+      model.evaluateAll()
+    changeFormula: (columnId, formula) ->
+      model.changeFormula(columnId, formula)
+      model.evaluateAll()
+    deleteColumn: (columnId) ->
+      model.deleteColumn(columnId)
+      model.evaluateAll()
+    writeState: (qFamilyId, value, present) ->
+      model.writeState(qFamilyId, value, present)
+      model.evaluateAll()
+  })

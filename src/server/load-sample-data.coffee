@@ -241,6 +241,6 @@
       childColumnId = model.getColumn(columnId).childByName.get(childColumnName)
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
-        model.writeState({columnId: childColumnId, parentCellId: cellId}, value, true)
+        model.writeState({columnId: childColumnId, cellId: cellId}, value, true)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)

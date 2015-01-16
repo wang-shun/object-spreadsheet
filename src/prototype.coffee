@@ -399,31 +399,33 @@ if Meteor.isClient
 
   # CLEANUP: Change the rendering code to read the published data directly
   # rather than generating RSRels as an intermediate step.
-  generateViewSection = (columnId, allCellIds) ->
+  generateViewSection = (columnId, type, allCellIds) ->
     column = Columns.findOne(columnId)  # published data
     unless column?
       throw new NotReadyError()
     new ViewSection(
       column.name ? column.cellName ? '',
-      column.type,
+      type,
       for childColumnId in column.children
         rel = []
         allChildCellIds = []
+        childType = null
         for cellId in allCellIds
           # See if reactive.
-          familyData = FamilyData.findOne(EJSON.stringify({columnId: childColumnId, parentCellId: cellId}))
+          familyData = FamilyData.findOne(EJSON.stringify({columnId: childColumnId, cellId: cellId}))
           unless familyData?
             throw new NotReadyError()
-          content = familyData.content
-          if content == null
-            # Hack: child cell ID 'null' will not relate to anything.
-            rel.push([EJSON.stringify(cellId), ['ERROR', null]])
-          else
-            for value in content
+          if familyData.state == FAMILY_SUCCESS
+            # XXX: Model should assert that all families evaluate to the same type.
+            childType ?= familyData.content.type
+            for value in familyData.content.elements
               childCellId = cellIdChild(cellId, value)
               allChildCellIds.push(childCellId)
               rel.push([EJSON.stringify(cellId), [value, EJSON.stringify(childCellId)]])
-        new ViewField(new RSRel(rel), generateViewSection(childColumnId, allChildCellIds))
+          else
+            # Hack: child cell ID 'null' will not relate to anything.
+            rel.push([EJSON.stringify(cellId), ['ERROR', null]])
+        new ViewField(new RSRel(rel), generateViewSection(childColumnId, childType, allChildCellIds))
     )
 
   rebuildView = () ->
@@ -432,9 +434,7 @@ if Meteor.isClient
       viewHOT = null
     try
       viewDef = new View([[null, EJSON.stringify([])]],
-                         # Type _unit is not really correct but is OK since
-                         # we don't display the first column.
-                         generateViewSection(rootColumnId, [rootCellId]))
+                         generateViewSection(rootColumnId, null, [rootCellId]))
     catch e
       if e instanceof NotReadyError
         return  # Let the autorun run again once we have the data.
