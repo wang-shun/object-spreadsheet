@@ -101,9 +101,14 @@ class ViewSection
       items.push(item)
     # TODO: More type-specific rendering?
     displayValue =
+      # For now, we need to see token values in order to interpret IDs.
+      # Future: Enable this again when we have a better way of rendering IDs.
+      #if @firstColumnType == '_token' then '*'
       if @firstColumnType == '_unit' then 'X'
-      else if @firstColumnType == '_token' then '*'
-      else value[0]
+      # Should be OK if the user knows which columns are string-typed.
+      else if typeof value[0] == 'string' then value[0]
+      # Make sure IDs (especially) are unambiguous.
+      else EJSON.stringify(value[0])
     new ViewHlist(minHeight, displayValue, items)
 
   renderVlist: (vlist, height) ->
@@ -384,41 +389,59 @@ if Meteor.isClient
     )
   ###
 
-  generateViewSection = (column) ->
+  @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
+
+  # The Error constructor is not usable by subclasses
+  # (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
+  # version of CoffeeScript is doing), but apparently we can throw any object we
+  # like, it just won't have a stack trace.
+  class NotReadyError
+
+  # CLEANUP: Change the rendering code to read the published data directly
+  # rather than generating RSRels as an intermediate step.
+  generateViewSection = (columnId, allCellIds) ->
+    column = Columns.findOne(columnId)  # published data
+    unless column?
+      throw new NotReadyError()
     new ViewSection(
       column.name ? column.cellName ? '',
       column.type,
-      for childColumn in Columns.find({parent: column._id},
-                                      {sort: ['orderToken']}).fetch()
-        new ViewField(
-          new RSRel(
-            for childCellId, childCell of childColumn.cells
-              [childCell.parent, [childCell.value, childCellId]]
-          ),
-          generateViewSection(childColumn))
+      for childColumnId in column.children
+        rel = []
+        allChildCellIds = []
+        for cellId in allCellIds
+          # See if reactive.
+          familyData = FamilyData.findOne(EJSON.stringify({columnId: childColumnId, parentCellId: cellId}))
+          unless familyData?
+            throw new NotReadyError()
+          content = familyData.content
+          if content == null
+            # Hack: child cell ID 'null' will not relate to anything.
+            rel.push([EJSON.stringify(cellId), ['ERROR', null]])
+          else
+            for value in content
+              childCellId = cellIdChild(cellId, value)
+              allChildCellIds.push(childCellId)
+              rel.push([EJSON.stringify(cellId), [value, EJSON.stringify(childCellId)]])
+        new ViewField(new RSRel(rel), generateViewSection(childColumnId, allChildCellIds))
     )
 
-  # TODO: Reading columns directly from the database each time we want them
-  # works for now, but we may want to (1) introduce a model class to hold
-  # generally useful methods and (2) maintain a server-wide cache that can
-  # assign stable IDs to computed cells for use in the server's runtime data
-  # structures without having to write the cells to the database and clean them
-  # up on server shutdown.  If a stable ID is only needed by a particular
-  # client (e.g., to identify a cell selected by the user), and we want it to
-  # survive a server restart but not leak if the client fails to reconnect, then
-  # things become complicated; the client may just have to store the whole path
-  # to the cell in this case.
   rebuildView = () ->
     if viewHOT
       viewHOT.destroy()
-    viewDef = new View([[null, '_unit']],
-                       # Type _unit is not really correct but is OK since
-                       # we don't display the first column.
-                       generateViewSection({_id: '_unit', type: '_unit'}))
+      viewHOT = null
+    try
+      viewDef = new View([[null, EJSON.stringify([])]],
+                         # Type _unit is not really correct but is OK since
+                         # we don't display the first column.
+                         generateViewSection(rootColumnId, [rootCellId]))
+    catch e
+      if e instanceof NotReadyError
+        return  # Let the autorun run again once we have the data.
+      throw e
     viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
-    window.viewHOT = viewHOT  # debug
 
-  $ () ->
+  Meteor.startup () ->
     ###
     viewDefTreeHost = $('#ViewDefTree')
     viewDefTreeHost.jstree({
