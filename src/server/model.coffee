@@ -1,46 +1,8 @@
-@rootColumnId = '_unit'
-
-# Multisets unsupported for now: twindex removed.
-
-@rootCellId = []
-@cellIdParent = (cellId) -> cellId[0..-2]
-@cellIdChild = (cellId, value) -> cellId.concat([value])
-@cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
-
-# Column:
-#@parent: column ID
-#@children: array of column IDs, now in the user's desired order
-#@childByName: EJSONKeyedMap<name, column ID>
-#@name: string or null
-#@type: column ID or primitive; null for formula columns
-#@cellName: string or null
-#@formula: some JSON data structure, or null
-
-# TypedSet:
-#@type: column ID or primitive
-#@elements: array, no duplicates (for now), order is not meaningful
-
 class @EvaluationError
-
-# The client should not need most of this code, but I don't want to fight with
-# the load order right now. ~ Matt
-
-@FAMILY_DATA_COLLECTION = 'familyData'
-@COLUMN_COLLECTION = 'columns'
-FAMILY_IN_PROGRESS = 1  # should not be seen by the client
-@FAMILY_SUCCESS = 2
-@FAMILY_ERROR = 3
 
 class Model
 
   # TODO: Indicate which methods are intended to be public!
-
-  class CacheEntry  # local
-    constructor: () ->
-      @state = FAMILY_IN_PROGRESS
-      # Only needed if we want to revalidate existing results.
-      #@deps = []  # array of QFamilyId
-      @content = null  # TypedSet
 
   #@state: EJSONKeyedMapToSet<QFamilyId, value>
   #@familyCache: EJSONKeyedMap<QFamilyId, CacheEntry>
@@ -250,7 +212,7 @@ class Model
   evaluateFamily: (qFamilyId) ->
     ce = @familyCache.get(qFamilyId)
     unless ce?
-      ce = new CacheEntry()
+      ce = {state: FAMILY_IN_PROGRESS, content: null}
       @familyCache.set(qFamilyId, ce)
       try
         ce.content = @evaluateFamily1(qFamilyId)
@@ -339,37 +301,36 @@ class Model
   removePublisher: (publisher) ->
     @publishers.splice(@publishers.indexOf(publisher), 1)
 
-if Meteor.isServer
-  Meteor.startup () ->
-    @model = new Model()
-    if model.columns.keys().length == 1  # root column :/
-      loadSampleData()
+Meteor.startup () ->
+  @model = new Model()
+  if model.columns.keys().length == 1  # root column :/
+    loadSampleData()
+  model.evaluateAll()
+# Publish everything for now.
+# Future: Reduce amount of add/remove thrashing.
+Meteor.publish(null, () ->
+  @onStop(() -> model.removePublisher(this))
+  model.addPublisher(this)
+)
+Meteor.methods({
+  # The model methods do not automatically evaluate so that we can do bulk
+  # changes from the server side, but for now we always evaluate after each
+  # change from the client.  It would be a little harder for the client itself
+  # to request this via another method (it would require a callback).
+  # Future: validation!
+  defineColumn: (parentId, name, type, cellName, formula) ->
+    model.defineColumn(parentId, name, type, cellName, formula)
     model.evaluateAll()
-  # Publish everything for now.
-  # Future: Reduce amount of add/remove thrashing.
-  Meteor.publish(null, () ->
-    @onStop(() -> model.removePublisher(this))
-    model.addPublisher(this)
-  )
-  Meteor.methods({
-    # The model methods do not automatically evaluate so that we can do bulk
-    # changes from the server side, but for now we always evaluate after each
-    # change from the client.  It would be a little harder for the client itself
-    # to request this via another method (it would require a callback).
-    # Future: validation!
-    defineColumn: (parentId, name, type, cellName, formula) ->
-      model.defineColumn(parentId, name, type, cellName, formula)
-      model.evaluateAll()
-    renameColumn: (columnId, name, cellName) ->
-      model.renameColumn(columnId, name, cellName)
-      model.evaluateAll()
-    changeFormula: (columnId, formula) ->
-      model.changeFormula(columnId, formula)
-      model.evaluateAll()
-    deleteColumn: (columnId) ->
-      model.deleteColumn(columnId)
-      model.evaluateAll()
-    writeState: (qFamilyId, value, present) ->
-      model.writeState(qFamilyId, value, present)
-      model.evaluateAll()
-  })
+  renameColumn: (columnId, name, cellName) ->
+    model.renameColumn(columnId, name, cellName)
+    model.evaluateAll()
+  changeFormula: (columnId, formula) ->
+    model.changeFormula(columnId, formula)
+    model.evaluateAll()
+  deleteColumn: (columnId) ->
+    model.deleteColumn(columnId)
+    model.evaluateAll()
+  writeState: (qFamilyId, value, present) ->
+    model.writeState(qFamilyId, value, present)
+    model.evaluateAll()
+})

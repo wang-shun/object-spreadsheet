@@ -1,6 +1,43 @@
+@rootColumnId = '_unit'
+
+# Multisets unsupported for now: twindex removed.
+
+@rootCellId = []
+@cellIdParent = (cellId) -> cellId[0..-2]
+@cellIdChild = (cellId, value) -> cellId.concat([value])
+@cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
+
+# Model data structures and parameters the client needs to be aware of:
+# (I tried using EJSON custom classes but it was too much of a pain to store in
+# the DB.  If I find a good solution, we could go back to using EJSON custom
+# classes. ~ Matt)
+
+# Column:
+#@parent: column ID
+#@children: array of column IDs, now in the user's desired order
+#@childByName: EJSONKeyedMap<name, column ID>
+#@name: string or null
+#@type: column ID or primitive; null for formula columns
+#@cellName: string or null
+#@formula: some JSON data structure, or null
+
+# CacheEntry:
+#@state: one of FAMILY_{IN_PROGRESS,SUCCESS,ERROR}
+##@deps: array of QFamilyId - Only needed if we want to revalidate existing results.
+#@content: TypedSet if state is SUCCESS, otherwise null
+
+# TypedSet:
+#@type: column ID or primitive
+#@elements: array, no duplicates (for now), order is not meaningful
+
+@FAMILY_DATA_COLLECTION = 'familyData'
+@COLUMN_COLLECTION = 'columns'
+@FAMILY_IN_PROGRESS = 1  # should not be seen by the client
+@FAMILY_SUCCESS = 2
+@FAMILY_ERROR = 3
+
 # We can only define this in one file.
-# TODO: Decide if we want a namespace.
-@Columns = new Mongo.Collection('columns')
+@Columns = new Mongo.Collection(COLUMN_COLLECTION)
 
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...
