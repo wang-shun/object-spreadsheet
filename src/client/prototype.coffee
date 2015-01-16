@@ -1,156 +1,197 @@
-class RSRel extends Array
+# The Error constructor is not usable by subclasses
+# (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
+# version of CoffeeScript is doing), but apparently we can throw any object we
+# like, it just won't have a stack trace.
+class NotReadyError
 
-  # Now the iterable should return [parentCellId, [value, childCellId]].
-  ## "Singular" means the schema requires that for each x,
-  ## there's at most one y such that (x,y) is in the relation.
-  ## "Unique": other way around.  Better terms welcomed.
-  constructor: (iterable
-                #, @leftType, @rightType, @singular, @unique
-  ) ->
-    @push x for x in iterable
+# Grid utilities
 
-  # TODO: Implement something like this again when ready.
-  #xpose: -> new BinRel([y,x] for [x,y] in @,
-  #  @rightType, @leftType, @unique, @singular)
+class ViewCell
+  constructor: (@value, @rowspan, @colspan) ->
+    @qFamilyId = null
+    @qCellId = null
+    @columnIdTop = null
+    @columnIdBelow = null
 
-  lookup: (key) ->
-    r[1] for r in @ when r[0] == key
+# Mutate "orig" by adding "extension" at the bottom.
+# This would be a good place to add some assertions...
+gridVertExtend = (orig, extension) ->
+  orig.push(extension...)
 
+# Mutate "orig" by adding "extension" at the right.
+gridHorizExtend = (orig, extension) ->
+  for i in [0..orig.length-1] by 1
+    orig[i].push(extension[i]...)
 
-class ViewField
-  constructor: (@relation, @subsection) ->
+# Return a grid consisting of one "height x width" merged cell and enough dummy
+# 1x1 cells.  You can mutate the upper-left cell as desired.
+gridMergedCell = (height, width) ->
+  grid =
+    for i in [0..height-1] by 1
+      for j in [0..width-1] by 1
+        new ViewCell('', 1, 1)
+  grid[0][0].rowspan = height
+  grid[0][0].colspan = width
+  grid
 
+class ViewVlist
+  # @hlists == null means error.
+  constructor: (@parentCellId, @minHeight, @hlists) ->
+
+class ViewHlist
+  constructor: (@cellId, @minHeight, @value, @vlists) ->
 
 class ViewSection
 
-  constructor: (firstColumnName, @firstColumnType, @fields) ->
-    # Currently, we always have the original value in the first column.
-    @columnNames = [firstColumnName]
+  constructor: (@columnId) ->
+    @col = Columns.findOne(@columnId)
+    unless @col?
+      throw new NotReadyError()
+    # Future: Set this when we know it.
+    @relationSingular = false
+    # Might be undefined (root cell or no cells), fail gently.
+    @type =
+      if @col.formula? then FormulaColumnType.findOne(@columnId)?.type
+      else @col.type
+    @width = 1
     @leftEdgeSingular = true
     @rightEdgeSingular = true
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
-    for field in @fields
+    @subsections = []
+    @headerHeightBelow = 3  # name, id, type
+    for childColumnId in @col.children
+      subsection = new ViewSection(childColumnId)
+      @subsections.push(subsection)
       nextLeftEdgeSingular =
-        field.relation.singular && field.subsection.leftEdgeSingular
+        subsection.relationSingular && subsection.leftEdgeSingular
       haveSep = (!@rightEdgeSingular && !nextLeftEdgeSingular)
       @haveSeparatorColBefore.push(haveSep)
       if haveSep
-        @columnNames.push('')
-      # TODO: Make the hierarchy clear in the column names?
-      @columnNames.push(field.subsection.columnNames...)
+        @width++
+      @width += subsection.width
+      @headerHeightBelow = Math.max(@headerHeightBelow, 1 + subsection.headerMinHeight)
       @rightEdgeSingular =
-        field.relation.singular && field.subsection.rightEdgeSingular
+        subsection.relationSingular && subsection.rightEdgeSingular
+    @headerMinHeight = 1 + @headerHeightBelow  # cellName
 
-  prerenderVlist: (values) ->
-    hlists = (@prerenderHlist(value) for value in values)
-    minHeight = 0
-    for hlist in hlists
-      minHeight += hlist.minHeight
-    new ViewVlist(minHeight, hlists)
+  prerenderVlist: (parentCellId) ->
+    familyData = FamilyData.findOne(EJSON.stringify({columnId: @columnId, cellId: parentCellId}))
+    unless familyData?
+      throw new NotReadyError()
+    if familyData.state == FAMILY_SUCCESS
+      hlists = (@prerenderHlist(parentCellId, value) for value in familyData.content.elements)
+      minHeight = 0
+      for hlist in hlists
+        minHeight += hlist.minHeight
+      # Don't add any extra rows: it's looking ridiculous.  Once we know which
+      # columns are plural, we can reconsider adding extra rows.
+      new ViewVlist(parentCellId, minHeight, hlists)
+    else
+      new ViewVlist(parentCellId, 1, null)
 
-  prerenderHlist: (value) ->
+  prerenderHlist: (parentCellId, value) ->
+    cellId = if @columnId == rootColumnId then [] else cellIdChild(parentCellId, value)
     minHeight = 1
-    items = []
-    for field in @fields
-      fieldValues = field.relation.lookup(value[1])
-      if field.relation.singular
-        item = field.subsection.prerenderHlist(fieldValues[0])
-        minHeight = Math.max(minHeight, item.minHeight)
-      else
-        item = field.subsection.prerenderVlist(fieldValues)
-        # Disable this behavior until we know which fields are singular again.
-        ## Ensure that a plural field with only one value is followed by at least
-        ## one blank row so the user can tell it is plural.  We currently don't
-        ## provide a visual distinction between empty singular and plural fields.
-        #minHeight = Math.max(minHeight,
-        #                     item.minHeight + (fieldValues.length == 1))
-        minHeight = Math.max(minHeight, item.minHeight)
-      items.push(item)
     # TODO: More type-specific rendering?
     displayValue =
       # For now, we need to see token values in order to interpret IDs.
       # Future: Enable this again when we have a better way of rendering IDs.
-      #if @firstColumnType == '_token' then '*'
-      if @firstColumnType == '_unit' then 'X'
+      #if @type == '_token' then '*'
+      if @type == '_unit' then 'X'
       # Should be OK if the user knows which columns are string-typed.
-      else if typeof value[0] == 'string' then value[0]
+      else if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
-      else EJSON.stringify(value[0])
-    new ViewHlist(minHeight, displayValue, items)
+      else EJSON.stringify(value)
+    vlists =
+      for subsection in @subsections
+        subsection.prerenderVlist(cellId)
+    minHeight = Math.max(1, (vlist.minHeight for vlist in vlists)...)
+    new ViewHlist(cellId, minHeight, displayValue, vlists)
 
   renderVlist: (vlist, height) ->
-    grid = []
-    for hlist in vlist.hlists
-      grid.push(@renderHlist(hlist, hlist.minHeight)...)
-    # Add blank cell at bottom
-    origHeight = grid.length
-    for row in [origHeight..height-1] by 1
-      grid.push(new ViewCell('', 1, 1) for col in [0..@columnNames.length-1] by 1)
-    if origHeight < height
-      grid[origHeight][0].rowspan = height - origHeight
-      grid[origHeight][0].colspan = @columnNames.length
+    qFamilyId = {columnId: @columnId, cellId: vlist.parentCellId}
+    if vlist.hlists?
+      grid = []
+      for hlist in vlist.hlists
+        gridVertExtend(grid, @renderHlist(hlist, hlist.minHeight))
+      # Add blank cell at bottom
+      if grid.length < height
+        bottomGrid = gridMergedCell(height - grid.length, @width)
+        bottomGrid[0][0].qFamilyId = qFamilyId
+        gridVertExtend(grid, bottomGrid)
+    else
+      grid = gridMergedCell(height, @width)
+      grid[0][0].value = 'ERROR'
+      grid[0][0].qFamilyId = qFamilyId
     grid
 
   renderHlist: (hlist, height) ->
     # Value
-    grid = [].concat(
-      [[new ViewCell(hlist.value, height, 1)]],
-      [new ViewCell('', 1, 1)] for row in [1..height-1] by 1
-    )
-    # Fields
-    for field, i in @fields
+    grid = gridMergedCell(height, 1)
+    grid[0][0].value = hlist.value
+    grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
+    # This logic could be in a ViewCell accessor instead, but for now it isn't
+    # duplicated so there's no need.
+    if @columnId != rootColumnId
+      grid[0][0].qFamilyId = {columnId: @columnId, cellId: cellIdParent(hlist.cellId)}
+    # Subsections
+    for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
-        grid[0].push(new ViewCell('', height, 1))
-        for j in [1..height-1] by 1
-          grid[j].push(new ViewCell('', 1, 1))
-      fieldGrid =
-        if field.relation.singular
-        then field.subsection.renderHlist(hlist.items[i], height)
-        else field.subsection.renderVlist(hlist.items[i], height)
-      for j in [0..height-1] by 1
-        grid[j].push(fieldGrid[j]...)
+        gridHorizExtend(grid, gridMergedCell(height, 1))
+      subsectionGrid = subsection.renderVlist(hlist.vlists[i], height)
+      gridHorizExtend(grid, subsectionGrid)
     grid
 
-class ViewCell
-  constructor: (@value, @rowspan, @colspan) ->
-
-class ViewVlist
-  constructor: (@minHeight, @hlists) ->
-
-class ViewHlist
-  # Items contains one item for each field: an hlist for a singular field or a
-  # vlist for a plural field.
-  constructor: (@minHeight, @value, @items) ->
+  renderHeader: (height) ->
+    gridTop = gridMergedCell(height - @headerHeightBelow, @width)
+    gridTop[0][0].value = @col.cellName ? ''
+    gridTop[0][0].columnIdTop = @columnId
+    gridBelow = gridMergedCell(@headerHeightBelow - 2, 1)
+    gridBelow[0][0].value = @col.name ? ''
+    gridBelow[0][0].columnIdBelow = @columnId
+    # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
+    gridVertExtend(gridBelow, [[new ViewCell(@columnId.substr(0, 8), 1, 1)]])
+    gridVertExtend(gridBelow, [[new ViewCell(@type?.substr(0, 8) ? '', 1, 1)]])
+    # Now gridBelow is (@headerMinHeight - 1) x 1.
+    for subsection, i in @subsections
+      if @haveSeparatorColBefore[i]
+        gridHorizExtend(gridBelow, gridMergedCell(@headerHeightBelow, 1))
+      gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow))
+    gridVertExtend(gridTop, gridBelow)
+    gridTop
 
 class View
-  constructor: (@domain, @mainSection) ->
 
-  permuteColumns: (grid, header, colPerm) -> [
-    ((row[i] for i in colPerm) for row in grid)
-    (header[i] for i in colPerm)
-  ]
+  constructor: ->
+    @mainSection = new ViewSection(rootColumnId)
 
   hotConfig: ->
-    vlist = @mainSection.prerenderVlist(@domain)
-    grid = @mainSection.renderVlist(vlist, vlist.minHeight)
-    header = @mainSection.columnNames
-    # TODO allow custom column permutations
-    colPerm = (i for _,i in header)[1..]
-    [grid, header] = @permuteColumns grid, header, colPerm
+    # Display the root column for completeness.  However, it doesn't have a real
+    # parentCellId or value.
+    hlist = @mainSection.prerenderHlist(null, '')
+    grid = @mainSection.renderHeader(@mainSection.headerMinHeight)
+    headerHeight = grid.length
+    gridVertExtend(grid, @mainSection.renderHlist(hlist, hlist.minHeight))
     d = {
       readOnly: true
       data: ((cell.value for cell in row) for row in grid)
-      colHeaders: header
       # Separator columns are 8 pixels wide.  Others use default width.
-      colWidths: (for n in header
-                    if n then undefined else 8)
-      afterGetColHeader: (col, TH) =>
-        if header[col+1] == ''
-          ($ TH) .addClass 'incomparable'
-      columns: (for n in header
-                  if n then {} else {className: 'incomparable'})\
-               [1..] .concat [{}]
+      colWidths: (for cell in grid[headerHeight - 2]  # id row (hack)
+                    if cell.value then undefined else 8)
+      cells: (row, col, prop) ->
+        p = {}
+        if row < headerHeight
+          # Bottom align text, and gray background color.
+          p.className = 'htBottom rsHeader'
+        p
+      # TODO: Make this work again if desired (Matt is not convinced).
+      #!afterGetColHeader: (col, TH) =>
+      #!  if header[col+1] == ''
+      #!    ($ TH) .addClass 'incomparable'
+      #!columns: (for n in header
+      #!            if n then {} else {className: 'incomparable'})\
+      #!         [1..] .concat [{}]
       autoColumnSize: true
       mergeCells: [].concat((
         for row,i in grid
@@ -162,55 +203,17 @@ class View
 
 viewHOT = null
 
-# The Error constructor is not usable by subclasses
-# (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
-# version of CoffeeScript is doing), but apparently we can throw any object we
-# like, it just won't have a stack trace.
-class NotReadyError
-
-# CLEANUP: Change the rendering code to read the published data directly
-# rather than generating RSRels as an intermediate step.
-generateViewSection = (columnId, type, allCellIds) ->
-  column = Columns.findOne(columnId)  # published data
-  unless column?
-    throw new NotReadyError()
-  new ViewSection(
-    column.name ? column.cellName ? '',
-    type,
-    for childColumnId in column.children
-      rel = []
-      allChildCellIds = []
-      childType = null
-      for cellId in allCellIds
-        # See if reactive.
-        familyData = FamilyData.findOne(EJSON.stringify({columnId: childColumnId, cellId: cellId}))
-        unless familyData?
-          throw new NotReadyError()
-        if familyData.state == FAMILY_SUCCESS
-          # XXX: Model should assert that all families evaluate to the same type.
-          childType ?= familyData.content.type
-          for value in familyData.content.elements
-            childCellId = cellIdChild(cellId, value)
-            allChildCellIds.push(childCellId)
-            rel.push([EJSON.stringify(cellId), [value, EJSON.stringify(childCellId)]])
-        else
-          # Hack: child cell ID 'null' will not relate to anything.
-          rel.push([EJSON.stringify(cellId), ['ERROR', null]])
-      new ViewField(new RSRel(rel), generateViewSection(childColumnId, childType, allChildCellIds))
-  )
-
 rebuildView = () ->
   if viewHOT
     viewHOT.destroy()
     viewHOT = null
   try
-    viewDef = new View([[null, EJSON.stringify([])]],
-                       generateViewSection(rootColumnId, null, [rootCellId]))
+    hotConfig = new View().hotConfig()
   catch e
     if e instanceof NotReadyError
       return  # Let the autorun run again once we have the data.
     throw e
-  viewHOT = new Handsontable($('#View')[0], viewDef.hotConfig())
+  viewHOT = new Handsontable($('#View')[0], hotConfig)
 
 Meteor.startup () ->
   # Load order...

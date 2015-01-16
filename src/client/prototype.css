@@ -1,3 +1,7 @@
 .incomparable {
    border-right: none !important;
 }
+
+.handsontable td.rsHeader {
+  background-color: #EEE;
+}
