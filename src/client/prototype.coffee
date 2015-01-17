@@ -159,7 +159,7 @@ class ViewSection
     idCell.fullText = @columnId
     typeCell = new ViewCell(
       (@type?.substr(0, 4) ? '') + (if @col.formula? then '=' else ''))
-    typeCell.fullText = @type ? '' + (if @col.formula? then ' (formula)' else '')
+    typeCell.fullText = (@type ? '') + (if @col.formula? then ' (formula)' else '')
     gridVertExtend(gridBelow, [[idCell]])
     gridVertExtend(gridBelow, [[typeCell]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
