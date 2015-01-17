@@ -137,6 +137,8 @@ class Model
 
   changeColumnName: (columnId, name) ->
     col = @columns.get(columnId)
+    if name == col.name
+      return
     parentId = col.parent
     parentCol = @columns.get(parentId)
     if name? && parentCol.childByName.get(name)?
@@ -153,6 +155,8 @@ class Model
 
   changeColumnCellName: (columnId, cellName) ->
     col = @columns.get(columnId)
+    if cellName == col.cellName
+      return
     parentId = col.parent
     parentCol = @columns.get(parentId)
     if cellName? && parentCol.childByName.get(cellName)?
