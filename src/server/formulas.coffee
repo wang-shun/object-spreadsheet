@@ -1,3 +1,23 @@
+# A smidgen of user documentation:
+#
+# The current representation of formulas follows the style of Lisp in the format
+# of JSON.  A formula is an array in which the first element is a string giving
+# the name of a supported operation.  The formats and meanings of any remaining
+# elements depend on the operation; they may include subformulas.  Each
+# operation is briefly documented in "dispatch" below.
+#
+# A (sub)formula is evaluated with respect to a mapping of variable names
+# (strings) to values.  At this time, the value of a variable or a subformula
+# (assuming no runtime evaluation error occurs) is always a finite "typed set",
+# though some operations deal exclusively with singleton sets.  The formula of
+# a formula column is evaluated once for each cell in the parent column, with
+# "this" bound to that parent cell, and the returned set gives the values of
+# cells to generate in a "family" in the formula column.  Some operations may
+# evaluate subformulas with additional variable bindings.
+#
+# Primitive types known to the system so far: _unit ('X') and _bool
+# (false, true).
+
 valAssert = (cond, message) ->
   throw new FormulaValidationError(message) unless cond
 evalAssert = (cond, message) ->
@@ -101,7 +121,7 @@ doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantVa
 
   # Processing related to values in the target column.
   # This duplicates some of the work of the previous loop.
-  # Future: To support navigateFilterValues to an infinite column, we'll need to
+  # Future: To support cellsWithValues to an infinite column, we'll need to
   # skip the last iteration of the previous loop and directly construct the
   # requested child cell IDs of each cell of the parent column rather than
   # reading the (infinite) family.
@@ -132,6 +152,8 @@ doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantVa
 
 dispatch = {
 
+  # ["lit", type ID (string), elements (array)]:
+  # A literal set of elements of the specified type.
   lit:
     argAdapters: [Type, {}]
     validate: (vars, type, list) ->
@@ -141,6 +163,8 @@ dispatch = {
       # XXXXXXX: Validate members of the type.
       new TypedSet(type, new EJSONKeyedSet(list))
 
+  # ["var", varName (string)]:
+  # Gets the value of a bound variable.
   var:
     argAdapters: [VarName]
     validate: (vars, varName) ->
@@ -149,27 +173,42 @@ dispatch = {
     evaluate: (model, vars, varName) ->
       vars.get(varName)
 
+  # ["cells", startCells (subformula), targetColumnId]:
+  # startCells must return a set of cells in in a "starting" column, and
+  # targetColumnId is the ID of a "target" column.  Let the "ancestor" column
+  # be the common ancestor of the starting and target columns.  Projects the
+  # starting cells up to ancestor cells in the ancestor column, and returns all
+  # descendants of these cells in the target column.
   cells:
     argAdapters: [EagerSubformulaCells, ColumnId]
-    evaluate: (model, vars, startCellsTset, targetCol) ->
-      doNavigate(model, vars, startCellsTset, targetCol, null, false)
+    evaluate: (model, vars, startCellsTset, targetColId) ->
+      doNavigate(model, vars, startCellsTset, targetColId, null, false)
 
+  # ["values", startCells, targetColumnId]:
+  # Like "cells" but returns the values of the cells instead of their IDs.
   values:
     argAdapters: [EagerSubformulaCells, ColumnId]
-    validate: (vars, startCellsFmla, targetCol, filterValuesFmla) ->
-      valAssert(targetCol != rootColumnId,
-                'Cannot navigateValues to the root column because it has no values.')
-    evaluate: (model, vars, startCellsTset, targetCol) ->
-      doNavigate(model, vars, startCellsTset, targetCol, null, true)
+    validate: (vars, startCellsFmla, targetColId, filterValuesFmla) ->
+      valAssert(targetColId != rootColumnId,
+                'Cannot use values on the root column because it has no values.')
+    evaluate: (model, vars, startCellsTset, targetColId) ->
+      doNavigate(model, vars, startCellsTset, targetColId, null, true)
 
+  # ["values", startCells, targetColumnId, filterValues (subformula)]:
+  # Like "cells" but only returns cells whose values are members of the set
+  # returned by filterValues.
   cellsWithValues:
     argAdapters: [EagerSubformulaCells, ColumnId, EagerSubformula]
-    validate: (vars, startCellsFmla, targetCol, filterValuesFmla) ->
-      valAssert(targetCol != rootColumnId,
-                'Cannot navigateFilterValues to the root column because it has no values.')
-    evaluate: (model, vars, startCellsTset, targetCol, filterValuesTset) ->
-      doNavigate(model, vars, startCellsTset, targetCol, filterValuesTset, false)
+    validate: (vars, startCellsFmla, targetColId, filterValuesFmla) ->
+      valAssert(targetColId != rootColumnId,
+                'Cannot use cellsWithValues on the root column because it has no values.')
+    evaluate: (model, vars, startCellsTset, targetColId, filterValuesTset) ->
+      doNavigate(model, vars, startCellsTset, targetColId, filterValuesTset, false)
 
+  # ["filter", domain (subformula), [varName, predicate (subformula)]]:
+  # For each cell in the domain, evaluates the predicate with varName bound to
+  # the domain cell, which must return a singleton boolean.  Returns the set of
+  # domain cells for which the predicate returned true.
   filter:
     argAdapters: [EagerSubformula, Lambda]
     evaluate: (model, vars, domainTset, predicateLambda) ->
@@ -182,6 +221,9 @@ dispatch = {
             evalAsSingleton(evalAsType(predicateLambda(tset), '_bool'))
           )))
 
+  # ["=", lhs (subformula), rhs (subformula)]
+  # Compares two _singleton_ sets (currently) of the same type for equality.
+  # Returns a singleton boolean.
   '=':
     argAdapters: [EagerSubformula, EagerSubformula]
     evaluate: (model, vars, lhs, rhs) ->

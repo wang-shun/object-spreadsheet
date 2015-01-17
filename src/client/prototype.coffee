@@ -234,7 +234,7 @@ Template.newColumn.events({
         type = null
         # Default formula to get the new column created ASAP.
         # Then the user can edit it as desired.
-        formula = ['literalSet', '_unit', []]
+        formula = ['lit', '_unit', []]
       else
         throw new Error()  # should not happen
     Meteor.call('defineColumn',
