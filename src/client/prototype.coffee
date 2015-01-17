@@ -292,7 +292,7 @@ Template.changeFormula.events({
       return
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
-    template.find('input[name=formula]').value = JSON.stringify(formulaStr)
+    template.find('input[name=formula]').value = JSON.stringify(formula)
     Meteor.call('changeColumnFormula',
                 @columnId,
                 formula,
