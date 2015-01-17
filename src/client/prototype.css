@@ -24,3 +24,7 @@
 .rsDialog {
   border: 3px outset;
 }
+
+.formulaModified {
+  background-color: #FF0;
+}

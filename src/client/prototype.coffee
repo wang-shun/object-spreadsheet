@@ -51,7 +51,7 @@ class ViewHlist
 class ViewSection
 
   constructor: (@columnId) ->
-    @col = Columns.findOne(@columnId)
+    @col = getColumn(@columnId)
     unless @col?
       throw new NotReadyError()
     # Future: Set this when we know it.
@@ -167,6 +167,7 @@ class ViewSection
     gridVertExtend(gridTop, gridBelow)
     gridTop
 
+view = null
 # XXX: OK to reference this variable from View?
 viewHOT = null
 
@@ -174,11 +175,34 @@ viewHOT = null
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
 
-newColumnArgs = new ReactiveVar(null, EJSON.equals)
-newColumnKind = new ReactiveVar(null)
+onSelection = () ->
+  selectedCell = view.getSingleSelectedCell()
+  if selectedCell?
+    # Cancel this form if the user clicks something else.
+    # XXX: Better UI flow?
+    newColumnArgs.set([])
+  # Hacks to get the #each to clear the forms when the cell changes.
+  addStateCellArgs.set(
+    if (qf = selectedCell?.qFamilyId)? && columnIsState(getColumn(qf.columnId))
+      [{_id: EJSON.stringify(qf), qFamilyId: qf}]
+    else
+      []
+  )
+  changeFormulaArgs.set(
+    if (ci = selectedCell?.columnIdBelow)? && getColumn(ci).formula?
+      [{_id: ci, columnId: ci}]
+    else
+      []
+  )
+
 Template.body.helpers({
-  inNewColumn: () -> newColumnArgs.get()?
+  newColumnArgs: () -> newColumnArgs.get()
+  addStateCellArgs: () -> addStateCellArgs.get()
+  changeFormulaArgs: () -> changeFormulaArgs.get()
 })
+
+newColumnArgs = new ReactiveVar([], EJSON.equals)
+newColumnKind = new ReactiveVar(null)
 Template.newColumn.helpers({
   # This is ridiculous: spacebars won't let us compare two strings?
   newColumnIsState: () -> newColumnKind.get() == 'state'
@@ -203,16 +227,66 @@ Template.newColumn.events({
       else
         throw new Error()  # should not happen
     Meteor.call('defineColumn',
-                newColumnArgs.get().parentId,
-                newColumnArgs.get().index,
+                @parentId,
+                @index,
                 null,  # name
                 type,
                 null,  # cellName
                 formula,
                 standardServerCallback)
-    newColumnArgs.set(null)
+    newColumnArgs.set([])
   'click .cancel': (event, template) ->
-    newColumnArgs.set(null)
+    newColumnArgs.set([])
+})
+
+addStateCellArgs = new ReactiveVar([], EJSON.equals)
+Template.addStateCell.events({
+  'click .submit': (event, template) ->
+    valueStr = template.find('input[name=value]').value
+    try
+      value = EJSON.parse(valueStr)
+    catch e
+      alert('Invalid JSON.')
+      return
+    Meteor.call('writeState',
+                @qFamilyId,
+                value,
+                true,
+                standardServerCallback)
+    # XXX: Clear the field on successful submission (only)
+})
+
+changeFormulaArgs = new ReactiveVar([], EJSON.equals)
+Template.changeFormula.rendered = () ->
+  orig = EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+  newFormulaStr.set(orig)
+  @find('input[name=formula]').value =
+    EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+newFormulaStr = new ReactiveVar(null)
+Template.changeFormula.helpers({
+  formulaClass: ->
+    orig = EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+    entered = newFormulaStr.get()
+    if orig != entered then 'formulaModified' else ''
+})
+Template.changeFormula.events({
+  'input .formula': (event, template) ->
+    newFormulaStr.set(template.find('input[name=formula]').value)
+  'click .submit': (event, template) ->
+    formulaStr = template.find('input[name=formula]').value
+    try
+      formula = EJSON.parse(formulaStr)
+    catch e
+      alert('Invalid JSON.')
+      return
+    Meteor.call('changeColumnFormula',
+                @columnId,
+                formula,
+                standardServerCallback)
+  'click .cancel': (event, template) ->
+    orig = EJSON.stringify(getColumn(@columnId).formula)
+    newFormulaStr.set(orig)
+    template.find('input[name=formula]').value = orig
 })
 
 class View
@@ -276,9 +350,10 @@ class View
 
       # Try to put the selection somewhere reasonable after the table is reloaded.
       afterDeselect: () ->
-        selectedCell = null
+        onSelection()
+
       afterSelectionEnd: (r1, c1, r2, c2) ->
-        selectedCell = thisView.getSingleSelectedCell()
+        onSelection()
 
       beforeChange: (changes, source) ->
         for [row, col, oldVal, newVal] in changes
@@ -312,11 +387,12 @@ class View
             callback: () ->
               c = thisView.getSingleSelectedCell()
               ci = c.columnIdTop
-              col = Columns.findOne(ci)
+              col = getColumn(ci)
               parentId = col.parent
-              parentCol = Columns.findOne(parentId)
+              parentCol = getColumn(parentId)
               index = parentCol.children.indexOf(ci)
-              newColumnArgs.set({parentId: parentId, index: index})
+              viewHOT.deselectCell()
+              newColumnArgs.set([{parentId: parentId, index: index}])
           }
           addColumnRight: {
             name: 'Insert column on the right'
@@ -327,15 +403,16 @@ class View
               c = thisView.getSingleSelectedCell()
               if (ci = c.columnIdTop)?
                 # Like addColumnLeft except + 1
-                col = Columns.findOne(ci)
+                col = getColumn(ci)
                 parentId = col.parent
-                parentCol = Columns.findOne(parentId)
+                parentCol = getColumn(parentId)
                 index = parentCol.children.indexOf(ci) + 1
               else
                 # Child of the selected column
                 parentId = c.columnIdBelow
                 index = 0
-              newColumnArgs.set({parentId: parentId, index: index})
+              viewHOT.deselectCell()
+              newColumnArgs.set([{parentId: parentId, index: index}])
           }
           deleteColumn: {
             name: 'Delete column'
@@ -344,30 +421,22 @@ class View
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
               !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId &&
-                (col = Columns.findOne(ci)).children.length == 0 &&
+                (col = getColumn(ci)).children.length == 0 &&
                 !(columnIsState(col) && col.numStateCells > 0))
             callback: () ->
               c = thisView.getSingleSelectedCell()
+              # Otherwise changeFormula form gets hosed.
+              viewHOT.deselectCell()
               Meteor.call('deleteColumn',
                           c.columnIdTop ? c.columnIdBelow,
                           standardServerCallback)
           }
           sep1: '----------'
-          addStateCell: {
-            name: 'Add cell to this set'
-            disabled: () ->
-              !((c = thisView.getSingleSelectedCell())? &&
-                c.qFamilyId? && columnIsState(Columns.findOne(c.qFamilyId.columnId)))
-            callback: () ->
-              c = thisView.getSingleSelectedCell()
-              alert('Unimplemented')
-              #Meteor.call('writeState', c.qFamilyId, TODO, false)
-          }
           deleteStateCell: {
             name: 'Delete cell'
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
-                c.qCellId? && columnIsState(Columns.findOne(c.qCellId.columnId)))
+                c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
             callback: () ->
               c = thisView.getSingleSelectedCell()
               # For now, if there are descendants, an error will be logged in the developer console.
@@ -411,6 +480,7 @@ rebuildView = () ->
   if viewHOT
     viewHOT.destroy()
     viewHOT = null
+    view = null
   try
     view = new View()
     hotConfig = view.hotConfig()

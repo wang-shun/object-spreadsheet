@@ -212,6 +212,7 @@ class Model
     mongoUpdateThing['cells.' + EJSONtoMongoFieldName(cellId)] = true
     if present
       if !@state.has(qFamilyId, value)
+        # XXXXXXXX: Validate data type!
         @invalidateCache()
         @state.add(qFamilyId, value)
         Columns.update(qFamilyId.columnId, {$set: mongoUpdateThing})
@@ -398,7 +399,7 @@ Meteor.methods({
     model.changeColumnCellName(columnId, cellName)
     model.evaluateAll()
   changeColumnFormula: (columnId, formula) ->
-    model.changeFormula(columnId, formula)
+    model.changeColumnFormula(columnId, formula)
     model.evaluateAll()
   deleteColumn: (columnId) ->
     model.deleteColumn(columnId)
