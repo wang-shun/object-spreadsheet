@@ -1,3 +1,8 @@
+# Future: Make this better.
+standardServerCallback = (error, result) ->
+  if error?
+    alert('The operation failed on the server: ' + error.message)
+
 # The Error constructor is not usable by subclasses
 # (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
 # version of CoffeeScript is doing), but apparently we can throw any object we
@@ -164,12 +169,17 @@ class ViewSection
 # XXX: OK to reference this variable from View?
 viewHOT = null
 
+# This may hold a reference to a ViewCell object from an old View.  Weird but
+# shouldn't cause any problem and not worth doing differently.
+selectedCell = null
+
 class View
 
   constructor: ->
     @mainSection = new ViewSection(rootColumnId)
 
   hotConfig: ->
+    thisView = this
     # Display the root column for completeness.  However, it doesn't have a real
     # parentCellId or value.
     hlist = @mainSection.prerenderHlist(null, '')
@@ -189,20 +199,7 @@ class View
       grid.length - headerHeight, 1, 'data', ['rsCaption']))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
-
-    getSingleSelectedCell = () ->
-      s = viewHOT.getSelected()
-      unless s?
-        # Unsure under what circumstances this can happen.  Whatever.
-        return null
-      [r1, c1, r2, c2] = s
-      [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)]
-      [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)]
-      cell = grid[r1][c1]
-      if r2 == r1 + cell.rowspan - 1 && c2 == c1 + cell.colspan - 1
-        return cell
-      else
-        return null
+    @grid = grid
 
     d = {
       readOnly: true
@@ -225,65 +222,133 @@ class View
           for cell,j in row when cell.rowspan != 1 || cell.colspan != 1
             {row: i, col: j, rowspan: cell.rowspan, colspan: cell.colspan}
         )...)
+
+      # Seems more helpful to the user (e.g., when scrolling the browser window).
+      # See if we have trouble with the user needing to "escape" from the table.
+      outsideClickDeselects: false
+
+      # Try to put the selection somewhere reasonable after the table is reloaded.
+      afterDeselect: () ->
+        selectedCell = null
+      afterSelectionEnd: (r1, c1, r2, c2) ->
+        selectedCell = thisView.getSingleSelectedCell()
+
       contextMenu: {
         # TODO: Implement commands.
         items: {
+          # Future: Would be nice to move selection appropriately on column
+          # insert/delete, but this is a less common case.
+
           # addColumnLeft is redundant but nice for users.
           addColumnLeft: {
             name: 'Insert column on the left'
             disabled: () ->
-              !((c = getSingleSelectedCell())? &&
+              !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop)? && ci != rootColumnId)
             callback: () -> alert('Unimplemented')
           }
           addColumnRight: {
             name: 'Insert column on the right'
             disabled: () ->
-              !((c = getSingleSelectedCell())? &&
+              !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId)
             callback: () -> alert('Unimplemented')
           }
           deleteColumn: {
             name: 'Delete column'
             disabled: () ->
+              # Future: Support recursive delete.
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
-              !((c = getSingleSelectedCell())? &&
+              !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId &&
                 (col = Columns.findOne(ci)).children.length == 0 &&
                 !(columnIsState(col) && col.numStateCells > 0))
-            callback: () -> alert('Unimplemented')
+            callback: () ->
+              c = thisView.getSingleSelectedCell()
+              Meteor.call('deleteColumn',
+                          c.columnIdTop ? c.columnIdBelow,
+                          standardServerCallback)
           }
           sep1: '----------'
           addStateCell: {
             name: 'Add cell to this set'
             disabled: () ->
-              !((c = getSingleSelectedCell())? &&
+              !((c = thisView.getSingleSelectedCell())? &&
                 c.qFamilyId? && columnIsState(Columns.findOne(c.qFamilyId.columnId)))
-            callback: () -> alert('Unimplemented')
+            callback: () ->
+              c = thisView.getSingleSelectedCell()
+              alert('Unimplemented')
+              #Meteor.call('writeState', c.qFamilyId, TODO, false)
           }
           deleteStateCell: {
             name: 'Delete cell'
             disabled: () ->
-              !((c = getSingleSelectedCell())? &&
+              !((c = thisView.getSingleSelectedCell())? &&
                 c.qCellId? && columnIsState(Columns.findOne(c.qCellId.columnId)))
-            callback: () -> alert('Unimplemented')
+            callback: () ->
+              c = thisView.getSingleSelectedCell()
+              # For now, if there are descendants, an error will be logged in the developer console.
+              Meteor.call('writeState',
+                          {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)},
+                          cellIdLastStep(c.qCellId.cellId), false,
+                          standardServerCallback)
           }
         }
       }
     }
     d
 
+  getSingleSelectedCell: =>
+    s = viewHOT.getSelected()
+    unless s?
+      # Unsure under what circumstances this can happen.  Whatever.
+      return null
+    [r1, c1, r2, c2] = s
+    [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)]
+    [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)]
+    cell = @grid[r1][c1]
+    if r2 == r1 + cell.rowspan - 1 && c2 == c1 + cell.colspan - 1
+      return cell
+    else
+      return null
+
+  selectSingleCell: (r1, c1) ->
+    cell = @grid[r1][c1]
+    viewHOT.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
+
+  selectMatchingCell: (predicate) ->
+    for i in [0..@grid.length-1] by 1
+      for j in [0..@mainSection.width-1] by 1
+        if predicate(@grid[i][j])
+          @selectSingleCell(i, j)
+          return true
+    return false
+
 rebuildView = () ->
   if viewHOT
     viewHOT.destroy()
     viewHOT = null
   try
-    hotConfig = new View().hotConfig()
+    view = new View()
+    hotConfig = view.hotConfig()
   catch e
     if e instanceof NotReadyError
       return  # Let the autorun run again once we have the data.
     throw e
   viewHOT = new Handsontable($('#View')[0], hotConfig)
+  # Try to select a cell similar to the one previously selected.
+  if selectedCell?
+    ((selectedCell.qCellId? &&
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId))) ||
+     (selectedCell.qFamilyId? &&
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
+     (selectedCell.qFamilyId? &&
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId.columnId, c.columnIdBelow))) ||
+     (selectedCell.columnIdTop? &&
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.columnIdTop, c.columnIdTop))) ||
+     (selectedCell.columnIdBelow? &&
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.columnIdBelow, c.columnIdBelow))) ||
+     false)
 
 Meteor.startup () ->
   # Load order...

@@ -195,11 +195,11 @@ class Model
   writeState: (qFamilyId, value, present) ->
     # Future: Validate everything.
     cellId = cellIdChild(qFamilyId.cellId, value)
-    @invalidateCache()
     mongoUpdateThing = {}
     mongoUpdateThing['cells.' + EJSONtoMongoFieldName(cellId)] = true
     if present
       if !@state.has(qFamilyId, value)
+        @invalidateCache()
         @state.add(qFamilyId, value)
         Columns.update(qFamilyId.columnId, {$set: mongoUpdateThing})
         @columns.get(qFamilyId.columnId).numStateCells++
@@ -208,9 +208,20 @@ class Model
           @publishColumn(qFamilyId.columnId, publisher)
     else
       if @state.has(qFamilyId, value)
+        cellId = cellIdChild(qFamilyId.cellId, value)
+        col = @columns.get(qFamilyId.columnId)
+
+        # Check we are not orphaning descendant state cells.
+        for childColumnId in col.children
+          childCol = @columns.get(childColumnId)
+          if @state.elementsFor({columnId: childColumnId, cellId: cellId}).length > 0
+            throw new Meteor.Error('delete-state-cell-has-descendants',
+                                   'Please delete descendant state cells first.')
+
+        @invalidateCache()
         @state.delete(qFamilyId, value)
         Columns.update(qFamilyId.columnId, {$unset: mongoUpdateThing})
-        @columns.get(qFamilyId.columnId).numStateCells--
+        col.numStateCells--
         for publisher in @publishers
           @unpublishColumn(qFamilyId.columnId, publisher)
           @publishColumn(qFamilyId.columnId, publisher)
