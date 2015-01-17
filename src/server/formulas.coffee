@@ -4,8 +4,9 @@ evalAssert = (cond, message) ->
   throw new EvaluationError(message) unless cond
 
 evalAsSingleton = (set) ->
-  evalAssert(set.length == 1, 'Expected a singleton')
-  set[0]
+  elements = set.elements()
+  evalAssert(elements.length == 1, 'Expected a singleton')
+  elements[0]
 evalAsType = (tset, type) ->
   evalAssert(mergeTypes(tset.type, type) != TYPE_MIXED,
              'Expected a set of type ' + type)
@@ -36,6 +37,26 @@ LazySubformula = {
   validate: (vars, arg) ->
     validateSubformula(vars, arg)
 }
+# It might be nicer on the users to not require the extra 2-element array in the
+# input, but for now this goes with our framework.
+Lambda = {
+  validate: (vars, arg) ->
+    valAssert(_.isArray(arg) && arg.length == 2,
+              'Lambda subformula must be a two-element array')
+    [varName, body] = arg
+    # Try to save users from themselves.
+    valAssert(!vars.has(varName),
+              'Lambda shadows variable ' + varName)
+    newVars = vars.shallowClone()
+    newVars.add(varName)
+    validateSubformula(newVars, body)
+  adapt: (model, vars, [varName, body]) ->
+    # he he he!
+    (arg) ->
+      newVars = vars.shallowClone()
+      newVars.set(varName, arg)
+      evaluateFormula(model, newVars, body)
+}
 ColumnId = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Column ID must be a string')
@@ -56,8 +77,10 @@ Type = {
 
 # filterValuesTset may be null.
 doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantValues) ->
-  #if EJSON.equals(vars.get('this').set.elements()[0], ["0","Daniel Jackson"])
-    #debugger
+  unless startCellsTset.type?
+    # We can't navigate, but we know the result should be empty.
+    return if wantValues then new TypedSet() else new TypedSet(targetColId)
+
   [upPath, downPath] = model.findCommonAncestorPaths(startCellsTset.type, targetColId)
 
   # Go up.
@@ -83,6 +106,8 @@ doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantVa
   # requested child cell IDs of each cell of the parent column rather than
   # reading the (infinite) family.
   if filterValuesTset? || wantValues
+    # We'll use one of the two.
+    newCellIds = new EJSONKeyedSet()
     valuesTset = new TypedSet()
     for cellId in tmpCellIds.elements()
       value = cellIdLastStep(cellId)
@@ -107,7 +132,7 @@ doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantVa
 
 dispatch = {
 
-  literalSet:
+  lit:
     argAdapters: [Type, {}]
     validate: (vars, type, list) ->
       valAssert(_.isArray(list), 'Set literal must be an array')
@@ -124,12 +149,12 @@ dispatch = {
     evaluate: (model, vars, varName) ->
       vars.get(varName)
 
-  navigate:
+  cells:
     argAdapters: [EagerSubformulaCells, ColumnId]
     evaluate: (model, vars, startCellsTset, targetCol) ->
       doNavigate(model, vars, startCellsTset, targetCol, null, false)
 
-  navigateValues:
+  values:
     argAdapters: [EagerSubformulaCells, ColumnId]
     validate: (vars, startCellsFmla, targetCol, filterValuesFmla) ->
       valAssert(targetCol != rootColumnId,
@@ -137,7 +162,7 @@ dispatch = {
     evaluate: (model, vars, startCellsTset, targetCol) ->
       doNavigate(model, vars, startCellsTset, targetCol, null, true)
 
-  navigateFilterValues:
+  cellsWithValues:
     argAdapters: [EagerSubformulaCells, ColumnId, EagerSubformula]
     validate: (vars, startCellsFmla, targetCol, filterValuesFmla) ->
       valAssert(targetCol != rootColumnId,
@@ -145,6 +170,24 @@ dispatch = {
     evaluate: (model, vars, startCellsTset, targetCol, filterValuesTset) ->
       doNavigate(model, vars, startCellsTset, targetCol, filterValuesTset, false)
 
+  filter:
+    argAdapters: [EagerSubformula, Lambda]
+    evaluate: (model, vars, domainTset, predicateLambda) ->
+      new TypedSet(
+        domainTset.type,
+        new EJSONKeyedSet(
+          _.filter(domainTset.set.elements(), (x) ->
+            # Future: Figure out where to put this code once we start duplicating it.
+            tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
+            evalAsSingleton(evalAsType(predicateLambda(tset), '_bool'))
+          )))
+
+  '=':
+    argAdapters: [EagerSubformula, EagerSubformula]
+    evaluate: (model, vars, lhs, rhs) ->
+      evalAssert(mergeTypes(lhs.type, rhs.type) != TYPE_MIXED,
+                 'Mismatched types to = operator')
+      new TypedSet('_bool', new EJSONKeyedSet([EJSON.equals(lhs.set, rhs.set)]))
 }
 
 # Catches syntax errors, references to nonexistent bound variables, and

@@ -453,7 +453,6 @@ class View
                 c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
             callback: () ->
               c = thisView.getSingleSelectedCell()
-              # For now, if there are descendants, an error will be logged in the developer console.
               Meteor.call('writeState',
                           {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)},
                           cellIdLastStep(c.qCellId.cellId), false,

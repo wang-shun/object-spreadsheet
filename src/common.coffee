@@ -95,6 +95,7 @@ class @EJSONKeyedSet
   add: (x) -> @map.set(x, true)
   delete: (x) -> @map.delete(x)
   elements: -> @map.keys()
+  shallowClone: -> new EJSONKeyedSet(@elements())
   typeName: 'EJSONKeyedSet'
   toJSONValue: -> @map.toJSONValue()
   @fromJSONValue: (json) ->

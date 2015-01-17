@@ -250,7 +250,12 @@
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)
 
-  # Add a formula column for testing purposes.
+  # Add some formula columns.
   # XXX parseTypeStr is not really meant to be used for this.
-  personNameColumnId = parseTypeStr('Person.name')
-  model.defineColumn(personNameColumnId, 0, 'nameThis', null, null, ['var', 'this'])
+  slotColumnId = parseTypeStr('Person.Teacher.Slot')
+  meetingColumnId = parseTypeStr('Meeting')
+  meetingSlotColumnId = parseTypeStr('Meeting.slot')
+  model.defineColumn(slotColumnId, 1, 'meeting1', null, null,
+                     ["cells",["cellsWithValues",["lit","_root",[[]]],meetingSlotColumnId,["var","this"]],meetingColumnId])
+  model.defineColumn(slotColumnId, 2, 'meeting2', null, null,
+                     ["filter",["cells",["lit","_root",[[]]],meetingColumnId],["m",["=",["values",["var","m"],meetingSlotColumnId],["var","this"]]]])
