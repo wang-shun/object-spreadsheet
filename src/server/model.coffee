@@ -181,6 +181,7 @@ class Model
       throw new Error('Please delete all state cells first.')
     parentId = col.parent
     parentCol = @columns.get(parentId)
+    @invalidateCache()
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     @unregisterColumnWithParent(col)

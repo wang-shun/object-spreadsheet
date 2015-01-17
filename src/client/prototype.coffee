@@ -155,7 +155,8 @@ class ViewSection
     gridBelow[0][0].columnIdBelow = @columnId
     # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
     gridVertExtend(gridBelow, [[new ViewCell(@columnId.substr(0, 4))]])
-    gridVertExtend(gridBelow, [[new ViewCell(@type?.substr(0, 4) ? '')]])
+    gridVertExtend(gridBelow, [[new ViewCell(
+      (@type?.substr(0, 4) ? '') + (if @col.formula? then '=' else ''))]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]

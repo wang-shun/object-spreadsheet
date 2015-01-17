@@ -244,3 +244,8 @@
         model.writeState({columnId: childColumnId, cellId: cellId}, value, true)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)
+
+  # Add a formula column for testing purposes.
+  # XXX parseTypeStr is not really meant to be used for this.
+  personNameColumnId = model.parseTypeStr('Person.name')
+  model.defineColumn(personNameColumnId, 'nameThis', null, null, ['var', 'this'])
