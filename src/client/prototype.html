@@ -8,6 +8,9 @@
 <body>
   {{! Hack to reduce the jerking for addStateCell/changeFormula. }}
   <div style="min-height: 2em;">
+    {{#if fullTextToShow}}
+      <div>Full text: {{fullTextToShow}}</div>
+    {{/if}}
     {{#each newColumnArgs}}
       {{> newColumn}}
     {{/each}}

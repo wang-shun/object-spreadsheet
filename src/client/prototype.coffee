@@ -17,6 +17,7 @@ class ViewCell
     @qCellId = null
     @columnIdTop = null
     @columnIdBelow = null
+    @fullText = null
 
 # Mutate "orig" by adding "extension" at the bottom.
 # This would be a good place to add some assertions...
@@ -154,9 +155,13 @@ class ViewSection
     gridBelow = gridMergedCell(@headerHeightBelow - 2, 1, @col.name ? '', ['rsHeaderBelow'])
     gridBelow[0][0].columnIdBelow = @columnId
     # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
-    gridVertExtend(gridBelow, [[new ViewCell(@columnId.substr(0, 4))]])
-    gridVertExtend(gridBelow, [[new ViewCell(
-      (@type?.substr(0, 4) ? '') + (if @col.formula? then '=' else ''))]])
+    idCell = new ViewCell(@columnId.substr(0, 4))
+    idCell.fullText = @columnId
+    typeCell = new ViewCell(
+      (@type?.substr(0, 4) ? '') + (if @col.formula? then '=' else ''))
+    typeCell.fullText = @type ? '' + (if @col.formula? then ' (formula)' else '')
+    gridVertExtend(gridBelow, [[idCell]])
+    gridVertExtend(gridBelow, [[typeCell]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
@@ -181,7 +186,8 @@ onSelection = () ->
     # Cancel this form if the user clicks something else.
     # XXX: Better UI flow?
     newColumnArgs.set([])
-  # Hacks to get the #each to clear the forms when the cell changes.
+  fullTextToShow.set(selectedCell?.fullText)
+  # _id: Hacks to get the #each to clear the forms when the cell changes.
   addStateCellArgs.set(
     if (qf = selectedCell?.qFamilyId)? && columnIsState(getColumn(qf.columnId))
       [{_id: EJSON.stringify(qf), qFamilyId: qf}]
@@ -195,7 +201,10 @@ onSelection = () ->
       []
   )
 
+fullTextToShow = new ReactiveVar(null)
+
 Template.body.helpers({
+  fullTextToShow: () -> fullTextToShow.get()
   newColumnArgs: () -> newColumnArgs.get()
   addStateCellArgs: () -> addStateCellArgs.get()
   changeFormulaArgs: () -> changeFormulaArgs.get()
