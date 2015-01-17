@@ -221,14 +221,14 @@
 
   scanColumns = (parentId, schema) ->
     schema.children ?= []
-    for columnDef in schema.children
+    for columnDef, i in schema.children
       thisId = model.defineColumn(
-        parentId,
+        parentId, i,
         columnDef.name,
         # This only works because all of the types in our sample dataset refer to
         # columns that come earlier in preorder.  We can probably live with this
         # until we implement full validation of acyclic type usage.
-        model.parseTypeStr(columnDef.type),
+        parseTypeStr(columnDef.type),
         columnDef.cellName,
         null  # formula
       )
@@ -247,5 +247,5 @@
 
   # Add a formula column for testing purposes.
   # XXX parseTypeStr is not really meant to be used for this.
-  personNameColumnId = model.parseTypeStr('Person.name')
-  model.defineColumn(personNameColumnId, 'nameThis', null, null, ['var', 'this'])
+  personNameColumnId = parseTypeStr('Person.name')
+  model.defineColumn(personNameColumnId, 0, 'nameThis', null, null, ['var', 'this'])

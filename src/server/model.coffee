@@ -88,17 +88,7 @@ class Model
     # XXX: Replace by a real API.  At least the references will be easy to find.
     return @columns.get(columnId)
 
-  parseTypeStr: (s) ->
-    if typeIsPrimitive(s)
-      return s
-    else
-      colId = rootColumnId
-      for n in s.split('.')
-        # XXX: Maybe types should accept cellName only.
-        colId = @getColumn(colId).childByName.get(n)
-      return colId
-
-  defineColumn: (parentId, name, type, cellName, formula) ->
+  defineColumn: (parentId, index, name, type, cellName, formula) ->
     # Future: specify order rather than always at the end
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
@@ -110,6 +100,9 @@ class Model
       throw new Error('Cannot specify type for a formula column')
     if !formula? && !type?
       throw new Error('Must specify type for a state column')
+    parentCol = @columns.get(parentId)
+    unless 0 <= index <= parentCol.children.length
+      throw new Error('Index out of range')
     @invalidateCache()
     thisId = Random.id()
     col = {
@@ -127,8 +120,7 @@ class Model
     # Silly... "cells" is for DB only.
     delete col.cells
     @initializeColumnTempData(col)
-    parentCol = @columns.get(parentId)
-    parentCol.children.push(thisId)
+    parentCol.children.splice(index, 0, thisId)
     # Meteor is nice for so many things, but not ORM...
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     @registerColumnWithParent(col)
@@ -328,11 +320,7 @@ class Model
     publisher.removed(COLUMN_COLLECTION, columnId)
 
   publishColumn: (columnId, publisher) ->
-    col = @columns.get(columnId)
-    x = {}
-    for k, v of col when k != 'childByName'
-      x[k] = v
-    publisher.added(COLUMN_COLLECTION, columnId, x)
+    publisher.added(COLUMN_COLLECTION, columnId, @columns.get(columnId))
 
   invalidateCache: ->
     if @familyCache?
@@ -364,6 +352,7 @@ class Model
 
 Meteor.startup () ->
   @model = new Model()
+  @getColumn = (id) -> model.getColumn(id)
   if model.columns.keys().length == 1  # root column :/
     loadSampleData()
   model.evaluateAll()
@@ -379,8 +368,8 @@ Meteor.methods({
   # change from the client.  It would be a little harder for the client itself
   # to request this via another method (it would require a callback).
   # Future: validation!
-  defineColumn: (parentId, name, type, cellName, formula) ->
-    model.defineColumn(parentId, name, type, cellName, formula)
+  defineColumn: (parentId, index, name, type, cellName, formula) ->
+    model.defineColumn(parentId, index, name, type, cellName, formula)
     model.evaluateAll()
   renameColumn: (columnId, name, cellName) ->
     model.renameColumn(columnId, name, cellName)

@@ -174,6 +174,47 @@ viewHOT = null
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
 
+newColumnArgs = new ReactiveVar(null, EJSON.equals)
+newColumnKind = new ReactiveVar(null)
+Template.body.helpers({
+  inNewColumn: () -> newColumnArgs.get()?
+})
+Template.newColumn.helpers({
+  # This is ridiculous: spacebars won't let us compare two strings?
+  newColumnIsState: () -> newColumnKind.get() == 'state'
+})
+Template.newColumn.rendered = () ->
+  # ensure consistent
+  newColumnKind.set(@find('input[name=kind]:checked').value)
+Template.newColumn.events({
+  'change input[name=kind]': (event, template) ->
+    newColumnKind.set(template.find('input[name=kind]:checked').value)
+  'click .submit': (event, template) ->
+    switch newColumnKind.get()
+      when 'state'
+        type = parseTypeStr(template.find('input[name=datatype]').value)
+        formula = null
+      when 'formula'
+        type = null
+        # Default formula to get the new column created ASAP.
+        # Then the user can edit it as desired.
+        # TODO: Change to empty set once supported.
+        formula = ['var', 'this']
+      else
+        throw new Error()  # should not happen
+    Meteor.call('defineColumn',
+                newColumnArgs.get().parentId,
+                newColumnArgs.get().index,
+                null,  # name
+                type,
+                null,  # cellName
+                formula,
+                standardServerCallback)
+    newColumnArgs.set(null)
+  'click .cancel': (event, template) ->
+    newColumnArgs.set(null)
+})
+
 class View
 
   constructor: ->
@@ -246,14 +287,33 @@ class View
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop)? && ci != rootColumnId)
-            callback: () -> alert('Unimplemented')
+            callback: () ->
+              c = thisView.getSingleSelectedCell()
+              ci = c.columnIdTop
+              col = Columns.findOne(ci)
+              parentId = col.parent
+              parentCol = Columns.findOne(parentId)
+              index = parentCol.children.indexOf(ci)
+              newColumnArgs.set({parentId: parentId, index: index})
           }
           addColumnRight: {
             name: 'Insert column on the right'
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId)
-            callback: () -> alert('Unimplemented')
+            callback: () ->
+              c = thisView.getSingleSelectedCell()
+              if (ci = c.columnIdTop)?
+                # Like addColumnLeft except + 1
+                col = Columns.findOne(ci)
+                parentId = col.parent
+                parentCol = Columns.findOne(parentId)
+                index = parentCol.children.indexOf(ci) + 1
+              else
+                # Child of the selected column
+                parentId = c.columnIdBelow
+                index = 0
+              newColumnArgs.set({parentId: parentId, index: index})
           }
           deleteColumn: {
             name: 'Delete column'

@@ -7,5 +7,29 @@
 </head>
 <body>
   <h1>Relational Spreadsheets</h1>
+  {{#if inNewColumn}}
+    {{> newColumn}}
+  {{/if}}
   <div id="View"></div>
+  <div id="newColumnDialog" title="New column">
+  </div>
 </body>
+
+<template name="newColumn">
+  <form id="newColumnForm" class="rsDialog">
+    <h2>New column</h2>
+    <div>
+      <input id="newColumn-type-state" type="radio" name="kind" value="state"/>
+      <label for="newColumn-type-state">State column</label>
+      <input id="newColumn-type-formula" type="radio" name="kind" value="formula" checked="checked"/>
+      <label for="newColumn-type-formula">Formula column</label>
+    </div>
+    {{#if newColumnIsState}}
+      <div>Data type (primitive or dot-separated names): <input type="text" name="datatype"/></div>
+    {{/if}}
+    <div>
+      <input type="button" class="submit" value="Create"/>
+      <input type="button" class="cancel" value="Cancel"/>
+    </div>
+  </form>
+</template>

@@ -27,6 +27,17 @@
 
 @columnIsState = (col) -> col._id != rootColumnId && !col.formula?
 
+# Requires that an appropriate global getColumn function be defined.
+@parseTypeStr = (s) ->
+  if typeIsPrimitive(s)
+    return s
+  else
+    colId = rootColumnId
+    for n in s.split('.')
+      # XXX: Maybe types should accept cellName only.
+      colId = getColumn(colId).childByName.get(n)
+    return colId
+
 # CacheEntry:
 #@state: one of FAMILY_{IN_PROGRESS,SUCCESS,ERROR}
 ##@deps: array of QFamilyId - Only needed if we want to revalidate existing results.
@@ -44,6 +55,8 @@
 
 # We can only define this in one file.
 @Columns = new Mongo.Collection(COLUMN_COLLECTION)
+if Meteor.isClient
+  @getColumn = (id) -> Columns.findOne(id)
 
 # {_id: formula column ID, _type: type}
 @FORMULA_COLUMN_TYPE_COLLECTION = 'formulaColumnType'
@@ -58,22 +71,25 @@ class @EJSONKeyedMap
     # engines and CoffeeScript.
     @obj = {}
   wrapKey = (k) -> 'map_' + EJSON.stringify(k)
-  unwrapKey = (k) ->
-    try
-      EJSON.parse(k.substr(4))
-    catch e
-      console.log('unwrapKey failed on', k)
-      throw e
+  unwrapKey = (k) -> EJSON.parse(k.substr(4))
 
   get: (k) -> @obj[wrapKey(k)]
   set: (k, v) -> @obj[wrapKey(k)] = v
   delete: (k) -> delete @obj[wrapKey(k)]
   keys: -> unwrapKey(wk) for wk of @obj
-  shallowClone: ->
-    m = new EJSONKeyedMap()
-    for k in @keys()
-      m.set(k, @get(k))
-    return m
+  # What was this for?
+  #shallowClone: ->
+  #  m = new EJSONKeyedMap()
+  #  for k in @keys()
+  #    m.set(k, @get(k))
+  #  return m
+  typeName: -> 'EJSONKeyedMap'
+  toJSONValue: -> @obj
+EJSON.addType('EJSONKeyedMap', (json) ->
+  m = new EJSONKeyedMap()
+  m.obj = json
+  m
+)
 
 class @EJSONKeyedSet
   constructor: ->
