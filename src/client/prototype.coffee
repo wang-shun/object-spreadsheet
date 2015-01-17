@@ -7,7 +7,7 @@ class NotReadyError
 # Grid utilities
 
 class ViewCell
-  constructor: (@value, @rowspan, @colspan) ->
+  constructor: (@value = '', @rowspan = 1, @colspan = 1, @cssClasses = []) ->
     @qFamilyId = null
     @qCellId = null
     @columnIdTop = null
@@ -25,13 +25,15 @@ gridHorizExtend = (orig, extension) ->
 
 # Return a grid consisting of one "height x width" merged cell and enough dummy
 # 1x1 cells.  You can mutate the upper-left cell as desired.
-gridMergedCell = (height, width) ->
+gridMergedCell = (height, width, value = '', cssClasses = []) ->
   grid =
     for i in [0..height-1] by 1
       for j in [0..width-1] by 1
-        new ViewCell('', 1, 1)
+        new ViewCell()
   grid[0][0].rowspan = height
   grid[0][0].colspan = width
+  grid[0][0].value = value
+  grid[0][0].cssClasses = cssClasses
   grid
 
 class ViewVlist
@@ -121,15 +123,13 @@ class ViewSection
         bottomGrid[0][0].qFamilyId = qFamilyId
         gridVertExtend(grid, bottomGrid)
     else
-      grid = gridMergedCell(height, @width)
-      grid[0][0].value = 'ERROR'
+      grid = gridMergedCell(height, @width, 'ERROR')
       grid[0][0].qFamilyId = qFamilyId
     grid
 
   renderHlist: (hlist, height) ->
     # Value
-    grid = gridMergedCell(height, 1)
-    grid[0][0].value = hlist.value
+    grid = gridMergedCell(height, 1, hlist.value)
     grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
     # This logic could be in a ViewCell accessor instead, but for now it isn't
     # duplicated so there's no need.
@@ -144,19 +144,19 @@ class ViewSection
     grid
 
   renderHeader: (height) ->
-    gridTop = gridMergedCell(height - @headerHeightBelow, @width)
-    gridTop[0][0].value = @col.cellName ? ''
+    gridTop = gridMergedCell(height - @headerHeightBelow, @width, @col.cellName ? '', ['rsHeaderTop'])
     gridTop[0][0].columnIdTop = @columnId
-    gridBelow = gridMergedCell(@headerHeightBelow - 2, 1)
-    gridBelow[0][0].value = @col.name ? ''
+    gridBelow = gridMergedCell(@headerHeightBelow - 2, 1, @col.name ? '', ['rsHeaderBelow'])
     gridBelow[0][0].columnIdBelow = @columnId
     # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
-    gridVertExtend(gridBelow, [[new ViewCell(@columnId.substr(0, 8), 1, 1)]])
-    gridVertExtend(gridBelow, [[new ViewCell(@type?.substr(0, 8) ? '', 1, 1)]])
+    gridVertExtend(gridBelow, [[new ViewCell(@columnId.substr(0, 4))]])
+    gridVertExtend(gridBelow, [[new ViewCell(@type?.substr(0, 4) ? '')]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
-        gridHorizExtend(gridBelow, gridMergedCell(@headerHeightBelow, 1))
+        # Turns out class rsHeaderBelow will work for separators too.
+        gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow'])
+        gridHorizExtend(gridBelow, gridSeparator)
       gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow))
     gridVertExtend(gridTop, gridBelow)
     gridTop
@@ -171,8 +171,22 @@ class View
     # parentCellId or value.
     hlist = @mainSection.prerenderHlist(null, '')
     grid = @mainSection.renderHeader(@mainSection.headerMinHeight)
+    for row in grid
+      for cell in row
+        cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here
     headerHeight = grid.length
     gridVertExtend(grid, @mainSection.renderHlist(hlist, hlist.minHeight))
+
+    gridCaption = gridMergedCell(headerHeight - 3, 1, 'cellName', ['htMiddle', 'rsCaption'])
+    gridCaption.push(
+      [new ViewCell('name', 1, 1, ['rsCaption'])],
+      [new ViewCell('id', 1, 1, ['rsCaption'])],
+      [new ViewCell('type', 1, 1, ['rsCaption'])])
+    gridVertExtend(gridCaption, gridMergedCell(
+      grid.length - headerHeight, 1, 'data', ['rsCaption']))
+    gridHorizExtend(gridCaption, grid)
+    grid = gridCaption
+
     d = {
       readOnly: true
       data: ((cell.value for cell in row) for row in grid)
@@ -180,11 +194,7 @@ class View
       colWidths: (for cell in grid[headerHeight - 2]  # id row (hack)
                     if cell.value then undefined else 8)
       cells: (row, col, prop) ->
-        p = {}
-        if row < headerHeight
-          # Bottom align text, and gray background color.
-          p.className = 'htBottom rsHeader'
-        p
+        {className: grid[row][col].cssClasses.join(' ')}
       # TODO: Make this work again if desired (Matt is not convinced).
       #!afterGetColHeader: (col, TH) =>
       #!  if header[col+1] == ''
