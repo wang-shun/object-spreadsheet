@@ -14,6 +14,8 @@ class Model
 
   initializeColumnTempData: (col) ->
     col.childByName = new EJSONKeyedMap()
+    if columnIsState(col)
+      col.numStateCells = 0
 
   registerColumnWithParent: (col) ->
     parentColId = col.parent
@@ -43,13 +45,14 @@ class Model
     # Future: Need a way to make a temporary model for a transaction without reloading.
     for col in Columns.find().fetch()
       @columns.set(col._id, col)
+      @initializeColumnTempData(col)
       for cellIdStr of col.cells ? {}
         cellId = EJSONfromMongoFieldName(cellIdStr)
         @state.add({columnId: col._id, cellId: cellIdParent(cellId)},
                    cellIdLastStep(cellId))
+        col.numStateCells++
       # Don't store a duplicate copy.  So, careful about writing col back to DB.
       delete col.cells
-      @initializeColumnTempData(col)
 
     # Special case: create root column if missing.
     unless @columns.get(rootColumnId)?
@@ -167,16 +170,15 @@ class Model
       @publishColumn(columnId, publisher)
 
   deleteColumn: (columnId) ->
+    if columnId == rootColumnId
+      throw new Error('Cannot delete the root column.')
     # Assert not root
     col = @columns.get(columnId)
-    if col.children.length
+    if col.children.length > 0
       throw new Error('Please delete all child columns first.')
     # Assert col.childByName also empty
-    unless col.formula?
-      for k in @state.keys()
-        # XXX: Slow; the data structure should let us query a column.
-        if EJSON.equals(k.columnId, columnId)
-          throw new Error('Please delete all state cells first.')
+    if columnIsState(col) && col.numStateCells > 0
+      throw new Error('Please delete all state cells first.')
     parentId = col.parent
     parentCol = @columns.get(parentId)
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
@@ -197,11 +199,21 @@ class Model
     mongoUpdateThing = {}
     mongoUpdateThing['cells.' + EJSONtoMongoFieldName(cellId)] = true
     if present
-      @state.add(qFamilyId, value)
-      Columns.update(qFamilyId.columnId, {$set: mongoUpdateThing})
+      if !@state.has(qFamilyId, value)
+        @state.add(qFamilyId, value)
+        Columns.update(qFamilyId.columnId, {$set: mongoUpdateThing})
+        @columns.get(qFamilyId.columnId).numStateCells++
+        for publisher in @publishers
+          @unpublishColumn(qFamilyId.columnId, publisher)
+          @publishColumn(qFamilyId.columnId, publisher)
     else
-      @state.delete(qFamilyId, value)
-      Columns.update(qFamilyId.columnId, {$unset: mongoUpdateThing})
+      if @state.has(qFamilyId, value)
+        @state.delete(qFamilyId, value)
+        Columns.update(qFamilyId.columnId, {$unset: mongoUpdateThing})
+        @columns.get(qFamilyId.columnId).numStateCells--
+        for publisher in @publishers
+          @unpublishColumn(qFamilyId.columnId, publisher)
+          @publishColumn(qFamilyId.columnId, publisher)
 
   evaluateFamily1: (qFamilyId) ->
     col = @columns.get(qFamilyId.columnId)

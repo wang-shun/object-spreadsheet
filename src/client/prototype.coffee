@@ -72,7 +72,7 @@ class ViewSection
       if haveSep
         @width++
       @width += subsection.width
-      @headerHeightBelow = Math.max(@headerHeightBelow, 1 + subsection.headerMinHeight)
+      @headerHeightBelow = Math.max(@headerHeightBelow, subsection.headerMinHeight)
       @rightEdgeSingular =
         subsection.relationSingular && subsection.rightEdgeSingular
     @headerMinHeight = 1 + @headerHeightBelow  # cellName
@@ -161,6 +161,9 @@ class ViewSection
     gridVertExtend(gridTop, gridBelow)
     gridTop
 
+# XXX: OK to reference this variable from View?
+viewHOT = null
+
 class View
 
   constructor: ->
@@ -187,6 +190,20 @@ class View
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
 
+    getSingleSelectedCell = () ->
+      s = viewHOT.getSelected()
+      unless s?
+        # Unsure under what circumstances this can happen.  Whatever.
+        return null
+      [r1, c1, r2, c2] = s
+      [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)]
+      [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)]
+      cell = grid[r1][c1]
+      if r2 == r1 + cell.rowspan - 1 && c2 == c1 + cell.colspan - 1
+        return cell
+      else
+        return null
+
     d = {
       readOnly: true
       data: ((cell.value for cell in row) for row in grid)
@@ -208,10 +225,53 @@ class View
           for cell,j in row when cell.rowspan != 1 || cell.colspan != 1
             {row: i, col: j, rowspan: cell.rowspan, colspan: cell.colspan}
         )...)
+      contextMenu: {
+        # TODO: Implement commands.
+        items: {
+          # addColumnLeft is redundant but nice for users.
+          addColumnLeft: {
+            name: 'Insert column on the left'
+            disabled: () ->
+              !((c = getSingleSelectedCell())? &&
+                (ci = c.columnIdTop)? && ci != rootColumnId)
+            callback: () -> alert('Unimplemented')
+          }
+          addColumnRight: {
+            name: 'Insert column on the right'
+            disabled: () ->
+              !((c = getSingleSelectedCell())? &&
+                (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId)
+            callback: () -> alert('Unimplemented')
+          }
+          deleteColumn: {
+            name: 'Delete column'
+            disabled: () ->
+              # CLEANUP: This is a mess; find a way to share the code or publish from the server.
+              !((c = getSingleSelectedCell())? &&
+                (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId &&
+                (col = Columns.findOne(ci)).children.length == 0 &&
+                !(columnIsState(col) && col.numStateCells > 0))
+            callback: () -> alert('Unimplemented')
+          }
+          sep1: '----------'
+          addStateCell: {
+            name: 'Add cell to this set'
+            disabled: () ->
+              !((c = getSingleSelectedCell())? &&
+                c.qFamilyId? && columnIsState(Columns.findOne(c.qFamilyId.columnId)))
+            callback: () -> alert('Unimplemented')
+          }
+          deleteStateCell: {
+            name: 'Delete cell'
+            disabled: () ->
+              !((c = getSingleSelectedCell())? &&
+                c.qCellId? && columnIsState(Columns.findOne(c.qCellId.columnId)))
+            callback: () -> alert('Unimplemented')
+          }
+        }
+      }
     }
     d
-
-viewHOT = null
 
 rebuildView = () ->
   if viewHOT

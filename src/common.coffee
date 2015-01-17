@@ -15,13 +15,17 @@
 # classes. ~ Matt)
 
 # Column:
+#@_id
 #@parent: column ID
 #@children: array of column IDs, now in the user's desired order
 #@childByName: EJSONKeyedMap<name, column ID>
+#@numStateCells: integer (state columns only)
 #@name: string or null
 #@type: column ID or primitive; null for formula columns
 #@cellName: string or null
 #@formula: some JSON data structure, or null
+
+@columnIsState = (col) -> col._id != rootColumnId && !col.formula?
 
 # CacheEntry:
 #@state: one of FAMILY_{IN_PROGRESS,SUCCESS,ERROR}
@@ -95,6 +99,7 @@ class @EJSONKeyedMapToSet
       if s.elements().length == 0
         @map.delete(k)
   keys: -> @map.keys()
+  has: (k, v) -> (s = @map.get(k))? && s.has(v)
   elementsFor: (k) -> @map.get(k)?.elements() ? []
 
 @EJSONtoMongoFieldName = (x) ->
