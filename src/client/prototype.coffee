@@ -244,13 +244,18 @@ class View
     @grid = grid
 
     d = {
-      readOnly: true
       data: ((cell.value for cell in row) for row in grid)
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for cell in grid[headerHeight - 2]  # id row (hack)
                     if cell.value then undefined else 8)
       cells: (row, col, prop) ->
-        {className: grid[row][col].cssClasses.join(' ')}
+        cell = grid[row][col]
+        {
+          className: cell.cssClasses.join(' ')
+          # Only column header "top" and "below" cells can be edited,
+          # for the purpose of changing the cellName and name respectively.
+          readOnly: !(cell.columnIdTop ? cell.columnIdBelow)?
+        }
       # TODO: Make this work again if desired (Matt is not convinced).
       #!afterGetColHeader: (col, TH) =>
       #!  if header[col+1] == ''
@@ -274,6 +279,23 @@ class View
         selectedCell = null
       afterSelectionEnd: (r1, c1, r2, c2) ->
         selectedCell = thisView.getSingleSelectedCell()
+
+      beforeChange: (changes, source) ->
+        for [row, col, oldVal, newVal] in changes
+          cell = grid[row][col]
+          # One of these cases should apply...
+          if cell.columnIdTop?
+            Meteor.call('changeColumnCellName',
+                        cell.columnIdTop, newVal,
+                        standardServerCallback)
+          if cell.columnIdBelow?
+            Meteor.call('changeColumnName',
+                        cell.columnIdBelow, newVal,
+                        standardServerCallback)
+        # Don't apply the changes directly; let them come though the Meteor
+        # stubs.  This ensures that they get reverted by Meteor if the server
+        # call fails.
+        return false
 
       contextMenu: {
         # TODO: Implement commands.
@@ -417,3 +439,13 @@ Meteor.startup () ->
   @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
   Tracker.autorun(rebuildView)
+
+Meteor.methods({
+  # Implement these two methods to reduce display jankiness, since they're easy.
+  # Hm, doesn't help much, I suspect the bottleneck is rerendering the table,
+  # not the server call.
+  changeColumnName: (columnId, name) ->
+    Columns.update(columnId, {$set: {name: name}})
+  changeColumnCellName: (columnId, cellName) ->
+    Columns.update(columnId, {$set: {cellName: cellName}})
+})

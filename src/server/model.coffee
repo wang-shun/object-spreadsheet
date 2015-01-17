@@ -103,6 +103,9 @@ class Model
     parentCol = @columns.get(parentId)
     unless 0 <= index <= parentCol.children.length
       throw new Error('Index out of range')
+    if ((name? && parentCol.childByName.get(name)?) ||
+        (cellName? && parentCol.childByName.get(cellName)?))
+      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     @invalidateCache()
     thisId = Random.id()
     col = {
@@ -132,15 +135,32 @@ class Model
 
     return thisId
 
-  renameColumn: (columnId, name, cellName) ->
+  changeColumnName: (columnId, name) ->
     col = @columns.get(columnId)
     parentId = col.parent
     parentCol = @columns.get(parentId)
+    if name? && parentCol.childByName.get(name)?
+      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     @unregisterColumnWithParent(col)
     col.name = name
+    @registerColumnWithParent(col)
+    Columns.update(columnId, {$set: {name: name}})
+    for publisher in @publishers
+      @unpublishColumn(columnId, publisher)
+      @publishColumn(columnId, publisher)
+      @unpublishColumn(parentId, publisher)
+      @publishColumn(parentId, publisher)
+
+  changeColumnCellName: (columnId, cellName) ->
+    col = @columns.get(columnId)
+    parentId = col.parent
+    parentCol = @columns.get(parentId)
+    if cellName? && parentCol.childByName.get(cellName)?
+      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
+    @unregisterColumnWithParent(col)
     col.cellName = cellName
     @registerColumnWithParent(col)
-    Columns.update(columnId, {$set: {name: name, cellName: cellName}})
+    Columns.update(columnId, {$set: {cellName: cellName}})
     for publisher in @publishers
       @unpublishColumn(columnId, publisher)
       @publishColumn(columnId, publisher)
@@ -150,7 +170,7 @@ class Model
   # Future: API to move and copy groups of columns.  This is an order of
   # magnitude more complicated.
 
-  changeFormula: (columnId, formula) ->
+  changeColumnFormula: (columnId, formula) ->
     col = @columns.get(columnId)
     unless col.formula?
       throw new Error('Can only changeFormula on a formula column!')
@@ -371,10 +391,13 @@ Meteor.methods({
   defineColumn: (parentId, index, name, type, cellName, formula) ->
     model.defineColumn(parentId, index, name, type, cellName, formula)
     model.evaluateAll()
-  renameColumn: (columnId, name, cellName) ->
-    model.renameColumn(columnId, name, cellName)
+  changeColumnName: (columnId, name) ->
+    model.changeColumnName(columnId, name)
     model.evaluateAll()
-  changeFormula: (columnId, formula) ->
+  changeColumnCellName: (columnId, cellName) ->
+    model.changeColumnCellName(columnId, cellName)
+    model.evaluateAll()
+  changeColumnFormula: (columnId, formula) ->
     model.changeFormula(columnId, formula)
     model.evaluateAll()
   deleteColumn: (columnId) ->
