@@ -407,7 +407,7 @@ class View
             name: 'Insert column on the right'
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
-                (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId)
+                ((ci = c.columnIdTop)? && ci != rootColumnId || c.columnIdBelow?))
             callback: () ->
               c = thisView.getSingleSelectedCell()
               if (ci = c.columnIdTop)?
