@@ -104,7 +104,7 @@
   V = () -> ([val, {}] for val in arguments)
 
   # Type _unit
-  U = (cell) -> [['_unit', cell]]
+  U = (cell) -> [['X', cell]]
 
   # Type _token: successive integer tokens for now.
   T = (cellList) -> ([i.toString(), cell] for cell, i in cellList)

@@ -1,6 +1,6 @@
 @typeIsPrimitive = (type) -> /^_/.test(type)
 
-@rootColumnId = '_unit'
+@rootColumnId = '_root'
 
 # Multisets unsupported for now: twindex removed.
 

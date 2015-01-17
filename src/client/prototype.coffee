@@ -106,9 +106,10 @@ class ViewSection
       # For now, we need to see token values in order to interpret IDs.
       # Future: Enable this again when we have a better way of rendering IDs.
       #if @type == '_token' then '*'
-      if @type == '_unit' then 'X'
+      # Show _unit values for now so we can see if they aren't 'X'.
+      #if @type == '_unit' then 'X'
       # Should be OK if the user knows which columns are string-typed.
-      else if typeof value == 'string' then value
+      if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
       else EJSON.stringify(value)
     vlists =
