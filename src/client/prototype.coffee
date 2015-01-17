@@ -88,7 +88,9 @@ class ViewSection
     unless familyData?
       throw new NotReadyError()
     if familyData.state == FAMILY_SUCCESS
-      hlists = (@prerenderHlist(parentCellId, value) for value in familyData.content.elements)
+      hlists =
+        for value in familyData.content.set.elements()
+          @prerenderHlist(parentCellId, value)
       minHeight = 0
       for hlist in hlists
         minHeight += hlist.minHeight
@@ -111,7 +113,7 @@ class ViewSection
       # Should be OK if the user knows which columns are string-typed.
       if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
-      else EJSON.stringify(value)
+      else JSON.stringify(value)
     vlists =
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
@@ -232,8 +234,7 @@ Template.newColumn.events({
         type = null
         # Default formula to get the new column created ASAP.
         # Then the user can edit it as desired.
-        # TODO: Change to empty set once supported.
-        formula = ['var', 'this']
+        formula = ['literalSet', '_unit', []]
       else
         throw new Error()  # should not happen
     Meteor.call('defineColumn',
@@ -254,7 +255,7 @@ Template.addStateCell.events({
   'click .submit': (event, template) ->
     valueStr = template.find('input[name=value]').value
     try
-      value = EJSON.parse(valueStr)
+      value = JSON.parse(valueStr)
     catch e
       alert('Invalid JSON.')
       return
@@ -268,14 +269,14 @@ Template.addStateCell.events({
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 Template.changeFormula.rendered = () ->
-  orig = EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+  orig = JSON.stringify(getColumn(Template.currentData().columnId).formula)
   newFormulaStr.set(orig)
   @find('input[name=formula]').value =
-    EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+    JSON.stringify(getColumn(Template.currentData().columnId).formula)
 newFormulaStr = new ReactiveVar(null)
 Template.changeFormula.helpers({
   formulaClass: ->
-    orig = EJSON.stringify(getColumn(Template.currentData().columnId).formula)
+    orig = JSON.stringify(getColumn(Template.currentData().columnId).formula)
     entered = newFormulaStr.get()
     if orig != entered then 'formulaModified' else ''
 })
@@ -285,16 +286,19 @@ Template.changeFormula.events({
   'click .submit': (event, template) ->
     formulaStr = template.find('input[name=formula]').value
     try
-      formula = EJSON.parse(formulaStr)
+      formula = JSON.parse(formulaStr)
     catch e
       alert('Invalid JSON.')
       return
+    # Canonicalize the string in the field, otherwise the field might stay
+    # yellow after successful submission.
+    template.find('input[name=formula]').value = JSON.stringify(formulaStr)
     Meteor.call('changeColumnFormula',
                 @columnId,
                 formula,
                 standardServerCallback)
   'click .cancel': (event, template) ->
-    orig = EJSON.stringify(getColumn(@columnId).formula)
+    orig = JSON.stringify(getColumn(@columnId).formula)
     newFormulaStr.set(orig)
     template.find('input[name=formula]').value = orig
 })

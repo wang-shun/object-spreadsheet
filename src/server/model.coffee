@@ -1,3 +1,6 @@
+class @FormulaValidationError
+  constructor: (@message) ->
+
 class @EvaluationError
 
 class Model
@@ -88,24 +91,49 @@ class Model
     # XXX: Replace by a real API.  At least the references will be easy to find.
     return @columns.get(columnId)
 
+  # Finds the lowest common ancestor of columnId1 and columnId2 and returns a
+  # pair of arrays giving the sequences of ancestors from columnId1 and
+  # columnId2 (respectively) to the common ancestor, inclusive.
+  findCommonAncestorPaths: (columnId1, columnId2) ->
+    ancestors1 = []
+    cid = columnId1
+    loop
+      ancestors1.push(cid)
+      break if cid == rootColumnId
+      cid = @columns.get(cid).parent
+    ancestors2 = []
+    cid = columnId2
+    loop
+      ancestors2.push(cid)
+      # We could make this not O(N^2) if we cared...
+      break if (idx = ancestors1.indexOf(cid)) != -1
+      cid = @columns.get(cid).parent
+    ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
+    return [ancestors1, ancestors2]
+
   defineColumn: (parentId, index, name, type, cellName, formula) ->
     # Future: specify order rather than always at the end
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
     parentCol = @columns.get(parentId)
-    if !formula? && parentCol.formula?
-      throw new Error('Creating a state column as child of a formula column is currently not allowed.')
-    if formula? && type?
-      # For now, with dynamic typing.  This might change.
-      throw new Error('Cannot specify type for a formula column')
-    if !formula? && !type?
-      throw new Error('Must specify type for a state column')
-    parentCol = @columns.get(parentId)
     unless 0 <= index <= parentCol.children.length
-      throw new Error('Index out of range')
+      throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
     if ((name? && parentCol.childByName.get(name)?) ||
         (cellName? && parentCol.childByName.get(cellName)?))
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
+    if !formula?
+      if parentCol.formula?
+        throw new Meteor.Error('defineColumn-state-under-formula',
+                               'Creating a state column as child of a formula column is currently not allowed.')
+      if !type?
+        throw new Meteor.Error('defineColumn-type-required',
+                               'Must specify type for a state column')
+    if formula?
+      if type?
+        # For now, with dynamic typing.  This might change.
+        throw new Meteor.Error('defineColumn-type-not-allowed',
+                               'Cannot specify type for a formula column')
+      validateFormula(formula)
     @invalidateCache()
     thisId = Random.id()
     col = {
@@ -177,7 +205,9 @@ class Model
   changeColumnFormula: (columnId, formula) ->
     col = @columns.get(columnId)
     unless col.formula?
-      throw new Error('Can only changeFormula on a formula column!')
+      throw new Meteor.Error('changeFormula-on-non-formula-column',
+                             'Can only changeFormula on a formula column!')
+    validateFormula(formula)
     @invalidateCache()
     col.formula = formula
     Columns.update(columnId, {$set: {formula: formula}})
@@ -187,14 +217,17 @@ class Model
 
   deleteColumn: (columnId) ->
     if columnId == rootColumnId
-      throw new Error('Cannot delete the root column.')
+      throw new Meteor.Error('delete-root-column',
+                             'Cannot delete the root column.')
     # Assert not root
     col = @columns.get(columnId)
     if col.children.length > 0
-      throw new Error('Please delete all child columns first.')
+      throw new Meteor.Error('delete-column-has-children',
+                             'Please delete all child columns first.')
     # Assert col.childByName also empty
     if columnIsState(col) && col.numStateCells > 0
-      throw new Error('Please delete all state cells first.')
+      throw new Meteor.Error('delete-column-has-state-cells',
+                             'Please delete all state cells first.')
     parentId = col.parent
     parentCol = @columns.get(parentId)
     @invalidateCache()
@@ -247,12 +280,12 @@ class Model
   evaluateFamily1: (qFamilyId) ->
     col = @columns.get(qFamilyId.columnId)
     if col.formula?
-      vars = new EJSONKeyedMap()
-      vars.set('this', {type: col.parent, elements: [qFamilyId.cellId]})
+      vars = new EJSONKeyedMap(
+        [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
       return evaluateFormula(this, vars, col.formula)
     else
       # State column (there are no domain columns yet)
-      return {type: col.type, elements: @state.elementsFor(qFamilyId)}
+      return new TypedSet(col.type, new EJSONKeyedSet(@state.elementsFor(qFamilyId)))
 
   evaluateFamily: (qFamilyId) ->
     ce = @familyCache.get(qFamilyId)
@@ -266,11 +299,11 @@ class Model
         if @columns.get(qFamilyId.columnId).formula?
           # Update formulaColumnType
           oldFCT = @formulaColumnType.get(qFamilyId.columnId)
-          if ce.content.type? && ce.content.type != oldFCT
+          newFCT = mergeTypes(oldFCT, ce.content.type)
+          if newFCT != oldFCT
             if oldFCT?
               for publisher in @publishers
                 @unpublishFormulaColumnType(qFamilyId.columnId, publisher)
-            newFCT = if oldFCT? then FORMULA_COLUMN_TYPE_MIXED else ce.content.type
             @formulaColumnType.set(qFamilyId.columnId, newFCT)
             for publisher in @publishers
               @publishFormulaColumnType(qFamilyId.columnId, publisher)
@@ -309,7 +342,7 @@ class Model
       for childColId in col.children
         ce = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
         if ce.state == FAMILY_SUCCESS
-          for value in ce.content.elements
+          for value in ce.content.set.elements()
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             evaluateSubtree(childQCellId)
 

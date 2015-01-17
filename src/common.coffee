@@ -1,6 +1,6 @@
-@typeIsPrimitive = (type) -> /^_/.test(type)
-
 @rootColumnId = '_root'
+
+@typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type)
 
 # Multisets unsupported for now: twindex removed.
 
@@ -43,10 +43,6 @@
 ##@deps: array of QFamilyId - Only needed if we want to revalidate existing results.
 #@content: TypedSet if state is SUCCESS, otherwise null
 
-# TypedSet:
-#@type: column ID or primitive, or null if we don't know because the set is empty.
-#@elements: array, no duplicates (for now), order is not meaningful
-
 @FAMILY_DATA_COLLECTION = 'familyData'
 @COLUMN_COLLECTION = 'columns'
 @FAMILY_IN_PROGRESS = 1  # should not be seen by the client
@@ -60,16 +56,18 @@ if Meteor.isClient
 
 # {_id: formula column ID, _type: type}
 @FORMULA_COLUMN_TYPE_COLLECTION = 'formulaColumnType'
-@FORMULA_COLUMN_TYPE_MIXED = '_mixed'
+@TYPE_MIXED = '_mixed'
 
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...
 
 class @EJSONKeyedMap
-  constructor: ->
+  constructor: (ents = []) ->
     # Future: Change to ECMAScript 6 Map when supported by all relevant JS
     # engines and CoffeeScript.
     @obj = {}
+    for [k, v] in ents
+      @set(k, v)
   wrapKey = (k) -> 'map_' + EJSON.stringify(k)
   unwrapKey = (k) -> EJSON.parse(k.substr(4))
 
@@ -77,27 +75,33 @@ class @EJSONKeyedMap
   set: (k, v) -> @obj[wrapKey(k)] = v
   delete: (k) -> delete @obj[wrapKey(k)]
   keys: -> unwrapKey(wk) for wk of @obj
-  # What was this for?
-  #shallowClone: ->
-  #  m = new EJSONKeyedMap()
-  #  for k in @keys()
-  #    m.set(k, @get(k))
-  #  return m
+  entries: -> [unwrapKey(wk), v] for wk, v of @obj
+  shallowClone: -> new EJSONKeyedMap(@entries())
   typeName: -> 'EJSONKeyedMap'
+  # Note, this only works if the values are EJSON-compatible.
   toJSONValue: -> @obj
-EJSON.addType('EJSONKeyedMap', (json) ->
-  m = new EJSONKeyedMap()
-  m.obj = json
-  m
-)
+  @fromJSONValue: (json) ->
+    m = new EJSONKeyedMap()
+    m.obj = json
+    m
+EJSON.addType('EJSONKeyedMap', EJSONKeyedMap.fromJSONValue)
 
 class @EJSONKeyedSet
-  constructor: ->
+  constructor: (els = []) ->
     @map = new EJSONKeyedMap()
+    for x in els
+      @add(x)
   has: (x) -> !!@map.get(x)
   add: (x) -> @map.set(x, true)
   delete: (x) -> @map.delete(x)
   elements: -> @map.keys()
+  typeName: 'EJSONKeyedSet'
+  toJSONValue: -> @map.toJSONValue()
+  @fromJSONValue: (json) ->
+    s = new EJSONKeyedSet()
+    s.map = EJSONKeyedMap.fromJSONValue(json)
+    s
+EJSON.addType('EJSONKeyedSet', EJSONKeyedSet.fromJSONValue)
 
 class @EJSONKeyedMapToSet
   constructor: ->
@@ -127,3 +131,34 @@ class @EJSONKeyedMapToSet
 
 @EJSONfromMongoFieldName = (f) ->
   EJSON.parse(f.replace('!', '.'))
+
+@mergeTypes = (t1, t2) ->
+  if t1?
+    if t2? && t2 != t1
+      TYPE_MIXED
+    else
+      t1
+  else
+    t2
+
+class @TypedSet
+  # public fields
+  #@type: column ID or primitive, or null if we don't know because the set is empty.
+  #@set: EJSONKeyedSet<@type>
+  constructor: (@type = null, @set = new EJSONKeyedSet()) ->
+
+  # Note, these can make a meaningless mess if the types are mixed.  The caller
+  # has to check @type afterwards.
+  add: (xType, x) ->
+    @type = mergeTypes(@type, xType)
+    @set.add(x)
+  addAll: (tset) ->
+    @type = mergeTypes(@type, tset.type)
+    for e in tset.set.elements()
+      @set.add(e)
+
+  typeName: -> 'TypedSet'
+  toJSONValue: -> {type: @type, set: @set.toJSONValue()}
+  @fromJSONValue: (json) ->
+    new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set))
+EJSON.addType('TypedSet', TypedSet.fromJSONValue)

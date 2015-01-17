@@ -71,6 +71,11 @@
         # TODO: Required, singleton
         }
         {
+        # There's some doubt in my mind whether the enrollment should be thought
+        # of as belonging to the section.  We might want to associate other data
+        # (e.g., grades) with it that is as important to the student as it is to
+        # the section.  But for now, this is useful as an example of having both
+        # a name and a cellName. ~ Matt
         name: 'student'
         type: 'Person.Student'
         cellName: 'Enrollment'
@@ -166,8 +171,8 @@
       name: V('Software Studio')
       Section: T([
         {
-        teacher: V(I(0))
-        student: V(I(2), I(3))
+        teacher: V(I(0, 'X'))
+        student: V(I(2, 'X'), I(3, 'X'))
         }
       ])
       }
@@ -176,8 +181,8 @@
       name: V('Alloy')
       Section: T([
         {
-        teacher: V(I(0))
-        student: V(I(2), I(4))
+        teacher: V(I(0, 'X'))
+        student: V(I(2, 'X'), I(4, 'X'))
         }
       ])
       }
@@ -186,32 +191,32 @@
       name: V('Managed Time')
       Section: T([
         {
-        teacher: V(I(1))
-        student: V(I(2))
+        teacher: V(I(1, 'X'))
+        student: V(I(2, 'X'))
         }
       ])
       }
     ])
     Meeting: T([
       {
-      enrollment: V(I(2, 0, 0))
-      slot: V(I(1, 0))
+      enrollment: V(I(2, 0, 2))
+      slot: V(I(1, 'X', 0))
       }
       {
-      enrollment: V(I(0, 0, 0))
-      slot: V(I(0, 1))
+      enrollment: V(I(0, 0, 2))
+      slot: V(I(0, 'X', 1))
       }
       {
-      enrollment: V(I(1, 0, 0))
-      slot: V(I(0, 2))
+      enrollment: V(I(1, 0, 2))
+      slot: V(I(0, 'X', 2))
       }
       {
-      enrollment: V(I(0, 0, 1))
-      slot: V(I(0, 3))
+      enrollment: V(I(0, 0, 3))
+      slot: V(I(0, 'X', 3))
       }
       {
-      enrollment: V(I(1, 0, 1))
-      slot: V(I(0, 0))
+      enrollment: V(I(1, 0, 4))
+      slot: V(I(0, 'X', 0))
       }
     ])
   }
