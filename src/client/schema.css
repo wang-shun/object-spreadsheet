@@ -1,0 +1,28 @@
+#Schema {
+  padding: 9px;
+}
+
+#Schema table {
+  border-collapse: collapse;
+}
+
+#Schema table >*> th,
+#Schema table >*> td {
+  border: 1px solid #888;
+  padding: 2px 3px;
+}
+
+#Schema table >*> th {
+  background: #e8e8e8;
+}
+
+#Schema .noisy {
+  color: #99b;
+}
+
+to:before {
+  content: "→";
+  font-family: "STIXGeneral";
+  font-size: 90%;
+  line-height: 1px;
+}

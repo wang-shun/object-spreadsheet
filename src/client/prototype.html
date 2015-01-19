@@ -6,13 +6,16 @@
   <link rel="stylesheet" type="text/css" href="jstree/themes/default/style.min.css">
 </head>
 <body>
+</body>
+
+<template name="Spreadsheet">
   <div id="ActionBar">
     {{> formulaValueBar}}
   </div>
   <div id="View"></div>
   <div id="newColumnDialog" title="New column">
   </div>
-</body>
+</template>
 
 <template name="formulaValueBar">
   {{! Hack to reduce the jerking for addStateCell/changeFormula. }}

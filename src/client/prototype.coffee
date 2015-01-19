@@ -9,6 +9,9 @@ standardServerCallback = (error, result) ->
 # like, it just won't have a stack trace.
 class NotReadyError
 
+Router.route "/", -> @render "Spreadsheet"
+Router.route "/schema"
+
 # Grid utilities
 
 class ViewCell
@@ -525,7 +528,8 @@ Meteor.startup () ->
   @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
   @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
-  Tracker.autorun(rebuildView)
+  Template.Spreadsheet.rendered = ->
+    Tracker.autorun(rebuildView)
 
 Meteor.methods({
   # Implement these two methods to reduce display jankiness, since they're easy.

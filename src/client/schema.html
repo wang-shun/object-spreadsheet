@@ -1,0 +1,26 @@
+<template name="Schema">
+  <div id="ActionBar"><h1>Schema</h1></div>
+  <div id="Schema">
+    <table>
+      <tr>
+        <td></td><th>name / cellName</th><th>parent</th><th>type</th>
+      </tr>
+      {{#each columns}}
+      <tr>
+        <th class="noisy">{{short _id}}</th>
+        <td>
+          {{#if name}}
+            {{name}}
+          {{/if}}
+          {{#if cellName}}
+            / {{cellName}}
+          {{/if}}
+        </td>
+        <td class="noisy">{{short parent}}</td>
+        <td class="noisy">{{short type}}</td>
+        <td>{{human parent}} <to></to> {{human type}}</td>
+      </tr>
+      {{/each}}
+    </table>
+  </div>
+</template>
