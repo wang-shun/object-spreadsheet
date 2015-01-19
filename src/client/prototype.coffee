@@ -206,7 +206,7 @@ onSelection = () ->
 
 fullTextToShow = new ReactiveVar(null)
 
-Template.body.helpers({
+Template.formulaValueBar.helpers({
   fullTextToShow: () -> fullTextToShow.get()
   newColumnArgs: () -> newColumnArgs.get()
   addStateCellArgs: () -> addStateCellArgs.get()
@@ -283,13 +283,13 @@ Template.changeFormula.helpers({
 Template.changeFormula.events({
   'input .formula': (event, template) ->
     newFormulaStr.set(template.find('input[name=formula]').value)
-  'click .submit': (event, template) ->
+  'submit form': (event, template) ->
     formulaStr = template.find('input[name=formula]').value
     try
       formula = JSON.parse(formulaStr)
     catch e
       alert('Invalid JSON.')
-      return
+      return false
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
     template.find('input[name=formula]').value = JSON.stringify(formula)
@@ -297,10 +297,14 @@ Template.changeFormula.events({
                 @columnId,
                 formula,
                 standardServerCallback)
-  'click .cancel': (event, template) ->
+    false # prevent refresh
+  'click [type=reset]': (event, template) ->
     orig = JSON.stringify(getColumn(@columnId).formula)
     newFormulaStr.set(orig)
     template.find('input[name=formula]').value = orig
+    false # prevent clear
+  'keydown form': (event, template) ->
+    if (event.which == 27) then template.find("[type=reset]").click()
 })
 
 class View
