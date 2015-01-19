@@ -39,7 +39,7 @@ body { margin: 0; }
 }
 
 #ActionBar {
-  height: 3em;
+  min-height: 3em;
   padding: 9px;
   background: rgb(133,178,211); /* Old browsers */
   background: -moz-linear-gradient(top, rgba(133,178,211,1) 0%, rgba(167,199,220,1) 100%); /* FF3.6+ */
