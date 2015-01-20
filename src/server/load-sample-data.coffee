@@ -114,7 +114,9 @@
   # Type _token: successive integer tokens for now.
   T = (cellList) -> ([i.toString(), cell] for cell, i in cellList)
 
-  I = () -> (x.toString() for x in arguments)
+  I = () ->
+    for x in arguments
+      if typeof x == 'number' then x.toString() else x
 
   # _mark is used only to refer to a cell within this input format.  IDs will be
   # assigned by the loading code.
@@ -199,23 +201,23 @@
     ])
     Meeting: T([
       {
-      enrollment: V(I(2, 0, 2))
+      enrollment: V(I(2, 0, I(2, 'X')))
       slot: V(I(1, 'X', 0))
       }
       {
-      enrollment: V(I(0, 0, 2))
+      enrollment: V(I(0, 0, I(2, 'X')))
       slot: V(I(0, 'X', 1))
       }
       {
-      enrollment: V(I(1, 0, 2))
+      enrollment: V(I(1, 0, I(2, 'X')))
       slot: V(I(0, 'X', 2))
       }
       {
-      enrollment: V(I(0, 0, 3))
+      enrollment: V(I(0, 0, I(3, 'X')))
       slot: V(I(0, 'X', 3))
       }
       {
-      enrollment: V(I(1, 0, 4))
+      enrollment: V(I(1, 0, I(4, 'X')))
       slot: V(I(0, 'X', 0))
       }
     ])
