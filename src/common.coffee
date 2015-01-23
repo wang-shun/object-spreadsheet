@@ -45,12 +45,11 @@
 
 @FAMILY_DATA_COLLECTION = 'familyData'
 @COLUMN_COLLECTION = 'columns'
+@CELLS_COLLECTION = 'cells'
 @FAMILY_IN_PROGRESS = 1  # should not be seen by the client
 @FAMILY_SUCCESS = 2
 @FAMILY_ERROR = 3
 
-# We can only define this in one file.
-@Columns = new Mongo.Collection(COLUMN_COLLECTION)
 if Meteor.isClient
   @getColumn = (id) -> Columns.findOne(id)
 
@@ -163,3 +162,15 @@ class @TypedSet
   @fromJSONValue: (json) ->
     new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set))
 EJSON.addType('TypedSet', TypedSet.fromJSONValue)
+
+class Tree
+  constructor: (@root, @subtrees=[]) ->
+
+set = (x) -> new EJSONKeyedSet(x)
+T = -> new Tree(arguments...)
+
+exported = (d) ->
+  for k,v of d
+    @[k] = v
+
+exported {exported, set, Tree, T}

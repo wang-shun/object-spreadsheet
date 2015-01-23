@@ -3,6 +3,13 @@ standardServerCallback = (error, result) ->
   if error?
     alert('The operation failed on the server: ' + error.message)
 
+andThen = (cont) ->
+  (error, result) ->
+    if error?
+      standardServerCallback(arguments...)
+    else
+      cont(result)
+
 # The Error constructor is not usable by subclasses
 # (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
 # version of CoffeeScript is doing), but apparently we can throw any object we
@@ -54,7 +61,8 @@ class ViewHlist
 
 class ViewSection
 
-  constructor: (@columnId) ->
+  constructor: (@layoutTree) ->
+    @columnId = @layoutTree.root
     @col = getColumn(@columnId)
     unless @col?
       throw new NotReadyError()
@@ -71,8 +79,8 @@ class ViewSection
     @haveSeparatorColBefore = []
     @subsections = []
     @headerHeightBelow = 3  # name, id, type
-    for childColumnId in @col.children
-      subsection = new ViewSection(childColumnId)
+    for sublayout in @layoutTree.subtrees
+      subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
@@ -87,12 +95,11 @@ class ViewSection
     @headerMinHeight = 1 + @headerHeightBelow  # cellName
 
   prerenderVlist: (parentCellId) ->
-    familyData = FamilyData.findOne(EJSON.stringify({columnId: @columnId, cellId: parentCellId}))
-    unless familyData?
-      throw new NotReadyError()
-    if familyData.state == FAMILY_SUCCESS
+    column = new ColumnBinRel(@columnId)
+    familyData = column.lookup(set([parentCellId]))
+    if 1  # TODO familyData.state == FAMILY_SUCCESS
       hlists =
-        for value in familyData.content.set.elements()
+        for value in familyData.set.elements()
           @prerenderHlist(parentCellId, value)
       minHeight = 0
       for hlist in hlists
@@ -178,6 +185,9 @@ class ViewSection
     gridVertExtend(gridTop, gridBelow)
     gridTop
 
+Meteor.subscribe "columns"
+Meteor.subscribe "cells"
+
 view = null
 # XXX: OK to reference this variable from View?
 viewHOT = null
@@ -255,19 +265,19 @@ Template.newColumn.events({
 
 addStateCellArgs = new ReactiveVar([], EJSON.equals)
 Template.addStateCell.events({
-  'click .submit': (event, template) ->
+  'submit form': (event, template) ->
     valueStr = template.find('input[name=value]').value
     try
       value = JSON.parse(valueStr)
     catch e
       alert('Invalid JSON.')
       return
-    Meteor.call('writeState',
-                @qFamilyId,
-                value,
-                true,
-                standardServerCallback)
-    # XXX: Clear the field on successful submission (only)
+    key = @qFamilyId.cellId
+    new ColumnBinRel(@qFamilyId.columnId)
+      .add key, value,
+    # Clear the field on successful submission (only)
+    andThen -> template.find('input[name=value]').value = ''
+    false # prevent clear
 })
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
@@ -312,8 +322,14 @@ Template.changeFormula.events({
 
 class View
 
-  constructor: ->
-    @mainSection = new ViewSection(rootColumnId)
+  constructor: (@layoutTree) ->
+    @mainSection = new ViewSection(@layoutTree)
+
+  @entire: -> new @ @drillDown(rootColumnId)
+
+  @drillDown: (startingColumnId) ->
+    children = Columns.findOne(startingColumnId)?.children || []
+    new Tree(startingColumnId, (@drillDown child for child in children))
 
   hotConfig: ->
     thisView = this
@@ -460,10 +476,14 @@ class View
                 c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
             callback: () ->
               c = thisView.getSingleSelectedCell()
-              Meteor.call('writeState',
-                          {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)},
-                          cellIdLastStep(c.qCellId.cellId), false,
-                          standardServerCallback)
+              key = cellIdParent(c.qCellId.cellId)
+              value = cellIdLastStep(c.qCellId.cellId)
+              new ColumnBinRel(c.qCellId.columnId)
+                .remove(key, value, standardServerCallback)
+              #Meteor.call('writeState',
+              #            {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)},
+              #            cellIdLastStep(c.qCellId.cellId), false,
+              #            standardServerCallback)
           }
         }
       }
@@ -502,7 +522,7 @@ rebuildView = () ->
     viewHOT = null
     view = null
   try
-    view = new View()
+    view = View.entire()
     hotConfig = view.hotConfig()
   catch e
     if e instanceof NotReadyError
@@ -540,3 +560,6 @@ Meteor.methods({
   changeColumnCellName: (columnId, cellName) ->
     Columns.update(columnId, {$set: {cellName: cellName}})
 })
+
+$ ->
+  exported {View, rebuildView}

@@ -49,7 +49,7 @@ class Model
     for col in Columns.find().fetch()
       @columns.set(col._id, col)
       @initializeColumnTempData(col)
-      for cellIdStr of col.cells ? {}
+      for cellIdStr of {} #col.cells ? {}
         cellId = EJSONfromMongoFieldName(cellIdStr)
         @state.add({columnId: col._id, cellId: cellIdParent(cellId)},
                    cellIdLastStep(cellId))
@@ -354,6 +354,15 @@ class Model
       for publisher in @publishers
         @publishFamily(qFamilyId, publisher)
 
+  ## Removes all column definitions and data!
+  drop: ->
+    Columns.remove({_id: {$ne: rootColumnId}})
+    Columns.update(rootColumnId, {$set: {children: []}})
+    Cells.remove({})
+    # TODO maybe more stuff??
+    @columns = new EJSONKeyedMap()
+    @state = new EJSONKeyedMapToSet()
+
   unpublishFormulaColumnType: (columnId, publisher) ->
     publisher.removed(FORMULA_COLUMN_TYPE_COLLECTION, columnId)
 
@@ -375,10 +384,10 @@ class Model
                     @familyCache.get(qFamilyId))
 
   unpublishColumn: (columnId, publisher) ->
-    publisher.removed(COLUMN_COLLECTION, columnId)
+    #publisher.removed(COLUMN_COLLECTION, columnId)
 
   publishColumn: (columnId, publisher) ->
-    publisher.added(COLUMN_COLLECTION, columnId, @columns.get(columnId))
+    #publisher.added(COLUMN_COLLECTION, columnId, @columns.get(columnId))
 
   invalidateCache: ->
     if @familyCache?
@@ -409,17 +418,25 @@ class Model
     @publishers.splice(@publishers.indexOf(publisher), 1)
 
 Meteor.startup () ->
-  @model = new Model()
+  exported {Model}
+  if Columns.findOne(rootColumnId)?
+    @model = new Model
+  else
+    @model = loadSampleData()
+  #@model = new Model()
   @getColumn = (id) -> model.getColumn(id)
-  if model.columns.keys().length == 1  # root column :/
-    loadSampleData()
+  #if model.columns.keys().length == 1  # root column :/
+  #loadSampleData()
   model.evaluateAll()
+
+Meteor.publish "columns", -> Columns.find()
+Meteor.publish "cells", -> Cells.find()
 # Publish everything for now.
 # Future: Reduce amount of add/remove thrashing.
-Meteor.publish(null, () ->
-  @onStop(() -> model.removePublisher(this))
-  model.addPublisher(this)
-)
+#Meteor.publish(null, () ->
+#  @onStop(() -> model.removePublisher(this))
+#  model.addPublisher(this)
+#)
 Meteor.methods({
   # The model methods do not automatically evaluate so that we can do bulk
   # changes from the server side, but for now we always evaluate after each

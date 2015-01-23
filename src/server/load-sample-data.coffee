@@ -226,6 +226,12 @@
   # Add a super dict representing _unit, though it doesn't get an ID or anything.
   superSchema = {children: sampleSchema}
 
+  # Delete all existing columns!!
+  new Model().drop()
+
+  model = new Model()
+  @getColumn = (id) -> model.getColumn(id)
+
   scanColumns = (parentId, schema) ->
     schema.children ?= []
     for columnDef, i in schema.children
@@ -246,18 +252,21 @@
   insertCells = (columnId, cellId, cellData) ->
     for childColumnName, childCells of cellData ? {}
       childColumnId = model.getColumn(columnId).childByName.get(childColumnName)
+      childColumn = new ColumnBinRel(childColumnId)
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
-        model.writeState({columnId: childColumnId, cellId: cellId}, value, true)
+        childColumn.add(cellId, value)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
   # XXX parseTypeStr is not really meant to be used for this.
-  slotColumnId = parseTypeStr('Person.Teacher.Slot')
-  meetingColumnId = parseTypeStr('Meeting')
-  meetingSlotColumnId = parseTypeStr('Meeting.slot')
-  model.defineColumn(slotColumnId, 1, 'meeting1', null, null,
-                     ["cells",["cellsWithValues",["lit","_root",[[]]],meetingSlotColumnId,["var","this"]],meetingColumnId])
-  model.defineColumn(slotColumnId, 2, 'meeting2', null, null,
-                     ["filter",["cells",["lit","_root",[[]]],meetingColumnId],["m",["=",["values",["var","m"],meetingSlotColumnId],["var","this"]]]])
+  #slotColumnId = parseTypeStr('Person.Teacher.Slot')
+  #meetingColumnId = parseTypeStr('Meeting')
+  #meetingSlotColumnId = parseTypeStr('Meeting.slot')
+  #model.defineColumn(slotColumnId, 1, 'meeting1', null, null,
+  #                   ["cells",["cellsWithValues",["lit","_root",[[]]],meetingSlotColumnId,["var","this"]],meetingColumnId])
+  #model.defineColumn(slotColumnId, 2, 'meeting2', null, null,
+  #                   ["filter",["cells",["lit","_root",[[]]],meetingColumnId],["m",["=",["values",["var","m"],meetingSlotColumnId],["var","this"]]]])
+
+  model
