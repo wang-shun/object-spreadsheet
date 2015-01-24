@@ -29,6 +29,18 @@ class ColumnBinRel
     else
       Meteor.call 'ColumnBinRel_remove', @columnId, key, value, callback
 
+  ## remove(key, oldValue) + add(key, newValue) in a single operation
+  removeAdd: (key, oldValue, newValue, callback=->) ->
+    if (oldValue != newValue)
+      if Meteor.isServer
+        # This WOULD have been nice, but is not supported (Mongo ticket SERVER-1050)
+        #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}
+        Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
+        Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
+        Meteor.call 'notifyChange', callback
+      else
+        Meteor.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
+
   lookup: (keys) ->
     # @param keys: an EJSONKeyedSet or TypedSet
     # @return a TypedSet with matching values from column, {x.column | x in keys}
@@ -66,6 +78,8 @@ if Meteor.isServer
       new ColumnBinRel(columnId).add(key, value)
     ColumnBinRel_remove: (columnId, key, value) ->
       new ColumnBinRel(columnId).remove(key, value)
+    ColumnBinRel_removeAdd: (columnId, key, oldValue, newValue) ->
+      new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
 
 exported = (d) ->

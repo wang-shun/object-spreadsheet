@@ -276,18 +276,52 @@ addStateCellArgs = new ReactiveVar([], EJSON.equals)
 Template.addStateCell.events({
   'submit form': (event, template) ->
     valueStr = template.find('input[name=value]').value
-    try
-      value = JSON.parse(valueStr)
-    catch e
-      alert('Invalid JSON.')
-      return false
-    key = @qFamilyId.cellId
-    new ColumnBinRel(@qFamilyId.columnId)
-      .add key, value,
+    StateEdit.addCell @qFamilyId, valueStr,
     # Clear the field on successful submission (only)
     andThen -> template.find('input[name=value]').value = ''
     false # prevent clear
 })
+
+class StateEdit
+
+  @parseValue: (type, text) ->
+    if type in ['_string', '_token', '_unit']
+      text
+    else
+      JSON.parse text
+
+  @parseValueUi: (columnId, text) ->
+    col = getColumn(columnId)
+    try
+      @parseValue col.type, text
+    catch e
+      alert('Invalid value: ' + e.message)
+      null
+
+  @addCell: (qFamilyId, enteredValue, callback=->) ->
+    if (value = @parseValueUi qFamilyId.columnId, enteredValue)?
+      key = qFamilyId.cellId
+      new ColumnBinRel(qFamilyId.columnId)
+        .add key, value, callback
+
+  @modifyCell: (qCellId, enteredValue, callback=->) ->
+    if (newValue = @parseValueUi qCellId.columnId, enteredValue)?
+      key = cellIdParent(qCellId.cellId)
+      value = cellIdLastStep(qCellId.cellId)
+      # TODO check if cell has children!
+      new ColumnBinRel(qCellId.columnId)
+        .removeAdd key, value, newValue, callback
+
+  @removeCell: (qCellId, callback=->) ->
+    key = cellIdParent(qCellId.cellId)
+    value = cellIdLastStep(qCellId.cellId)
+    # TODO check if cell has children!
+    new ColumnBinRel(qCellId.columnId)
+      .remove key, value, callback
+
+  @canEdit: (qCellId) ->
+    col = getColumn(qCellId.columnId)
+    col? && columnIsState(col) && !columnIsToken(col)
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 Template.changeFormula.rendered = () ->
@@ -381,7 +415,8 @@ class View
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
-          readOnly: !(cell.columnIdTop ? cell.columnIdBelow)?
+          readOnly: !(cell.columnIdTop ? cell.columnIdBelow)? &&
+                    !(cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -413,6 +448,8 @@ class View
             Meteor.call('changeColumnName',
                         cell.columnIdBelow, newVal,
                         standardServerCallback)
+          if cell.qCellId?
+            StateEdit.modifyCell cell.qCellId, newVal
         # Don't apply the changes directly; let them come though the Meteor
         # stubs.  This ensures that they get reverted by Meteor if the server
         # call fails.
@@ -485,10 +522,8 @@ class View
                 c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
             callback: () ->
               c = thisView.getSingleSelectedCell()
-              key = cellIdParent(c.qCellId.cellId)
-              value = cellIdLastStep(c.qCellId.cellId)
-              new ColumnBinRel(c.qCellId.columnId)
-                .remove(key, value, standardServerCallback)
+              if c.qCellId?
+                StateEdit.removeCell c.qCellId, standardServerCallback
           }
         }
       }

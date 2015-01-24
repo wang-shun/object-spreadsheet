@@ -28,6 +28,7 @@ class SemanticError extends Error
 #@formula: some JSON data structure, or null
 
 @columnIsState = (col) -> col._id != rootColumnId && !col.formula?
+@columnIsToken = (col) -> col.type == '_token'
 
 # Requires that an appropriate global getColumn function be defined.
 @parseTypeStr = (s) ->
