@@ -354,26 +354,24 @@ class View
     grid = gridCaption
     @grid = grid
 
+    separatorColumns = (i for cell,i in grid[headerHeight - 2] when !(cell.value))
+
     d = {
       data: ((cell.value for cell in row) for row in grid)
       # Separator columns are 8 pixels wide.  Others use default width.
-      colWidths: (for cell in grid[headerHeight - 2]  # id row (hack)
-                    if cell.value then undefined else 8)
+      colWidths: (for i in [0..@mainSection.width]
+                    if i in separatorColumns then 10 else undefined)
       cells: (row, col, prop) ->
         cell = grid[row][col]
+        adjcol = col+cell.colspan
+        colClasses = if col in separatorColumns then ['separator'] else
+                     if adjcol in separatorColumns then ['incomparable'] else []
         {
-          className: cell.cssClasses.join(' ')
+          className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
           readOnly: !(cell.columnIdTop ? cell.columnIdBelow)?
         }
-      # TODO: Make this work again if desired (Matt is not convinced).
-      #!afterGetColHeader: (col, TH) =>
-      #!  if header[col+1] == ''
-      #!    ($ TH) .addClass 'incomparable'
-      #!columns: (for n in header
-      #!            if n then {} else {className: 'incomparable'})\
-      #!         [1..] .concat [{}]
       autoColumnSize: true
       mergeCells: [].concat((
         for row,i in grid
@@ -480,10 +478,6 @@ class View
               value = cellIdLastStep(c.qCellId.cellId)
               new ColumnBinRel(c.qCellId.columnId)
                 .remove(key, value, standardServerCallback)
-              #Meteor.call('writeState',
-              #            {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)},
-              #            cellIdLastStep(c.qCellId.cellId), false,
-              #            standardServerCallback)
           }
         }
       }
