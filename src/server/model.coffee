@@ -354,12 +354,28 @@ class Model
       for publisher in @publishers
         @publishFamily(qFamilyId, publisher)
 
+  evaluateColumn: (column) ->
+    if _.isString(column)
+      column = Columns.find column
+    if column.formula?
+      parent = new ColumnBinRel(column.parent)
+      for cell in parent.cells()
+        cellId = cellIdChild(cell[0], cell[1])
+        values = @evaluateFamily1 {columnId: column._id, cellId}
+        Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}
+        Columns.update(column._id, {$set: {type: values.type}})
+
+  evaluateAllFlat: ->
+    computed = Columns.find({formula: {$ne: null}}).fetch()
+    for column in computed
+      @evaluateColumn column
+
   ## Removes all column definitions and data!
   drop: ->
     Columns.remove({_id: {$ne: rootColumnId}})
     Columns.update(rootColumnId, {$set: {children: []}})
     Cells.remove({})
-    # TODO maybe more stuff??
+    # TODO this is clearly not enough
     @columns = new EJSONKeyedMap()
     @state = new EJSONKeyedMapToSet()
 
@@ -423,11 +439,8 @@ Meteor.startup () ->
     @model = new Model
   else
     @model = loadSampleData()
-  #@model = new Model()
   @getColumn = (id) -> model.getColumn(id)
-  #if model.columns.keys().length == 1  # root column :/
-  #loadSampleData()
-  model.evaluateAll()
+  model.evaluateAllFlat()
 
 Meteor.publish "columns", -> Columns.find()
 Meteor.publish "cells", -> Cells.find()
@@ -445,19 +458,21 @@ Meteor.methods({
   # Future: validation!
   defineColumn: (parentId, index, name, type, cellName, formula) ->
     model.defineColumn(parentId, index, name, type, cellName, formula)
-    model.evaluateAll()
+    #model.evaluateAll()
   changeColumnName: (columnId, name) ->
     model.changeColumnName(columnId, name)
-    model.evaluateAll()
+    #model.evaluateAll()
   changeColumnCellName: (columnId, cellName) ->
     model.changeColumnCellName(columnId, cellName)
-    model.evaluateAll()
+    #model.evaluateAll()
   changeColumnFormula: (columnId, formula) ->
     model.changeColumnFormula(columnId, formula)
-    model.evaluateAll()
+    model.evaluateAllFlat()
   deleteColumn: (columnId) ->
     model.deleteColumn(columnId)
-    model.evaluateAll()
+    #model.evaluateAll()
+  notifyChange: ->
+    model.evaluateAllFlat()
   writeState: (qFamilyId, value, present) ->
     model.writeState(qFamilyId, value, present)
     model.evaluateAll()

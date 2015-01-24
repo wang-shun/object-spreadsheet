@@ -69,9 +69,9 @@ class ViewSection
     # Future: Set this when we know it.
     @relationSingular = false
     # Might be undefined (root cell or no cells), fail gently.
-    @type =
-      if @col.formula? then FormulaColumnType.findOne(@columnId)?.type
-      else @col.type
+    @type = @col.type
+    #  if @col.formula? then FormulaColumnType.findOne(@columnId)?.type
+    #  else @col.type
     @width = 1
     @leftEdgeSingular = true
     @rightEdgeSingular = true
@@ -170,8 +170,12 @@ class ViewSection
     # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
     idCell = new ViewCell(@columnId.substr(0, 4))
     idCell.fullText = @columnId
+    typeName = (s) ->
+      if _.isArray(s) then (typeName(x) for x in s)
+      else if typeIsPrimitive(s) then s
+      else Columns.findOne(s)?.cellName ? (""+s)[...4]
     typeCell = new ViewCell(
-      (@type?.substr(0, 4) ? '') + (if @col.formula? then '=' else ''))
+      (if @col.formula? then '=' else '') + typeName(@type))
     typeCell.fullText = (@type ? '') + (if @col.formula? then ' (formula)' else '')
     gridVertExtend(gridBelow, [[idCell]])
     gridVertExtend(gridBelow, [[typeCell]])
@@ -271,7 +275,7 @@ Template.addStateCell.events({
       value = JSON.parse(valueStr)
     catch e
       alert('Invalid JSON.')
-      return
+      return false
     key = @qFamilyId.cellId
     new ColumnBinRel(@qFamilyId.columnId)
       .add key, value,

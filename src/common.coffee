@@ -9,6 +9,8 @@
 @cellIdChild = (cellId, value) -> cellId.concat([value])
 @cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
 
+class SemanticError extends Error
+
 # Model data structures and parameters the client needs to be aware of:
 # (I tried using EJSON custom classes but it was too much of a pain to store in
 # the DB.  If I find a good solution, we could go back to using EJSON custom
@@ -30,13 +32,18 @@
 # Requires that an appropriate global getColumn function be defined.
 @parseTypeStr = (s) ->
   if typeIsPrimitive(s)
-    return s
+    s
   else
-    colId = rootColumnId
-    for n in s.split('.')
-      # XXX: Maybe types should accept cellName only.
-      colId = getColumn(colId).childByName.get(n)
-    return colId
+    @parseColumnRef s
+
+@parseColumnRef = (s) ->
+  colId = rootColumnId
+  for n in s.split(':')
+    # XXX: Maybe types should accept cellName only.
+    colId = getColumn(colId).childByName.get(n)
+    if !colId
+      throw new SemanticError("column lookup failed: '#{s}'")
+  return colId
 
 # CacheEntry:
 #@state: one of FAMILY_{IN_PROGRESS,SUCCESS,ERROR}
@@ -157,6 +164,8 @@ class @TypedSet
     for e in tset.set.elements()
       @set.add(e)
 
+  elements: -> @set.elements()
+
   typeName: -> 'TypedSet'
   toJSONValue: -> {type: @type, set: @set.toJSONValue()}
   @fromJSONValue: (json) ->
@@ -173,4 +182,4 @@ exported = (d) ->
   for k,v of d
     @[k] = v
 
-exported {exported, set, Tree, T}
+exported {exported, set, Tree, T, SemanticError}

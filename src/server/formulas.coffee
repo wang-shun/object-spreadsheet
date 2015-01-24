@@ -81,7 +81,8 @@ ColumnId = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Column ID must be a string')
   adapt: (model, vars, arg) ->
-    evalAssert(model.getColumn(arg)?, 'Column does not exist')
+    if !(model.getColumn(arg))
+      arg = parseColumnRef arg
     arg
 }
 Type = {
@@ -172,6 +173,57 @@ dispatch = {
         throw new FormulaValidationError('Undefined variable ' + varName)
     evaluate: (model, vars, varName) ->
       vars.get(varName)
+
+  # ["col", columnId]
+  # Returns all the cells of the column as pairs
+  col:
+    argAdapters: [ColumnId]
+    evaluate: (model, vars, columnId) ->
+      new ColumnBinRel(columnId).cellset()
+
+  "col->":
+    argAdapters: [ColumnId]
+    evaluate: (model, vars, columnId) ->
+      column = Columns.findOne(columnId)
+      cells = new ColumnBinRel(columnId).cells()
+      edgeset = set([cell[0], cellIdChild(cell[0], cell[1])] for cell in cells)
+      new TypedSet([column.parent, columnId], edgeset)
+
+  # ["*", cells]
+  # Gets the values of the cells
+  "*":
+    argAdapters: [EagerSubformula]
+    evaluate: (model, vars, cells) ->
+      type = Columns.findOne(cells.type)?.type || "_any"
+      new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
+
+  # shortcut for ["*", ["var", "this"]]
+  "_":
+    argAdapters: []
+    evaluate: (model, vars) ->
+      thisSet = vars.get("this")
+      if !thisSet
+        new TypedSet("_nothing", set())
+      else
+        type = Columns.findOne(thisSet.type)?.type || "_any"
+        new TypedSet(type, set((cellIdLastStep(x) for x in thisSet.elements())))
+
+  # ["compose", set-of-values, set-of-pairs]
+  # Relational composition between a unary relation (set) and a binary relation
+  # (set of pairs)
+  compose:
+    argAdapters: [EagerSubformula, EagerSubformula]
+    evaluate: (model, vars, keys, binrel) ->
+      [dom, ran] = binrel.type
+      new PairsBinRel(binrel.elements(), dom, ran).lookup(keys)
+
+  # ["xpose", set-of-pairs]
+  # Transposes a binary relation
+  xpose:
+    argAdapters: [EagerSubformula]
+    evaluate: (model, vars, binrel) ->
+      [dom, ran] = binrel.type
+      new PairsBinRel(binrel.elements(), dom, ran).transpose().cellset()
 
   # ["cells", startCells (subformula), targetColumnId]:
   # startCells must return a set of cells in in a "starting" column, and

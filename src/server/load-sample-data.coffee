@@ -67,7 +67,7 @@
       children: [
         {
         name: 'teacher'
-        type: 'Person.Teacher'
+        type: 'Person:Teacher'
         # TODO: Required, singleton
         }
         {
@@ -77,7 +77,7 @@
         # the section.  But for now, this is useful as an example of having both
         # a name and a cellName. ~ Matt
         name: 'student'
-        type: 'Person.Student'
+        type: 'Person:Student'
         cellName: 'Enrollment'
         }
       ]
@@ -90,12 +90,12 @@
     children: [
       {
       name: 'enrollment'
-      type: 'Class.Section.Enrollment'
+      type: 'Class:Section:Enrollment'
       # TODO: Required, singleton, unique
       }
       {
       name: 'slot'
-      type: 'Person.Teacher.Slot'
+      type: 'Person:Teacher:Slot'
       # TODO: Required, singleton, unique
       }
       # TODO: Constraint slot.Teacher == enrollment.Teacher
@@ -260,13 +260,18 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  # XXX parseTypeStr is not really meant to be used for this.
-  #slotColumnId = parseTypeStr('Person.Teacher.Slot')
-  #meetingColumnId = parseTypeStr('Meeting')
-  #meetingSlotColumnId = parseTypeStr('Meeting.slot')
-  #model.defineColumn(slotColumnId, 1, 'meeting1', null, null,
-  #                   ["cells",["cellsWithValues",["lit","_root",[[]]],meetingSlotColumnId,["var","this"]],meetingColumnId])
-  #model.defineColumn(slotColumnId, 2, 'meeting2', null, null,
-  #                   ["filter",["cells",["lit","_root",[[]]],meetingColumnId],["m",["=",["values",["var","m"],meetingSlotColumnId],["var","this"]]]])
+  model.defineColumn(parseColumnRef("Person:Student:parent"),
+                     0, "parent's name", null, null,
+                     ["compose", ["_"], ["col", "Person:name"]])
+  model.defineColumn(parseColumnRef("Person:Teacher:Slot"),
+                     1, "scheduled meeting", null, null,
+                     ["compose",["var","this"],["xpose",["col","Meeting:slot"]]])
+
+  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting"),
+                     0, "discussed", null, null,
+                     ["*",["compose",["_"],["col","Meeting:enrollment"]]])
+  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting:discussed"),
+                     0, "student's name", null, null,
+    ["compose",["compose",["_"],["xpose",["col->","Person:Student"]]],["col","Person:name"]])
 
   model
