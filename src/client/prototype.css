@@ -35,7 +35,18 @@ body { margin: 0; }
 
 /* Ugly but at least recognizable. */
 .rsDialog {
-  border: 3px outset;
+  background: rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+
+.rsDialog label {
+  font-family: sans-serif;
+  font-size: smaller;
+}
+
+.rsDialog h1 {
+  float: left;
+  margin: 9px;
 }
 
 .formulaModified {

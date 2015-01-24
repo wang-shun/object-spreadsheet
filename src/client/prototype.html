@@ -35,20 +35,18 @@
 
 <template name="newColumn">
   <form class="rsDialog">
-    <h2>New column</h2>
+    <h1>New column</h1>
     <div>
       <input id="newColumn-kind-state" type="radio" name="kind" value="state"/>
-      <label for="newColumn-kind-state">State column</label>
+      <label for="newColumn-kind-state">State column of type</label>
+        <input id="newColumn-datatype" disabled="{{newColumnIsFormula}}" type="text" name="datatype"/>
+         (primitive or colon-separated names)
+      <br/>
       <input id="newColumn-kind-formula" type="radio" name="kind" value="formula" checked="checked"/>
       <label for="newColumn-kind-formula">Formula column</label>
     </div>
-    {{#if newColumnIsState}}
-      <div>
-        <label for="newColumn-datatype">Data type (primitive or dot-separated names):</label>
-        <input id="newColumn-datatype" type="text" name="datatype"/></div>
-    {{/if}}
     <div>
-      <input type="button" class="submit" value="Create"/>
+      <input type="submit" class="submit" value="Create"/>
       <input type="button" class="cancel" value="Cancel"/>
     </div>
   </form>

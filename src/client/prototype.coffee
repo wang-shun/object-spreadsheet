@@ -235,6 +235,7 @@ newColumnKind = new ReactiveVar(null)
 Template.newColumn.helpers({
   # This is ridiculous: spacebars won't let us compare two strings?
   newColumnIsState: () -> newColumnKind.get() == 'state'
+  newColumnIsFormula: () -> newColumnKind.get() == 'formula'
 })
 Template.newColumn.rendered = () ->
   # ensure consistent
@@ -242,27 +243,31 @@ Template.newColumn.rendered = () ->
 Template.newColumn.events({
   'change input[name=kind]': (event, template) ->
     newColumnKind.set(template.find('input[name=kind]:checked').value)
-  'click .submit': (event, template) ->
-    switch newColumnKind.get()
-      when 'state'
-        type = parseTypeStr(template.find('input[name=datatype]').value)
-        formula = null
-      when 'formula'
-        type = null
-        # Default formula to get the new column created ASAP.
-        # Then the user can edit it as desired.
-        formula = ['lit', '_unit', []]
-      else
-        throw new Error()  # should not happen
-    Meteor.call('defineColumn',
-                @parentId,
-                @index,
-                null,  # name
-                type,
-                null,  # cellName
-                formula,
-                standardServerCallback)
-    newColumnArgs.set([])
+  'submit form': (event, template) ->
+    try
+      switch newColumnKind.get()
+        when 'state'
+          type = parseTypeStr(template.find('input[name=datatype]').value)
+          formula = null
+        when 'formula'
+          type = null
+          # Default formula to get the new column created ASAP.
+          # Then the user can edit it as desired.
+          formula = ['lit', '_unit', []]
+        else
+          throw new Error()  # should not happen
+      Meteor.call('defineColumn',
+                  @parentId,
+                  @index,
+                  null,  # name
+                  type,
+                  null,  # cellName
+                  formula,
+                  standardServerCallback)
+      newColumnArgs.set([])
+    catch e
+      alert e.message
+    false  # prevent page reload
   'click .cancel': (event, template) ->
     newColumnArgs.set([])
 })
@@ -359,17 +364,19 @@ class View
     @grid = grid
 
     separatorColumns = (i for cell,i in grid[headerHeight - 2] when !(cell.value))
+    @separatorColumns = separatorColumns
 
     d = {
       data: ((cell.value for cell in row) for row in grid)
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for i in [0..@mainSection.width]
                     if i in separatorColumns then 10 else undefined)
-      cells: (row, col, prop) ->
-        cell = grid[row][col]
+      cells: (row, col, prop) =>
+        cell = @grid[row]?[col]
+        if !cell then return {}  # may occur if grid is changing
         adjcol = col+cell.colspan
-        colClasses = if col in separatorColumns then ['separator'] else
-                     if adjcol in separatorColumns then ['incomparable'] else []
+        colClasses = if col in @separatorColumns then ['separator'] else
+                     if adjcol in @separatorColumns then ['incomparable'] else []
         {
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
@@ -394,9 +401,9 @@ class View
       afterSelectionEnd: (r1, c1, r2, c2) ->
         onSelection()
 
-      beforeChange: (changes, source) ->
+      beforeChange: (changes, source) =>
         for [row, col, oldVal, newVal] in changes
-          cell = grid[row][col]
+          cell = @grid[row][col]
           # One of these cases should apply...
           if cell.columnIdTop?
             Meteor.call('changeColumnCellName',
@@ -488,6 +495,15 @@ class View
     }
     d
 
+  hotReconfig: (hot) ->
+    d = view.hotConfig()
+    ## Crazy hack!
+    MergeCells = hot.mergeCells.constructor
+    hot.mergeCells = new MergeCells(d.mergeCells)
+    hot.updateSettings {colWidths: d.colWidths}
+    hot.loadData d.data
+    #hot.render()
+
   getSingleSelectedCell: =>
     s = viewHOT.getSelected()
     unless s?
@@ -515,18 +531,24 @@ class View
     return false
 
 rebuildView = () ->
-  if viewHOT
-    viewHOT.destroy()
-    viewHOT = null
-    view = null
   try
-    view = View.entire()
-    hotConfig = view.hotConfig()
+    if !view || !viewHOT
+      if viewHOT
+        viewHOT.destroy()
+        viewHOT = null
+        view = null
+      view = View.entire()
+      hotConfig = view.hotConfig()
+      viewHOT = new Handsontable($('#View')[0], hotConfig)
+      @viewHOT = viewHOT
+    else
+      # Crazy hack!!
+      view.mainSection = View.entire().mainSection
+      view.hotReconfig viewHOT
   catch e
     if e instanceof NotReadyError
       return  # Let the autorun run again once we have the data.
     throw e
-  viewHOT = new Handsontable($('#View')[0], hotConfig)
   # Try to select a cell similar to the one previously selected.
   if selectedCell?
     ((selectedCell.qCellId? &&
@@ -541,12 +563,14 @@ rebuildView = () ->
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.columnIdBelow, c.columnIdBelow))) ||
      false)
 
+
 Meteor.startup () ->
   # Load order...
   @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
   @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
   Template.Spreadsheet.rendered = ->
+    #rebuildView()
     Tracker.autorun(rebuildView)
 
 Meteor.methods({
