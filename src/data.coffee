@@ -31,7 +31,7 @@ class ColumnBinRel
 
   ## remove(key, oldValue) + add(key, newValue) in a single operation
   removeAdd: (key, oldValue, newValue, callback=->) ->
-    if (oldValue != newValue)
+    if ! EJSON.equals(oldValue, newValue)
       if Meteor.isServer
         # This WOULD have been nice, but is not supported (Mongo ticket SERVER-1050)
         #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}

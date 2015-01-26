@@ -189,13 +189,6 @@ class ViewSection
     gridVertExtend(gridTop, gridBelow)
     gridTop
 
-Meteor.subscribe "columns"
-Meteor.subscribe "cells"
-
-view = null
-# XXX: OK to reference this variable from View?
-viewHOT = null
-
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
@@ -367,12 +360,17 @@ class View
 
   constructor: (@layoutTree) ->
     @mainSection = new ViewSection(@layoutTree)
+    @hot = null
 
   @entire: -> new @ @drillDown(rootColumnId)
 
   @drillDown: (startingColumnId) ->
     children = Columns.findOne(startingColumnId)?.children || []
     new Tree(startingColumnId, (@drillDown child for child in children))
+
+  entire: ->
+    @mainSection = View.entire().mainSection
+    @layoutTree = @mainSection.layoutTree
 
   hotConfig: ->
     thisView = this
@@ -449,7 +447,10 @@ class View
                         cell.columnIdBelow, newVal,
                         standardServerCallback)
           if cell.qCellId?
-            StateEdit.modifyCell cell.qCellId, newVal
+            if newVal
+              StateEdit.modifyCell cell.qCellId, newVal
+            else
+              StateEdit.removeCell cell.qCellId
         # Don't apply the changes directly; let them come though the Meteor
         # stubs.  This ensures that they get reverted by Meteor if the server
         # call fails.
@@ -467,14 +468,14 @@ class View
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop)? && ci != rootColumnId)
-            callback: () ->
+            callback: () =>
               c = thisView.getSingleSelectedCell()
               ci = c.columnIdTop
               col = getColumn(ci)
               parentId = col.parent
               parentCol = getColumn(parentId)
               index = parentCol.children.indexOf(ci)
-              viewHOT.deselectCell()
+              @hot.deselectCell()
               newColumnArgs.set([{parentId: parentId, index: index}])
           }
           addColumnRight: {
@@ -482,7 +483,7 @@ class View
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
                 ((ci = c.columnIdTop)? && ci != rootColumnId || c.columnIdBelow?))
-            callback: () ->
+            callback: () =>
               c = thisView.getSingleSelectedCell()
               if (ci = c.columnIdTop)?
                 # Like addColumnLeft except + 1
@@ -494,22 +495,22 @@ class View
                 # Child of the selected column
                 parentId = c.columnIdBelow
                 index = 0
-              viewHOT.deselectCell()
+              @hot.deselectCell()
               newColumnArgs.set([{parentId: parentId, index: index}])
           }
           deleteColumn: {
             name: 'Delete column'
-            disabled: () ->
+            disabled: () =>
               # Future: Support recursive delete.
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
               !((c = thisView.getSingleSelectedCell())? &&
                 (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId &&
                 (col = getColumn(ci)).children.length == 0 &&
                 !(columnIsState(col) && col.numStateCells > 0))
-            callback: () ->
+            callback: () =>
               c = thisView.getSingleSelectedCell()
               # Otherwise changeFormula form gets hosed.
-              viewHOT.deselectCell()
+              @hot.deselectCell()
               Meteor.call('deleteColumn',
                           c.columnIdTop ? c.columnIdBelow,
                           standardServerCallback)
@@ -520,8 +521,8 @@ class View
             disabled: () ->
               !((c = thisView.getSingleSelectedCell())? &&
                 c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
-            callback: () ->
-              c = thisView.getSingleSelectedCell()
+            callback: () =>
+              c = @getSingleSelectedCell()
               if c.qCellId?
                 StateEdit.removeCell c.qCellId, standardServerCallback
           }
@@ -530,9 +531,13 @@ class View
     }
     d
 
+  hotCreate: (domElement) ->
+    @hot = new Handsontable(domElement, @hotConfig())
+
   hotReconfig: (hot) ->
-    d = view.hotConfig()
+    d = @hotConfig()
     ## Crazy hack!
+    @hot = hot = hot ? @hot
     MergeCells = hot.mergeCells.constructor
     hot.mergeCells = new MergeCells(d.mergeCells)
     hot.updateSettings {colWidths: d.colWidths}
@@ -540,7 +545,7 @@ class View
     #hot.render()
 
   getSingleSelectedCell: =>
-    s = viewHOT.getSelected()
+    s = @hot.getSelected()
     unless s?
       # Unsure under what circumstances this can happen.  Whatever.
       return null
@@ -555,7 +560,7 @@ class View
 
   selectSingleCell: (r1, c1) ->
     cell = @grid[r1][c1]
-    viewHOT.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
+    @hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
 
   selectMatchingCell: (predicate) ->
     for i in [0..@grid.length-1] by 1
@@ -565,6 +570,14 @@ class View
           return true
     return false
 
+
+Meteor.subscribe "columns"
+Meteor.subscribe "cells"
+
+view = null
+viewHOT = null
+
+
 rebuildView = () ->
   try
     if !view || !viewHOT
@@ -573,13 +586,10 @@ rebuildView = () ->
         viewHOT = null
         view = null
       view = View.entire()
-      hotConfig = view.hotConfig()
-      viewHOT = new Handsontable($('#View')[0], hotConfig)
-      @viewHOT = viewHOT
+      viewHOT = view.hotCreate $('#View')[0]
     else
-      # Crazy hack!!
-      view.mainSection = View.entire().mainSection
-      view.hotReconfig viewHOT
+      view.entire()
+      view.hotReconfig()
   catch e
     if e instanceof NotReadyError
       return  # Let the autorun run again once we have the data.
