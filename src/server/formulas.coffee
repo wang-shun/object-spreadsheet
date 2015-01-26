@@ -179,12 +179,13 @@ dispatch = {
   col:
     argAdapters: [ColumnId]
     evaluate: (model, vars, columnId) ->
+      column = model.getColumn(columnId)
       new ColumnBinRel(columnId).cellset()
 
   "col->":
     argAdapters: [ColumnId]
     evaluate: (model, vars, columnId) ->
-      column = Columns.findOne(columnId)
+      column = model.getColumn(columnId) #Columns.findOne(columnId)
       cells = new ColumnBinRel(columnId).cells()
       edgeset = set([cell[0], cellIdChild(cell[0], cell[1])] for cell in cells)
       new TypedSet([column.parent, columnId], edgeset)
@@ -194,7 +195,7 @@ dispatch = {
   "*":
     argAdapters: [EagerSubformula]
     evaluate: (model, vars, cells) ->
-      type = Columns.findOne(cells.type)?.type || "_any"
+      type = model.getColumn(cells.type)?.type || "_any"
       new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
 
   # shortcut for ["*", ["var", "this"]]
@@ -205,7 +206,7 @@ dispatch = {
       if !thisSet
         new TypedSet("_nothing", set())
       else
-        type = Columns.findOne(thisSet.type)?.type || "_any"
+        type = model.getColumn(thisSet.type)?.type || "_any"
         new TypedSet(type, set((cellIdLastStep(x) for x in thisSet.elements())))
 
   # ["compose", set-of-values, set-of-pairs]
@@ -312,6 +313,13 @@ validateSubformula = (vars, formula) ->
                              'Invalid formula: ' + e.message)
     else
       throw e
+
+@trackerModel = (model) ->
+  depends: set()
+  getColumn: (columnId) ->
+    @depends.add columnId
+    @__proto__.getColumn arguments...
+  __proto__: model
 
 # Assumes formula has passed validation.
 # vars: EJSONKeyedMap<string, TypedSet>

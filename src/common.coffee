@@ -173,8 +173,84 @@ class @TypedSet
     new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set))
 EJSON.addType('TypedSet', TypedSet.fromJSONValue)
 
+
 class Tree
   constructor: (@root, @subtrees=[]) ->
+
+
+class Digraph
+  class @Node
+    constructor: (@label) ->
+      @in = []
+      @out = []
+  class @Edge
+    constructor: (@from, @to, @label=null) ->
+
+  constructor: ->
+    @nodes = []
+    @edges = []
+
+  add: (el) ->
+    if el instanceof Digraph.Node
+      @nodes.push el
+    else if el instanceof Digraph.Edge
+      @edges.push el
+      el.from.out.push el
+      el.to.in.push el
+    else
+      throw new Error("expected Digraph.Node or Digraph.Edge, got #{el}")
+
+  remove: (el) ->
+    if el instanceof Digraph.Node
+      for e in el.in.concat el.out
+        @remove e
+      @nodes = without @nodes, el
+    else if el instanceof Digraph.Edge
+      el.from.out = without el.from.out, el
+      el.to.in = without el.to.in, el
+      @edges = without @edges, el
+
+  disconnectIn: (node) ->
+    for e in node.in
+      e.from.out = without e.from.out, e
+    node.in = []
+
+  has: (el) ->
+    el in @nodes || el in @edges
+
+  findNode: (label, force=false) ->
+    for u in @nodes
+      if u.label == label then return u
+    if force
+      u = new Digraph.Node label
+      @add u
+      u
+
+  fromPairs: (listOfPairs) ->
+    node = (x) => @findNode(x, force: true)
+    for e in listOfPairs
+      @add new Digraph.Edge (node e[0]), (node e[1])
+
+  @fromPairs: (listOfPairs) ->
+    g = new @ ; g.fromPairs(listOfPairs)
+    g
+
+  topologicalSort: ->
+    visited = []
+    stack = []
+    visit = (u) ->
+      visited.push u
+      for e in u.out
+        v = e.to
+        if v not in visited then visit v
+      stack.push u
+    for u in @nodes
+      if u not in visited then visit u
+    stack.reverse()
+
+# helper functions
+without = (list, item) -> list.filter (x) -> x != item
+
 
 set = (x) -> new EJSONKeyedSet(x)
 T = -> new Tree(arguments...)
@@ -183,4 +259,4 @@ exported = (d) ->
   for k,v of d
     @[k] = v
 
-exported {exported, set, Tree, T, SemanticError}
+exported {exported, set, Tree, T, Digraph, SemanticError}

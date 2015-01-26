@@ -44,6 +44,8 @@ class Model
     @state = new EJSONKeyedMapToSet()
     @familyCache = null
 
+    @dependencies = new Digraph
+
     # Load from DB.
     # Future: Need a way to make a temporary model for a transaction without reloading.
     for col in Columns.find().fetch()
@@ -356,17 +358,25 @@ class Model
 
   evaluateColumn: (column) ->
     if _.isString(column)
-      column = Columns.find column
+      column = getColumn(column)
     if column.formula?
       parent = new ColumnBinRel(column.parent)
+      tmodel = trackerModel @
+      tmodel.depends.add parent
       for cell in parent.cells()
         cellId = cellIdChild(cell[0], cell[1])
-        values = @evaluateFamily1 {columnId: column._id, cellId}
+        values = tmodel.evaluateFamily1 {columnId: column._id, cellId}
         Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}
         Columns.update(column._id, {$set: {type: values.type}})
+      # update dependencies
+      if (u = @dependencies.findNode column._id)?
+        @dependencies.disconnectIn u
+      @dependencies.fromPairs ([dep, column._id] for dep in tmodel.depends.elements())
 
   evaluateAllFlat: ->
+    order = @dependencies.topologicalSort()
     computed = Columns.find({formula: {$ne: null}}).fetch()
+        .sort by_ (x) => order.indexOf @dependencies.findNode x._id
     for column in computed
       @evaluateColumn column
 
@@ -432,6 +442,11 @@ class Model
 
   removePublisher: (publisher) ->
     @publishers.splice(@publishers.indexOf(publisher), 1)
+
+# helper functions
+cmp = (a,b) -> if a<b then -1 else if a>b then 1 else 0
+by_ = (f) -> (x,y) -> cmp f(x), f(y)
+
 
 Meteor.startup () ->
   exported {Model}
