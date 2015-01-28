@@ -2,6 +2,7 @@ class @FormulaValidationError
   constructor: (@message) ->
 
 class @EvaluationError
+  constructor: (@message) ->
 
 class Model
 
@@ -367,7 +368,15 @@ class Model
       tmodel.depends.add parent
       for cell in parent.cells()
         cellId = cellIdChild(cell[0], cell[1])
-        values = tmodel.evaluateFamily1 {columnId: column._id, cellId}
+        try
+          values = tmodel.evaluateFamily1 {columnId: column._id, cellId}
+        catch e
+          if e instanceof EvaluationError
+            # Hack.  If you're lucky, the _error shows up in the UI.
+            console.log(e.message)
+            values = new TypedSet('_error')
+          else
+            throw e
         Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}
         Columns.update(column._id, {$set: {type: values.type}})
       # update dependencies

@@ -96,60 +96,42 @@ Type = {
     arg
 }
 
-# filterValuesTset may be null.
-doNavigate = (model, vars, startCellsTset, targetColId, filterValuesTset, wantValues) ->
-  unless startCellsTset.type?
-    # We can't navigate, but we know the result should be empty.
-    return if wantValues then new TypedSet() else new TypedSet(targetColId)
+getValues = (model, vars, cells) ->
+  # XXX: Fail on token columns
+  type = model.getColumn(cells.type)?.type || "_any"
+  new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
 
+goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
   [upPath, downPath] = model.findCommonAncestorPaths(startCellsTset.type, targetColId)
+  evalAssert(downPath.length == 1,
+             'Navigation from ' + startCellsTset.type + ' to ' + targetColId + ' is not up')
 
   # Go up.
   numIdStepsToDrop = upPath.length - 1
-  tmpCellIds = new EJSONKeyedSet()
+  result = new TypedSet(targetColId)
   for startCellId in startCellsTset.set.elements()
+    targetCellId = startCellId.slice(0, startCellId.length - numIdStepsToDrop)
     # Duplicates are thrown out.  Future: multisets?
-    tmpCellIds.add(startCellId.slice(0, startCellId.length - numIdStepsToDrop))
+    result.add(targetColId, startCellId.slice(0, startCellId.length - numIdStepsToDrop))
+
+  if wantValues then getValues(model, vars, result) else result
+
+goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
+  [upPath, downPath] = model.findCommonAncestorPaths(startCellsTset.type, targetColId)
+  # Getting the values of the start cells should be done using up, not down.
+  evalAssert(upPath.length == 1 && downPath.length > 1,
+             'Navigation from ' + startCellsTset.type + ' to ' + targetColId + ' is not down')
 
   # Go down.
+  cellsTset = startCellsTset
   for level in [downPath.length-2..0] by -1
     childColumnId = downPath[level]
-    newCellIds = new EJSONKeyedSet()
-    for cellId in tmpCellIds.elements()
-      for value in model.readFamilyForFormula({columnId: childColumnId, cellId: cellId}).set.elements()
-        newCellIds.add(cellIdChild(cellId, value))
-    tmpCellIds = newCellIds
+    model.getColumn(childColumnId)
+    cells = new ColumnBinRel(childColumnId).cells()
+    edges = ([cell[0], cellIdChild(cell[0], cell[1])] for cell in cells)
+    cellsTset = new PairsBinRel(edges, downPath[level+1], childColumnId).lookup(cellsTset)
 
-  # Processing related to values in the target column.
-  # This duplicates some of the work of the previous loop.
-  # Future: To support cellsWithValues to an infinite column, we'll need to
-  # skip the last iteration of the previous loop and directly construct the
-  # requested child cell IDs of each cell of the parent column rather than
-  # reading the (infinite) family.
-  if filterValuesTset? || wantValues
-    # We'll use one of the two.
-    newCellIds = new EJSONKeyedSet()
-    valuesTset = new TypedSet()
-    for cellId in tmpCellIds.elements()
-      value = cellIdLastStep(cellId)
-      valueType = model.readFamilyForFormula(
-        {columnId: targetColId, cellId: cellIdParent(cellId)}).type
-      if filterValuesTset? && !evalAsType(filterValuesTset, valueType).has(value)
-        continue
-      if wantValues
-        valuesTset.add(valueType, value)
-      else
-        newCellIds.add(cellId)
-    if wantValues
-      # Currently, we don't complain about heterogeneous values until you try to
-      # project them.
-      evalAssert(valuesTset.type != TYPE_MIXED,
-                 'Encountered heterogeneous values in column ' + targetColId)
-      return valuesTset
-    else
-      tmpCellIds = newCellIds
-
-  return new TypedSet(targetColId, tmpCellIds)
+  if wantValues then getValues(model, vars, cellsTset) else cellsTset
 
 dispatch = {
 
@@ -174,6 +156,10 @@ dispatch = {
     evaluate: (model, vars, varName) ->
       vars.get(varName)
 
+  ########
+  # I anticipate translating the concrete syntax only into calls to "up" and
+  # "down", not the functions from "col" to "xpose". ~ Matt
+
   # ["col", columnId]
   # Returns all the cells of the column as pairs
   col:
@@ -194,20 +180,13 @@ dispatch = {
   # Gets the values of the cells
   "*":
     argAdapters: [EagerSubformula]
-    evaluate: (model, vars, cells) ->
-      type = model.getColumn(cells.type)?.type || "_any"
-      new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
+    evaluate: getValues
 
   # shortcut for ["*", ["var", "this"]]
   "_":
     argAdapters: []
     evaluate: (model, vars) ->
-      thisSet = vars.get("this")
-      if !thisSet
-        new TypedSet("_nothing", set())
-      else
-        type = model.getColumn(thisSet.type)?.type || "_any"
-        new TypedSet(type, set((cellIdLastStep(x) for x in thisSet.elements())))
+      getValues(model, vars, vars.get("this") ? new TypedSet("_nothing", set()))
 
   # ["compose", set-of-values, set-of-pairs]
   # Relational composition between a unary relation (set) and a binary relation
@@ -226,37 +205,17 @@ dispatch = {
       [dom, ran] = binrel.type
       new PairsBinRel(binrel.elements(), dom, ran).transpose().cellset()
 
-  # ["cells", startCells (subformula), targetColumnId]:
-  # startCells must return a set of cells in in a "starting" column, and
-  # targetColumnId is the ID of a "target" column.  Let the "ancestor" column
-  # be the common ancestor of the starting and target columns.  Projects the
-  # starting cells up to ancestor cells in the ancestor column, and returns all
-  # descendants of these cells in the target column.
-  cells:
-    argAdapters: [EagerSubformulaCells, ColumnId]
-    evaluate: (model, vars, startCellsTset, targetColId) ->
-      doNavigate(model, vars, startCellsTset, targetColId, null, false)
+  ########
 
-  # ["values", startCells, targetColumnId]:
-  # Like "cells" but returns the values of the cells instead of their IDs.
-  values:
-    argAdapters: [EagerSubformulaCells, ColumnId]
-    validate: (vars, startCellsFmla, targetColId, filterValuesFmla) ->
-      valAssert(targetColId != rootColumnId,
-                'Cannot use values on the root column because it has no values.')
-    evaluate: (model, vars, startCellsTset, targetColId) ->
-      doNavigate(model, vars, startCellsTset, targetColId, null, true)
+  # ["up", startCells, targetColumnId, wantValues (bool)]
+  up:
+    argAdapters: [EagerSubformulaCells, ColumnId, {}]
+    evaluate: goUp
 
-  # ["values", startCells, targetColumnId, filterValues (subformula)]:
-  # Like "cells" but only returns cells whose values are members of the set
-  # returned by filterValues.
-  cellsWithValues:
-    argAdapters: [EagerSubformulaCells, ColumnId, EagerSubformula]
-    validate: (vars, startCellsFmla, targetColId, filterValuesFmla) ->
-      valAssert(targetColId != rootColumnId,
-                'Cannot use cellsWithValues on the root column because it has no values.')
-    evaluate: (model, vars, startCellsTset, targetColId, filterValuesTset) ->
-      doNavigate(model, vars, startCellsTset, targetColId, filterValuesTset, false)
+  # ["up", startCells, targetColumnId, wantValues (bool)]
+  down:
+    argAdapters: [EagerSubformulaCells, ColumnId, {}]
+    evaluate: goDown
 
   # ["filter", domain (subformula), [varName, predicate (subformula)]]:
   # For each cell in the domain, evaluates the predicate with varName bound to

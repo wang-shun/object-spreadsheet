@@ -261,27 +261,32 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
+  # NOTE: It can be subtle to remember what "this" refers to in a formula, so I
+  # anticipate encouraging users of the concrete syntax to instead use the
+  # cellName of the parent column, which generates a trivial call to "up".
+  # The example formulas reflect this convention.
   model.defineColumn(parseColumnRef("Person:Student:parent"),
                      0, "parent's name", null, null,
-                     ["compose", ["_"], ["col", "Person:name"]])
+                     ["down",["up",["var","this"],"Person:Student:parent",true],"Person:name",true])
   model.defineColumn(parseColumnRef("Person:Teacher:Slot"),
                      1, "scheduled meeting", null, null,
-                     ["compose",["var","this"],["xpose",["col","Meeting:slot"]]])
+                     ["filter",["down",["lit","_root",[[]]],"Meeting",false],["m",["=",["down",["var","m"],"Meeting:slot",true],["up",["var","this"],"Person:Teacher:Slot",false]]]])
 
   model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting"),
                      0, "discussed", null, null,
-                     ["*",["compose",["_"],["col","Meeting:enrollment"]]])
+                     ["up",["down",["up",["var","this"],"Person:Teacher:Slot:scheduled meeting",true],"Meeting:enrollment",true],"Class:Section:student",true])
   model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting:discussed"),
                      0, "student's name", null, null,
-    ["compose",["compose",["_"],["xpose",["col->","Person:Student"]]],["col","Person:name"]])
+    ["down",["up",["up",["var","this"],"Person:Teacher:Slot:scheduled meeting:discussed",true],"Person",false],"Person:name",true])
 
   model.defineColumn(parseColumnRef("Person"),
                      1, "children", null, null,
-    ["compose",["compose",["var","this"],["xpose",["col","Person:Student:parent"]]],["xpose",["col->","Person:Student"]]],
+                     # XXX: Incorrect for students with multiple parents.  To support that, we'd need an "in" operator.
+    ["filter",["down",["lit","_root",[[]]],"Person",false],["c",["=",["down",["var","c"],"Person:Student:parent",true],["up",["var","this"],"Person",false]]]],
                      {view: '1'})
   model.defineColumn(parseColumnRef("Person:children"),
                      0, "child's name", null, null,
-                     ["compose",["_"],["col","Person:name"]],
+                     ["down",["up",["var","this"],"Person:children",true],"Person:name",true],
                      {view: '1'})
 
   model.evaluateAllFlat()  # prepare dependencies
