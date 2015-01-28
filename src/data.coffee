@@ -1,6 +1,10 @@
+#COLUMN_COLLECTION = 'columns'
+#CELLS_COLLECTION = 'cells'
+# need them for publisher? maybe just use Columns._name, Cells._name?
 
-Columns = new Mongo.Collection(COLUMN_COLLECTION)
-Cells = new Mongo.Collection(CELLS_COLLECTION)
+Columns = new Mongo.Collection "columns"
+Cells = new Mongo.Collection "cells"
+Views = new Mongo.Collection "views"
 
 
 class ColumnBinRel
@@ -86,4 +90,5 @@ exported = (d) ->
   for k,v of d
     @[k] = v
 
-exported {Columns, Cells, ColumnBinRel, PairsBinRel}
+#exported {COLUMN_COLLECTION, CELLS_COLLECTION}
+exported {Columns, Cells, Views, ColumnBinRel, PairsBinRel}

@@ -38,10 +38,16 @@ class SemanticError extends Error
     @parseColumnRef s
 
 @parseColumnRef = (s) ->
+  if getColumn(s)? then return s  # Any other way to recognize ids vs. names?
   colId = rootColumnId
   for n in s.split(':')
     # XXX: Maybe types should accept cellName only.
-    colId = getColumn(colId).childByName.get(n)
+    if Meteor.isServer
+      colId = getColumn(colId).childByName.get(n)
+    else
+      # no childByName. make it?
+      colId = Columns.findOne {parent: colId, $or: [ {name: n}, {cellName: n} ]}
+        ?._id
     if !colId
       throw new SemanticError("column lookup failed: '#{s}'")
   return colId
@@ -52,8 +58,6 @@ class SemanticError extends Error
 #@content: TypedSet if state is SUCCESS, otherwise null
 
 @FAMILY_DATA_COLLECTION = 'familyData'
-@COLUMN_COLLECTION = 'columns'
-@CELLS_COLLECTION = 'cells'
 @FAMILY_IN_PROGRESS = 1  # should not be seen by the client
 @FAMILY_SUCCESS = 2
 @FAMILY_ERROR = 3
@@ -176,6 +180,21 @@ EJSON.addType('TypedSet', TypedSet.fromJSONValue)
 
 class Tree
   constructor: (@root, @subtrees=[]) ->
+
+  ## applies op to the root of each subtree
+  map: (op) ->
+    new Tree op(@root), (s.map op for s in @subtrees)
+
+  filter: (pred) ->
+    if pred @root
+      new Tree @root, ((s.filter pred for s in @subtrees).filter (x) -> x?)
+    else null
+
+  typeName: -> 'Tree'
+  toJSONValue: -> {@root, subtrees: (s.toJSONValue() for s in @subtrees)}
+  @fromJSONValue: (json) ->
+    new Tree(json.root, (Tree.fromJSONValue(s) for s in json.subtrees))
+EJSON.addType('Tree', Tree.fromJSONValue)
 
 
 class Digraph

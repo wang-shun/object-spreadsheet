@@ -113,7 +113,7 @@ class Model
     ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
     return [ancestors1, ancestors2]
 
-  defineColumn: (parentId, index, name, type, cellName, formula) ->
+  defineColumn: (parentId, index, name, type, cellName, formula, attrs) ->
     # Future: specify order rather than always at the end
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
@@ -148,6 +148,8 @@ class Model
       children: []
       cells: {}
     }
+    for k,v of attrs
+      col[k] = v
     @columns.set(thisId, col)
     Columns.insert(col)
     # Silly... "cells" is for DB only.
@@ -459,6 +461,7 @@ Meteor.startup () ->
 
 Meteor.publish "columns", -> Columns.find()
 Meteor.publish "cells", -> Cells.find()
+Meteor.publish "views", -> Views.find()
 # Publish everything for now.
 # Future: Reduce amount of add/remove thrashing.
 #Meteor.publish(null, () ->

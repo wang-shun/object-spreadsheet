@@ -17,6 +17,8 @@ andThen = (cont) ->
 class NotReadyError
 
 Router.route "/", -> @render "Spreadsheet"
+Router.route "/views/:_id", ->
+  @render "Spreadsheet", {data: {viewId: @params._id}}
 Router.route "/schema"
 
 # Grid utilities
@@ -171,7 +173,8 @@ class ViewSection
     idCell = new ViewCell(@columnId.substr(0, 4))
     idCell.fullText = @columnId
     typeName = (s) ->
-      if _.isArray(s) then (typeName(x) for x in s)
+      if !s then ''
+      else if _.isArray(s) then (typeName(x) for x in s)
       else if typeIsPrimitive(s) then s
       else Columns.findOne(s)?.cellName ? (""+s)[...4]
     typeCell = new ViewCell(
@@ -358,19 +361,29 @@ Template.changeFormula.events({
 
 class View
 
-  constructor: (@layoutTree) ->
-    @mainSection = new ViewSection(@layoutTree)
+  constructor: (@viewDef) ->
+    @reload()
     @hot = null
 
-  @entire: -> new @ @drillDown(rootColumnId)
+  @rootLayout: -> @drillDown(rootColumnId).filter (x) => !@ownerView(x)
 
   @drillDown: (startingColumnId) ->
     children = Columns.findOne(startingColumnId)?.children || []
     new Tree(startingColumnId, (@drillDown child for child in children))
 
-  entire: ->
-    @mainSection = View.entire().mainSection
-    @layoutTree = @mainSection.layoutTree
+  @ownerView: (columnId) ->
+    Columns.findOne(columnId)?.view
+
+  reload: (viewDef) ->
+    @viewDef = viewDef || @viewDef
+    if @viewDef?
+      try
+        @layoutTree = @viewDef?.layout?.map parseColumnRef
+      catch e
+        throw new NotReadyError
+    else
+      @layoutTree = View.rootLayout()
+    @mainSection = new ViewSection(@layoutTree)
 
   hotConfig: ->
     thisView = this
@@ -573,22 +586,40 @@ class View
 
 Meteor.subscribe "columns"
 Meteor.subscribe "cells"
+Meteor.subscribe "views"
 
 view = null
 viewHOT = null
 
+viewId = null
+layoutTree = null
+
+
+readViewDef = (viewId) ->
+  if viewId?
+    if (v = Views.findOne "" + viewId)? then v
+    else throw new NotReadyError
+  else
+    null
 
 rebuildView = () ->
   try
+    viewDef = readViewDef viewId
     if !view || !viewHOT
       if viewHOT
         viewHOT.destroy()
         viewHOT = null
         view = null
-      view = View.entire()
+      #try
+      #  tree = layoutTree.map parseColumnRef
+      #catch e
+        # dillemma: how to distinguish between an error reference and
+        # a non-ready database?
+      #  throw new NotReadyError
+      view = new View viewDef
       viewHOT = view.hotCreate $('#View')[0]
     else
-      view.entire()
+      view.reload viewDef
       view.hotReconfig()
   catch e
     if e instanceof NotReadyError
@@ -609,14 +640,18 @@ rebuildView = () ->
      false)
 
 
+Template.Spreadsheet.rendered = ->
+  viewId = @data?.viewId
+    #layoutTree = T('_root', [T('Person', [T('Person:name'),
+    #                                      T('Person:children', [T("Person:children:child's name")])])])
+  Tracker.autorun(rebuildView)
+
+
 Meteor.startup () ->
   # Load order...
   @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
   @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
-  Template.Spreadsheet.rendered = ->
-    #rebuildView()
-    Tracker.autorun(rebuildView)
 
 Meteor.methods({
   # Implement these two methods to reduce display jankiness, since they're easy.

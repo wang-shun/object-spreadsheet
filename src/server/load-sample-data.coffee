@@ -228,6 +228,7 @@
 
   # Delete all existing columns!!
   new Model().drop()
+  Views.remove {}
 
   model = new Model()
   @getColumn = (id) -> model.getColumn(id)
@@ -273,5 +274,26 @@
   model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting:discussed"),
                      0, "student's name", null, null,
     ["compose",["compose",["_"],["xpose",["col->","Person:Student"]]],["col","Person:name"]])
+
+  model.defineColumn(parseColumnRef("Person"),
+                     1, "children", null, null,
+    ["compose",["compose",["var","this"],["xpose",["col","Person:Student:parent"]]],["xpose",["col->","Person:Student"]]],
+                     {view: '1'})
+  model.defineColumn(parseColumnRef("Person:children"),
+                     0, "child's name", null, null,
+                     ["compose",["_"],["col","Person:name"]],
+                     {view: '1'})
+
+  model.evaluateAllFlat()  # prepare dependencies
+
+  # Create a view
+  T = -> new Tree arguments...
+
+  view1 =
+    _id: '1'
+    layout: T('_root', [T('Person', [T('Person:name'),
+            T('Person:children', [T("Person:children:child's name")])])])
+
+  Views.upsert(view1._id, view1)
 
   model
