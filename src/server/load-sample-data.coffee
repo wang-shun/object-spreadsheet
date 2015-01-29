@@ -297,7 +297,8 @@
   view1 =
     _id: '1'
     layout: T('_root', [T('Person', [T('Person:name'),
-            T('Person:children', [T("Person:children:child's name")])])])
+              T('Person:children', [T("Person:children:child's name")])])])
+            .map parseColumnRef
 
   Views.upsert(view1._id, view1)
 

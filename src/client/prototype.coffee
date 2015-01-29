@@ -27,9 +27,8 @@ class ViewCell
   constructor: (@value = '', @rowspan = 1, @colspan = 1, @cssClasses = []) ->
     @qFamilyId = null
     @qCellId = null
-    @columnIdTop = null
-    @columnIdBelow = null
-    @columnIdType = null
+    @columnId = null
+    @kind = null
     @fullText = null
 
 # Mutate "orig" by adding "extension" at the bottom.
@@ -171,9 +170,11 @@ class ViewSection
 
   renderHeader: (height) ->
     gridTop = gridMergedCell(height - @headerHeightBelow, @width, @col.cellName ? '', ['rsHeaderTop'])
-    gridTop[0][0].columnIdTop = @columnId
+    gridTop[0][0].columnId = @columnId
+    gridTop[0][0].kind = 'top'
     gridBelow = gridMergedCell(@headerHeightBelow - 2, 1, @col.name ? '', ['rsHeaderBelow'])
-    gridBelow[0][0].columnIdBelow = @columnId
+    gridBelow[0][0].columnId = @columnId
+    gridBelow[0][0].kind = 'below'
     # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
     idCell = new ViewCell(@columnId.substr(0, 4))
     idCell.fullText = @columnId
@@ -185,7 +186,8 @@ class ViewSection
     typeCell = new ViewCell(
       (if @col.formula? then '=' else '') + typeName(@type))
     typeCell.fullText = (@type ? '') + (if @col.formula? then ' (formula)' else '')
-    typeCell.columnIdType = @columnId
+    typeCell.columnId = @columnId
+    typeCell.kind = 'type'
     gridVertExtend(gridBelow, [[idCell]])
     gridVertExtend(gridBelow, [[typeCell]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
@@ -217,7 +219,9 @@ onSelection = () ->
       []
   )
   changeFormulaArgs.set(
-    if (ci = selectedCell?.columnIdBelow)? && getColumn(ci).formula?
+    if selectedCell? && selectedCell.kind? && selectedCell.colspan == 1 &&
+       !selectedCell.fullText? &&  # <- currently occupies the same spot, looks ugly
+       (ci = selectedCell.columnId)? && getColumn(ci).formula?
       [{_id: ci, columnId: ci}]
     else
       []
@@ -386,13 +390,7 @@ class View
 
   reload: (viewDef) ->
     @viewDef = viewDef || @viewDef
-    if @viewDef?
-      try
-        @layoutTree = @viewDef?.layout?.map parseColumnRef
-      catch e
-        throw new NotReadyError
-    else
-      @layoutTree = View.rootLayout()
+    @layoutTree = @viewDef?.layout || View.rootLayout()
     @mainSection = new ViewSection(@layoutTree)
 
   hotConfig: ->
@@ -436,8 +434,8 @@ class View
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
-          readOnly: !(cell.columnIdTop ? cell.columnIdBelow ? cell.columnIdType)? &&
-                    !(cell.qCellId? && StateEdit.canEdit(cell.qCellId))
+          readOnly: !(cell.kind in ['top', 'below', 'type'] ||
+                      cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -461,14 +459,14 @@ class View
         for [row, col, oldVal, newVal] in changes
           cell = @grid[row][col]
           # One of these cases should apply...
-          if cell.columnIdTop?
-            Meteor.call 'changeColumnCellName', cell.columnIdTop, newVal,
+          if cell.kind == 'top'
+            Meteor.call 'changeColumnCellName', cell.columnId, newVal,
                         standardServerCallback
-          if cell.columnIdBelow?
-            Meteor.call 'changeColumnName', cell.columnIdBelow, newVal,
+          if cell.kind == 'below'
+            Meteor.call 'changeColumnName', cell.columnId, newVal,
                         standardServerCallback
-          if cell.columnIdType?
-            Meteor.call 'changeColumnType', cell.columnIdType, newVal,
+          if cell.kind == 'type'
+            Meteor.call 'changeColumnType', cell.columnId, newVal,
                         standardServerCallback
           if cell.qCellId?
             if newVal
@@ -489,12 +487,12 @@ class View
           # addColumnLeft is redundant but nice for users.
           addColumnLeft: {
             name: 'Insert column on the left'
-            disabled: () ->
-              !((c = thisView.getSingleSelectedCell())? &&
-                (ci = c.columnIdTop)? && ci != rootColumnId)
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !((ci = c?.columnId)? && ci != rootColumnId)
             callback: () =>
-              c = thisView.getSingleSelectedCell()
-              ci = c.columnIdTop
+              c = @getSingleSelectedCell()
+              ci = c.columnId
               col = getColumn(ci)
               parentId = col.parent
               parentCol = getColumn(parentId)
@@ -504,12 +502,15 @@ class View
           }
           addColumnRight: {
             name: 'Insert column on the right'
-            disabled: () ->
-              !((c = thisView.getSingleSelectedCell())? &&
-                ((ci = c.columnIdTop)? && ci != rootColumnId || c.columnIdBelow?))
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              # TODO refine this condition
+              !((ci = c?.columnId)? && (c.kind == 'top' && ci != rootColumnId ||
+                                        c.kind =='below'))
             callback: () =>
-              c = thisView.getSingleSelectedCell()
-              if (ci = c.columnIdTop)?
+              c = @getSingleSelectedCell()
+              ci = c.columnId
+              if c.kind == 'top'
                 # Like addColumnLeft except + 1
                 col = getColumn(ci)
                 parentId = col.parent
@@ -517,7 +518,7 @@ class View
                 index = parentCol.children.indexOf(ci) + 1
               else
                 # Child of the selected column
-                parentId = c.columnIdBelow
+                parentId = ci
                 index = 0
               @hot.deselectCell()
               newColumnArgs.set([{parentId: parentId, index: index}])
@@ -526,7 +527,7 @@ class View
             name: 'Delete column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              ci = if c then c.columnIdTop ? c.columnIdBelow ? c.columnIdType ? c.qFamilyId?.columnId
+              ci = c && (c.columnId ? c.qFamilyId?.columnId)
               # Future: Support recursive delete.
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
               !(ci? && ci != rootColumnId &&
@@ -535,9 +536,8 @@ class View
 
             callback: () =>
               c = @getSingleSelectedCell()
-              ci = if c then c.columnIdTop ? c.columnIdBelow ? c.columnIdType ? c.qFamilyId?.columnId
-              # Otherwise changeFormula form gets hosed.
-              @hot.deselectCell()
+              ci = c && (c.columnId ? c.qFamilyId?.columnId)
+              @hot.deselectCell() # <- Otherwise changeFormula form gets hosed.
               Meteor.call('deleteColumn', ci,
                           standardServerCallback)
           }
@@ -605,8 +605,8 @@ Meteor.subscribe "views"
 view = null
 viewHOT = null
 
-viewId = null
-layoutTree = null
+#viewId = null
+#layoutTree = null
 
 
 readViewDef = (viewId) ->
@@ -616,29 +616,17 @@ readViewDef = (viewId) ->
   else
     null
 
-rebuildView = () ->
-  try
-    viewDef = readViewDef viewId
-    if !view || !viewHOT
-      if viewHOT
-        viewHOT.destroy()
-        viewHOT = null
-        view = null
-      #try
-      #  tree = layoutTree.map parseColumnRef
-      #catch e
-        # dillemma: how to distinguish between an error reference and
-        # a non-ready database?
-      #  throw new NotReadyError
-      view = new View viewDef
-      viewHOT = view.hotCreate $('#View')[0]
-    else
-      view.reload viewDef
-      view.hotReconfig()
-  catch e
-    if e instanceof NotReadyError
-      return  # Let the autorun run again once we have the data.
-    throw e
+rebuildView = (viewDef) ->
+  if !view || !viewHOT
+    if viewHOT
+      viewHOT.destroy()
+      viewHOT = null
+      view = null
+    view = new View viewDef
+    viewHOT = view.hotCreate $('#View')[0]
+  else
+    view.reload viewDef
+    view.hotReconfig()
   # Try to select a cell similar to the one previously selected.
   if selectedCell?
     ((selectedCell.qCellId? &&
@@ -646,19 +634,27 @@ rebuildView = () ->
      (selectedCell.qFamilyId? &&
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
      (selectedCell.qFamilyId? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId.columnId, c.columnIdBelow))) ||
-     (selectedCell.columnIdTop? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.columnIdTop, c.columnIdTop))) ||
-     (selectedCell.columnIdBelow? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.columnIdBelow, c.columnIdBelow))) ||
+      view.selectMatchingCell((c) -> c.kind == 'below' &&
+                                     EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) ||
+     (selectedCell.kind? &&
+      view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
+                                     EJSON.equals(selectedCell.columnIdTop, c.columnIdTop))) ||
      false)
+
+# Helper decorator for use with Tracker.autorun
+guarded = (op) ->
+  ->
+    try
+      op arguments...
+    catch e
+      if e instanceof NotReadyError
+        return  # Let the autorun run again once we have the data.
+      throw e
 
 
 Template.Spreadsheet.rendered = ->
   viewId = @data?.viewId
-    #layoutTree = T('_root', [T('Person', [T('Person:name'),
-    #                                      T('Person:children', [T("Person:children:child's name")])])])
-  Tracker.autorun(rebuildView)
+  Tracker.autorun(guarded -> rebuildView readViewDef viewId)
 
 
 Meteor.startup () ->
