@@ -29,6 +29,7 @@ class ViewCell
     @qCellId = null
     @columnIdTop = null
     @columnIdBelow = null
+    @columnIdType = null
     @fullText = null
 
 # Mutate "orig" by adding "extension" at the bottom.
@@ -124,6 +125,7 @@ class ViewSection
       #if @type == '_unit' then 'X'
       # Should be OK if the user knows which columns are string-typed.
       if typeof value == 'string' then value
+      else if value?.error? then {text: "!", fullText: value.error}
       # Make sure IDs (especially) are unambiguous.
       else JSON.stringify(value)
     vlists =
@@ -150,8 +152,11 @@ class ViewSection
 
   renderHlist: (hlist, height) ->
     # Value
-    grid = gridMergedCell(height, 1, hlist.value)
+    value = hlist.value
+    grid = gridMergedCell(height, 1, value.text ? value)
     grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
+    if value.fullText?
+      grid[0][0].fullText = value.fullText
     # This logic could be in a ViewCell accessor instead, but for now it isn't
     # duplicated so there's no need.
     if @columnId != rootColumnId
@@ -180,6 +185,7 @@ class ViewSection
     typeCell = new ViewCell(
       (if @col.formula? then '=' else '') + typeName(@type))
     typeCell.fullText = (@type ? '') + (if @col.formula? then ' (formula)' else '')
+    typeCell.columnIdType = @columnId
     gridVertExtend(gridBelow, [[idCell]])
     gridVertExtend(gridBelow, [[typeCell]])
     # Now gridBelow is (@headerMinHeight - 1) x 1.
@@ -321,16 +327,20 @@ class StateEdit
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 Template.changeFormula.rendered = () ->
-  orig = JSON.stringify(getColumn(Template.currentData().columnId).formula)
-  newFormulaStr.set(orig)
-  @find('input[name=formula]').value =
-    JSON.stringify(getColumn(Template.currentData().columnId).formula)
+  col = getColumn(Template.currentData().columnId)
+  if col?
+    orig = JSON.stringify(col.formula)
+    newFormulaStr.set(orig)
+    @find('input[name=formula]').value = orig
+      #JSON.stringify(col.formula)
 newFormulaStr = new ReactiveVar(null)
 Template.changeFormula.helpers({
   formulaClass: ->
-    orig = JSON.stringify(getColumn(Template.currentData().columnId).formula)
-    entered = newFormulaStr.get()
-    if orig != entered then 'formulaModified' else ''
+    col = getColumn(Template.currentData().columnId)
+    if col?
+      orig = JSON.stringify(col.formula)
+      entered = newFormulaStr.get()
+      if orig != entered then 'formulaModified' else ''
 })
 Template.changeFormula.events({
   'input .formula': (event, template) ->
@@ -426,7 +436,7 @@ class View
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
-          readOnly: !(cell.columnIdTop ? cell.columnIdBelow)? &&
+          readOnly: !(cell.columnIdTop ? cell.columnIdBelow ? cell.columnIdType)? &&
                     !(cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
@@ -452,13 +462,14 @@ class View
           cell = @grid[row][col]
           # One of these cases should apply...
           if cell.columnIdTop?
-            Meteor.call('changeColumnCellName',
-                        cell.columnIdTop, newVal,
-                        standardServerCallback)
+            Meteor.call 'changeColumnCellName', cell.columnIdTop, newVal,
+                        standardServerCallback
           if cell.columnIdBelow?
-            Meteor.call('changeColumnName',
-                        cell.columnIdBelow, newVal,
-                        standardServerCallback)
+            Meteor.call 'changeColumnName', cell.columnIdBelow, newVal,
+                        standardServerCallback
+          if cell.columnIdType?
+            Meteor.call 'changeColumnType', cell.columnIdType, newVal,
+                        standardServerCallback
           if cell.qCellId?
             if newVal
               StateEdit.modifyCell cell.qCellId, newVal
@@ -514,26 +525,29 @@ class View
           deleteColumn: {
             name: 'Delete column'
             disabled: () =>
+              c = @getSingleSelectedCell()
+              ci = if c then c.columnIdTop ? c.columnIdBelow ? c.columnIdType ? c.qFamilyId?.columnId
               # Future: Support recursive delete.
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
-              !((c = thisView.getSingleSelectedCell())? &&
-                (ci = c.columnIdTop ? c.columnIdBelow)? && ci != rootColumnId &&
-                (col = getColumn(ci)).children.length == 0 &&
+              !(ci? && ci != rootColumnId &&
+                !((col = getColumn(ci))?.children?.length) &&
                 !(columnIsState(col) && col.numStateCells > 0))
+
             callback: () =>
-              c = thisView.getSingleSelectedCell()
+              c = @getSingleSelectedCell()
+              ci = if c then c.columnIdTop ? c.columnIdBelow ? c.columnIdType ? c.qFamilyId?.columnId
               # Otherwise changeFormula form gets hosed.
               @hot.deselectCell()
-              Meteor.call('deleteColumn',
-                          c.columnIdTop ? c.columnIdBelow,
+              Meteor.call('deleteColumn', ci,
                           standardServerCallback)
           }
           sep1: '----------'
           deleteStateCell: {
             name: 'Delete cell'
-            disabled: () ->
-              !((c = thisView.getSingleSelectedCell())? &&
-                c.qCellId? && columnIsState(getColumn(c.qCellId.columnId)))
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !(c? && c.qCellId? &&
+                columnIsState(getColumn(c.qCellId.columnId)))
             callback: () =>
               c = @getSingleSelectedCell()
               if c.qCellId?

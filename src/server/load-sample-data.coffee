@@ -281,12 +281,12 @@
 
   model.defineColumn(parseColumnRef("Person"),
                      1, "children", null, null,
-                     # XXX: Incorrect for students with multiple parents.  To support that, we'd need an "in" operator.
-    ["filter",["down",["::"],"Person",false],["c",["=",["down",["var","c"],"Person:Student:parent",true],["up",["var","this"],"Person",false]]]],
+                     # {c in Person | this in c.parent}
+                     ["filter",["down",["::"],"Person",false],["c",["in",["var","this"],["down",["var","c"],"Person:Student:parent",true]]]],
                      {view: '1'})
   model.defineColumn(parseColumnRef("Person:children"),
                      0, "child's name", null, null,
-                     ["down",["up",["var","this"],"Person",false],"Person:name",true],
+                     ["down",["_"],"Person:name",true],
                      {view: '1'})
 
   model.evaluateAllFlat()  # prepare dependencies

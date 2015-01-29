@@ -387,7 +387,7 @@ class Model
           if e instanceof EvaluationError
             # Hack.  If you're lucky, the _error shows up in the UI.
             console.log("(evaluating '#{column.name ? column.cellName}') #{e.message}")
-            values = new TypedSet('_error')
+            values = new TypedSet('_error', set([{error: e.message}]))
           else
             throw e
         Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}

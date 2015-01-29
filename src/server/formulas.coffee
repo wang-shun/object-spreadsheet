@@ -50,7 +50,7 @@ EagerSubformulaCells = {
     validateSubformula(vars, arg)
   adapt: (model, vars, arg) ->
     tset = evaluateFormula(model, vars, arg)
-    evalAssert(!typeIsPrimitive(tset.type), "Expected a set of cells, got '#{tset.type}'")
+    evalAssert(!typeIsPrimitive(tset.type), "Expected a set of cells, got set of '#{tset.type}'")
     tset
 }
 LazySubformula = {
@@ -246,8 +246,19 @@ dispatch = {
     argAdapters: [EagerSubformula, EagerSubformula]
     evaluate: (model, vars, lhs, rhs) ->
       evalAssert(mergeTypes(lhs.type, rhs.type) != TYPE_MIXED,
-                 'Mismatched types to = operator')
+                 "Mismatched types to = operator (#{lhs.type} and #{rhs.type})")
       new TypedSet('_bool', new EJSONKeyedSet([EJSON.equals(lhs.set, rhs.set)]))
+
+  # ["=", lhs (subformula), rhs (subformula)]
+  # Compares two sets of the same type for containment.
+  # Returns a singleton boolean.
+  'in':
+    argAdapters: [EagerSubformula, EagerSubformula]
+    evaluate: (model, vars, lhs, rhs) ->
+      evalAssert(mergeTypes(lhs.type, rhs.type) != TYPE_MIXED,
+                 "Mismatched types to 'in' operator (#{lhs.type} and #{rhs.type})")
+      new TypedSet('_bool', set([rhs.set.hasAll lhs.set]))
+
 }
 
 # Catches syntax errors, references to nonexistent bound variables, and

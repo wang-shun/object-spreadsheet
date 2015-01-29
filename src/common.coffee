@@ -103,6 +103,7 @@ class @EJSONKeyedSet
     for x in els
       @add(x)
   has: (x) -> !!@map.get(x)
+  hasAll: (s) -> forall s.elements(), (x) => @has x
   add: (x) -> @map.set(x, true)
   delete: (x) -> @map.delete(x)
   elements: -> @map.keys()
@@ -268,6 +269,10 @@ class Digraph
     stack.reverse()
 
 # helper functions
+forall = (list, pred) ->
+  for x in list
+    if !pred(x) then return false
+  true
 without = (list, item) -> list.filter (x) -> x != item
 
 
