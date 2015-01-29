@@ -29,7 +29,7 @@ evalAsSingleton = (set) ->
   elements[0]
 evalAsType = (tset, type) ->
   evalAssert(mergeTypes(tset.type, type) != TYPE_MIXED,
-             'Expected a set of type ' + type)
+             "Expected a set of type '#{type}', got '#{tset.type}'")
   tset.set
 
 # Argument adapters to reduce the amount of duplicated work to validate
@@ -37,7 +37,7 @@ evalAsType = (tset, type) ->
 # Future: Errors should pinpoint the offending subformula.
 VarName = {
   validate: (vars, arg) ->
-    valAssert(_.isString(arg), 'Variable name must be a string')
+    valAssert(_.isString(arg), "Variable name must be a string, got '#{arg}'")
 }
 EagerSubformula = {
   validate: (vars, arg) ->
@@ -50,7 +50,7 @@ EagerSubformulaCells = {
     validateSubformula(vars, arg)
   adapt: (model, vars, arg) ->
     tset = evaluateFormula(model, vars, arg)
-    evalAssert(!typeIsPrimitive(tset.type), 'Expected a set of cells')
+    evalAssert(!typeIsPrimitive(tset.type), "Expected a set of cells, got '#{tset.type}'")
     tset
 }
 LazySubformula = {
@@ -188,6 +188,12 @@ dispatch = {
     evaluate: (model, vars) ->
       getValues(model, vars, vars.get("this") ? new TypedSet("_nothing", set()))
 
+  # shortcut for ["lit", "_root", [[]]]
+  "::":
+    argAdapters: []
+    evaluate: (model, vars) ->
+      new TypedSet('_root', set([[]]))
+
   # ["compose", set-of-values, set-of-pairs]
   # Relational composition between a unary relation (set) and a binary relation
   # (set of pairs)
@@ -212,7 +218,7 @@ dispatch = {
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
     evaluate: goUp
 
-  # ["up", startCells, targetColumnId, wantValues (bool)]
+  # ["down", startCells, targetColumnId, wantValues (bool)]
   down:
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
     evaluate: goDown

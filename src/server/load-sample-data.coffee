@@ -274,19 +274,19 @@
 
   model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting"),
                      0, "discussed", null, null,
-                     ["up",["down",["up",["var","this"],"Person:Teacher:Slot:scheduled meeting",true],"Meeting:enrollment",true],"Class:Section:student",true])
+                     ["up",["down",["_"],"Meeting:enrollment",true],"Class:Section:student",true])
   model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting:discussed"),
                      0, "student's name", null, null,
-    ["down",["up",["up",["var","this"],"Person:Teacher:Slot:scheduled meeting:discussed",true],"Person",false],"Person:name",true])
+                     ["down",["up",["_"],"Person",false],"Person:name",true])
 
   model.defineColumn(parseColumnRef("Person"),
                      1, "children", null, null,
                      # XXX: Incorrect for students with multiple parents.  To support that, we'd need an "in" operator.
-    ["filter",["down",["lit","_root",[[]]],"Person",false],["c",["=",["down",["var","c"],"Person:Student:parent",true],["up",["var","this"],"Person",false]]]],
+    ["filter",["down",["::"],"Person",false],["c",["=",["down",["var","c"],"Person:Student:parent",true],["up",["var","this"],"Person",false]]]],
                      {view: '1'})
   model.defineColumn(parseColumnRef("Person:children"),
                      0, "child's name", null, null,
-                     ["down",["up",["var","this"],"Person:children",true],"Person:name",true],
+                     ["down",["up",["var","this"],"Person",false],"Person:name",true],
                      {view: '1'})
 
   model.evaluateAllFlat()  # prepare dependencies

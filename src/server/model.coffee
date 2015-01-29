@@ -204,6 +204,19 @@ class Model
       @unpublishColumn(parentId, publisher)
       @publishColumn(parentId, publisher)
 
+  changeColumnType: (columnId, type) ->
+    col = @columns.get(columnId)
+    if col.formula?
+      throw new Meteor.Error('formula-type', 'Cannot set the type for a formula column.')
+    col.type = type
+    Columns.update columnId, {$set: {type}}
+
+  # Skips formula check
+  _changeColumnType: (columnId, type) ->
+    col = @columns.get(columnId)
+    col.type = type
+    Columns.update columnId, {$set: {type}}
+
   # Future: API to move and copy groups of columns.  This is an order of
   # magnitude more complicated.
 
@@ -226,7 +239,7 @@ class Model
                              'Cannot delete the root column.')
     # Assert not root
     col = @columns.get(columnId)
-    if col.children.length > 0
+    if col.children?.length
       throw new Meteor.Error('delete-column-has-children',
                              'Please delete all child columns first.')
     # Assert col.childByName also empty
@@ -373,12 +386,12 @@ class Model
         catch e
           if e instanceof EvaluationError
             # Hack.  If you're lucky, the _error shows up in the UI.
-            console.log(e.message)
+            console.log("(evaluating '#{column.name ? column.cellName}') #{e.message}")
             values = new TypedSet('_error')
           else
             throw e
         Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}
-        Columns.update(column._id, {$set: {type: values.type}})
+        @_changeColumnType column._id, values.type
       # update dependencies
       if (u = @dependencies.findNode column._id)?
         @dependencies.disconnectIn u
@@ -492,6 +505,8 @@ Meteor.methods({
   changeColumnCellName: (columnId, cellName) ->
     model.changeColumnCellName(columnId, cellName)
     #model.evaluateAll()
+  changeColumnType: (columnId, typeRef) ->
+    model.changeColumnType(columnId, parseTypeStr(typeRef))
   changeColumnFormula: (columnId, formula) ->
     model.changeColumnFormula(columnId, formula)
     model.evaluateAllFlat()
