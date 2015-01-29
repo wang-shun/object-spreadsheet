@@ -206,10 +206,6 @@ selectedCell = null
 
 onSelection = () ->
   selectedCell = view.getSingleSelectedCell()
-  if selectedCell?
-    # Cancel this form if the user clicks something else.
-    # XXX: Better UI flow?
-    newColumnArgs.set([])
   fullTextToShow.set(selectedCell?.fullText)
   # _id: Hacks to get the #each to clear the forms when the cell changes.
   addStateCellArgs.set(
@@ -221,7 +217,7 @@ onSelection = () ->
   changeFormulaArgs.set(
     if selectedCell? && selectedCell.kind? && selectedCell.colspan == 1 &&
        !selectedCell.fullText? &&  # <- currently occupies the same spot, looks ugly
-       (ci = selectedCell.columnId)? && getColumn(ci).formula?
+       (ci = selectedCell.columnId)? # && getColumn(ci).formula?
       [{_id: ci, columnId: ci}]
     else
       []
@@ -231,51 +227,8 @@ fullTextToShow = new ReactiveVar(null)
 
 Template.formulaValueBar.helpers({
   fullTextToShow: () -> fullTextToShow.get()
-  newColumnArgs: () -> newColumnArgs.get()
   addStateCellArgs: () -> addStateCellArgs.get()
   changeFormulaArgs: () -> changeFormulaArgs.get()
-})
-
-newColumnArgs = new ReactiveVar([], EJSON.equals)
-newColumnKind = new ReactiveVar(null)
-Template.newColumn.helpers({
-  # This is ridiculous: spacebars won't let us compare two strings?
-  newColumnIsState: () -> newColumnKind.get() == 'state'
-  newColumnIsFormula: () -> newColumnKind.get() == 'formula'
-})
-Template.newColumn.rendered = () ->
-  # ensure consistent
-  newColumnKind.set(@find('input[name=kind]:checked').value)
-Template.newColumn.events({
-  'change input[name=kind]': (event, template) ->
-    newColumnKind.set(template.find('input[name=kind]:checked').value)
-  'submit form': (event, template) ->
-    try
-      switch newColumnKind.get()
-        when 'state'
-          type = parseTypeStr(template.find('input[name=datatype]').value)
-          formula = null
-        when 'formula'
-          type = null
-          # Default formula to get the new column created ASAP.
-          # Then the user can edit it as desired.
-          formula = ['lit', '_unit', []]
-        else
-          throw new Error()  # should not happen
-      Meteor.call('defineColumn',
-                  @parentId,
-                  @index,
-                  null,  # name
-                  type,
-                  null,  # cellName
-                  formula,
-                  standardServerCallback)
-      newColumnArgs.set([])
-    catch e
-      alert e.message
-    false  # prevent page reload
-  'click .cancel': (event, template) ->
-    newColumnArgs.set([])
 })
 
 addStateCellArgs = new ReactiveVar([], EJSON.equals)
@@ -330,22 +283,24 @@ class StateEdit
     col? && columnIsState(col) && !columnIsToken(col)
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
+newFormulaStr = new ReactiveVar(null)
 Template.changeFormula.rendered = () ->
   col = getColumn(Template.currentData().columnId)
-  if col?
+  if col?.formula?
     orig = JSON.stringify(col.formula)
     newFormulaStr.set(orig)
     @find('input[name=formula]').value = orig
-      #JSON.stringify(col.formula)
-newFormulaStr = new ReactiveVar(null)
-Template.changeFormula.helpers({
+Template.changeFormula.helpers
+  formula: ->
+    col = getColumn @columnId
+    col.formula
   formulaClass: ->
-    col = getColumn(Template.currentData().columnId)
-    if col?
+    col = getColumn @columnId
+    if col?.formula?
       orig = JSON.stringify(col.formula)
       entered = newFormulaStr.get()
       if orig != entered then 'formulaModified' else ''
-})
+
 Template.changeFormula.events({
   'input .formula': (event, template) ->
     newFormulaStr.set(template.find('input[name=formula]').value)
@@ -369,9 +324,27 @@ Template.changeFormula.events({
     newFormulaStr.set(orig)
     template.find('input[name=formula]').value = orig
     false # prevent clear
+  'click .create': (event, template) ->
+    # Default formula to get the new column created ASAP.
+	# Then the user can edit it as desired.
+    formula = ['lit', '_unit', []]
+    Meteor.call 'changeColumnFormula', @columnId, formula,
+                standardServerCallback
+    # TODO warn user if column has data!!
   'keydown form': (event, template) ->
-    if (event.which == 27) then template.find("[type=reset]").click()
+    if (event.which == 27) then template.find("[type=reset]")?.click()
 })
+
+insertBlankColumn = (parentId, index) ->
+  Meteor.call('defineColumn',
+              parentId,
+              index,
+              null,  # name
+              null,  # type
+              null,  # cellName
+              null,  # formula
+              standardServerCallback)
+
 
 class View
 
@@ -434,7 +407,8 @@ class View
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
-          readOnly: !(cell.kind in ['top', 'below', 'type'] ||
+          readOnly: !(cell.kind in ['top', 'below'] ||
+                      cell.kind == 'type' && columnIsState(getColumn(cell.columnId)) ||
                       cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
@@ -498,7 +472,7 @@ class View
               parentCol = getColumn(parentId)
               index = parentCol.children.indexOf(ci)
               @hot.deselectCell()
-              newColumnArgs.set([{parentId: parentId, index: index}])
+              insertBlankColumn parentId, index
           }
           addColumnRight: {
             name: 'Insert column on the right'
@@ -521,7 +495,7 @@ class View
                 parentId = ci
                 index = 0
               @hot.deselectCell()
-              newColumnArgs.set([{parentId: parentId, index: index}])
+              insertBlankColumn parentId, index
           }
           deleteColumn: {
             name: 'Delete column'
@@ -638,7 +612,7 @@ rebuildView = (viewDef) ->
                                      EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) ||
      (selectedCell.kind? &&
       view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
-                                     EJSON.equals(selectedCell.columnIdTop, c.columnIdTop))) ||
+                                     EJSON.equals(selectedCell.columnId, c.columnId))) ||
      false)
 
 # Helper decorator for use with Tracker.autorun

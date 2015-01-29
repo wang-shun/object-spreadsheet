@@ -129,8 +129,11 @@ class Model
         throw new Meteor.Error('defineColumn-state-under-formula',
                                'Creating a state column as child of a formula column is currently not allowed.')
       if !type?
-        throw new Meteor.Error('defineColumn-type-required',
-                               'Must specify type for a state column')
+        type = '_any'
+        # TODO perhaps a better flow would be to leave undefined, but check when
+        #  user enters data
+        #throw new Meteor.Error('defineColumn-type-required',
+        #                       'Must specify type for a state column')
     if formula?
       if type?
         # For now, with dynamic typing.  This might change.
@@ -222,9 +225,9 @@ class Model
 
   changeColumnFormula: (columnId, formula) ->
     col = @columns.get(columnId)
-    unless col.formula?
-      throw new Meteor.Error('changeFormula-on-non-formula-column',
-                             'Can only changeFormula on a formula column!')
+    #unless col.formula?
+    #  throw new Meteor.Error('changeFormula-on-non-formula-column',
+    #                         'Can only changeFormula on a formula column!')
     validateFormula(formula)
     @invalidateCache()
     col.formula = formula

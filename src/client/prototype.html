@@ -13,8 +13,6 @@
     {{> formulaValueBar}}
   </div>
   <div id="View"></div>
-  <div id="newColumnDialog" title="New column">
-  </div>
 </template>
 
 <template name="formulaValueBar">
@@ -22,34 +20,12 @@
   {{#if fullTextToShow}}
     <div>Full text: {{fullTextToShow}}</div>
   {{/if}}
-  {{#each newColumnArgs}}
-    {{> newColumn}}
-  {{/each}}
   {{#each addStateCellArgs}}
     {{> addStateCell}}
   {{/each}}
   {{#each changeFormulaArgs}}
     {{> changeFormula}}
   {{/each}}
-</template>
-
-<template name="newColumn">
-  <form class="rsDialog">
-    <h1>New column</h1>
-    <div>
-      <input id="newColumn-kind-state" type="radio" name="kind" value="state"/>
-      <label for="newColumn-kind-state">State column of type</label>
-        <input id="newColumn-datatype" disabled="{{newColumnIsFormula}}" type="text" name="datatype"/>
-         (primitive or colon-separated names)
-      <br/>
-      <input id="newColumn-kind-formula" type="radio" name="kind" value="formula" checked="checked"/>
-      <label for="newColumn-kind-formula">Formula column</label>
-    </div>
-    <div>
-      <input type="submit" class="submit" value="Create"/>
-      <input type="button" class="cancel" value="Cancel"/>
-    </div>
-  </form>
 </template>
 
 <template name="addStateCell">
@@ -61,6 +37,7 @@
 </template>
 
 <template name="changeFormula">
+  {{#if formula}}
   <form>
     <!-- hack to extend formula bar to fill the window and leave room -->
     <!-- for the buttons -->
@@ -74,4 +51,7 @@
       <input type="reset" value="Revert"/>
     </td></tr></table>
   </form>
+  {{else}}
+  <button class="create">Create formula</button>
+  {{/if}}
 </template>
