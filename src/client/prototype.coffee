@@ -463,7 +463,7 @@ class View
             name: 'Insert column on the left'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId)
+              !((ci = c?.columnId)? && ci != rootColumnId && c.kind == 'top')
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
