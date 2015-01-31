@@ -14,7 +14,7 @@
 
 # Used also for typechecking.
 @FormulaValidationError = Meteor.makeErrorType('FormulaValidationError',
-  class FormulaValidationError
+  class @FormulaValidationError
     constructor: (@message) ->
 )
 

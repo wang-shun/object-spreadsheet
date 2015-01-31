@@ -1,5 +1,8 @@
+# Careful: with "class EvaluationError", the original class gets assigned to a
+# file-scope variable that shadows the exported wrapped class seen by the rest
+# of the application, and instanceof breaks.
 @EvaluationError = Meteor.makeErrorType('EvaluationError',
-  class EvaluationError
+  class @EvaluationError
     constructor: (@message) ->
 )
 
@@ -256,15 +259,6 @@ class Model
                           new EJSONKeyedSet(ce.values))
     else
       return null
-
-  readFamilyForFormula: (qFamilyId) ->
-    tset = @evaluateFamily(qFamilyId)
-    if tset?
-      return tset
-    else
-      # Includes the case of a newly detected cycle.
-      # Future: Specifically state that there was a cycle.
-      throw new EvaluationError('Reference to #{qFamilyId}, which failed to evaluate')
 
   # This method serves two purposes:
   # - Determine the type that the column should be assumed to have for the

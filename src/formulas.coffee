@@ -23,6 +23,23 @@
 evalAssert = (cond, message) ->
   throw new EvaluationError(message) unless cond
 
+readFamilyForFormula = (model, qFamilyId) ->
+  tset = model.evaluateFamily(qFamilyId)
+  if tset?
+    return tset
+  else
+    # Includes the case of a newly detected cycle.
+    # Future: Specifically state that there was a cycle.
+    throw new EvaluationError("Reference to column #{qFamilyId.columnId} family #{JSON.stringify(qFamilyId.cellId)}, which failed to evaluate")
+
+readColumnTypeForFormula = (model, columnId) ->
+  type = model.typecheckColumn(columnId)
+  if type != TYPE_ERROR
+    return type
+  else
+    throw new FormulaValidationError("Reference to column #{columnId} of unknown type.  " +
+                                     "Fix its formula or manually specify the type if needed to break a cycle.")
+
 evalAsSingleton = (set) ->
   elements = set.elements()
   evalAssert(elements.length == 1, 'Expected a singleton')
@@ -117,13 +134,13 @@ typecheckUp = (model, vars, startCellsType, targetColId, wantValues) ->
   [upPath, downPath] = findCommonAncestorPaths(startCellsType, targetColId)
   valAssert(downPath.length == 1,
              'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not up')
-  if wantValues then model.typecheckColumn(targetColId) else targetColId
+  if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 typecheckDown = (model, vars, startCellsType, targetColId, wantValues) ->
   targetCol = model.getColumn(targetColId)
   valAssert(targetCol.parent == startCellsType,
              'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not down')
-  if wantValues then model.typecheckColumn(targetColId) else targetColId
+  if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
   # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
@@ -145,7 +162,7 @@ goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
   # Go down.
   targetCellsSet = new EJSONKeyedSet()
   for cellId in startCellsTset.elements()
-    for value in model.readFamilyForFormula({columnId: targetColId, cellId: cellId}).elements()
+    for value in readFamilyForFormula(model, {columnId: targetColId, cellId: cellId}).elements()
       targetCellsSet.add(cellIdChild(cellId, value))
   targetCellsTset = new TypedSet(targetColId, targetCellsSet)
 
@@ -395,6 +412,12 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   return interpretations[0]
 
 @parseFormula = (thisType, fmlaString) ->
+  # XXX: If we are changing a formula so as to introduce a new cyclic type
+  # checking dependency, we use the old types of the other columns to interpret
+  # navigations in the new formula.  However, as soon as we save, all the
+  # columns in the cycle will change to TYPE_ERROR and the navigations we just
+  # interpreted will become invalid.  This behavior is weird but not worth
+  # fixing now.
   liteModel = {
     getColumn: getColumn
     typecheckColumn: (columnId) -> getColumn(columnId).type
