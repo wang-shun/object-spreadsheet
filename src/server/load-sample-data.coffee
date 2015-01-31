@@ -266,30 +266,30 @@
   # cellName of the parent column, which generates a trivial call to "up".
   # The example formulas reflect this convention.
   model.defineColumn(parseColumnRef("Person:Student:parent"),
-                     0, "parent's name", null, null,
-                     ["down",["up",["var","this"],"Person:Student:parent",true],"Person:name",true])
+                     0, "parentName", null, null,
+                     ["down",["up",["var","this"],parseColumnRef("Person:Student:parent"),true],parseColumnRef("Person:name"),true])
   model.defineColumn(parseColumnRef("Person:Teacher:Slot"),
-                     1, "scheduled meeting", null, null,
-                     ["filter",["down",["lit","_root",[[]]],"Meeting",false],["m",["=",["down",["var","m"],"Meeting:slot",true],["up",["var","this"],"Person:Teacher:Slot",false]]]])
+                     1, "scheduledMeeting", null, null,
+                     ["filter",["down",["lit","_root",[[]]],parseColumnRef("Meeting"),false],["m",["=",["down",["var","m"],parseColumnRef("Meeting:slot"),true],["up",["var","this"],parseColumnRef("Person:Teacher:Slot"),false]]]])
 
-  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting"),
+  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduledMeeting"),
                      0, "discussed", null, null,
-                     ["up",["down",["_"],"Meeting:enrollment",true],"Class:Section:student",true])
-  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduled meeting:discussed"),
-                     0, "student's name", null, null,
-                     ["down",["up",["_"],"Person",false],"Person:name",true])
+                     ["up",["down",["up",["var","this"],parseColumnRef("Person:Teacher:Slot:scheduledMeeting"),true],parseColumnRef("Meeting:enrollment"),true],parseColumnRef("Class:Section:student"),true])
+  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduledMeeting:discussed"),
+                     0, "studentName", null, null,
+                     ["down",["up",["up",["var","this"],parseColumnRef("Person:Teacher:Slot:scheduledMeeting:discussed"),true],parseColumnRef("Person"),false],parseColumnRef("Person:name"),true])
 
   model.defineColumn(parseColumnRef("Person"),
                      1, "children", null, null,
                      # {c in Person | this in c.parent}
-                     ["filter",["down",["::"],"Person",false],["c",["in",["var","this"],["down",["var","c"],"Person:Student:parent",true]]]],
+                     ["filter",["down",["lit","_root",[[]]],parseColumnRef("Person"),false],["c",["in",["up",["var","this"],parseColumnRef("Person"),false],["down",["var","c"],parseColumnRef("Person:Student:parent"),true]]]],
                      {view: '1'})
   model.defineColumn(parseColumnRef("Person:children"),
-                     0, "child's name", null, null,
-                     ["down",["_"],"Person:name",true],
+                     0, "childName", null, null,
+                     ["down",["up",["var","this"],parseColumnRef("Person:children"),true],parseColumnRef("Person:name"),true],
                      {view: '1'})
 
-  model.evaluateAllFlat()  # prepare dependencies
+  model.evaluateAll()  # prepare dependencies
 
   # Create a view
   T = -> new Tree arguments...
@@ -297,7 +297,7 @@
   view1 =
     _id: '1'
     layout: T('_root', [T('Person', [T('Person:name'),
-              T('Person:children', [T("Person:children:child's name")])])])
+              T('Person:children', [T("Person:children:childName")])])])
             .map parseColumnRef
 
   Views.upsert(view1._id, view1)

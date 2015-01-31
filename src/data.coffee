@@ -6,7 +6,8 @@ Columns = new Mongo.Collection "columns"
 Cells = new Mongo.Collection "cells"
 Views = new Mongo.Collection "views"
 
-
+# NOTE: This class treats erroneous families in formula columns as empty!  Do
+# not use it if you care about error propagation.
 class ColumnBinRel
   constructor: (@columnId) ->
 

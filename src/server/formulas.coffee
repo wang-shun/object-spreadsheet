@@ -18,7 +18,7 @@
 # Primitive types known to the system so far: _unit ('X') and _bool
 # (false, true).
 
-valAssert = (cond, message) ->
+@valAssert = (cond, message) ->
   throw new FormulaValidationError(message) unless cond
 evalAssert = (cond, message) ->
   throw new EvaluationError(message) unless cond
@@ -28,34 +28,32 @@ evalAsSingleton = (set) ->
   evalAssert(elements.length == 1, 'Expected a singleton')
   elements[0]
 evalAsType = (tset, type) ->
-  evalAssert(mergeTypes(tset.type, type) != TYPE_MIXED,
+  evalAssert(mergeTypes(tset.type, type) != TYPE_ERROR,
              "Expected a set of type '#{type}', got '#{tset.type}'")
   tset.set
+
+IDENTIFIER_RE = /[_A-Za-z][_A-Za-z0-9]*/
 
 # Argument adapters to reduce the amount of duplicated work to validate
 # arguments and evaluate subexpressions.
 # Future: Errors should pinpoint the offending subformula.
-VarName = {
-  validate: (vars, arg) ->
-    valAssert(_.isString(arg), "Variable name must be a string, got '#{arg}'")
-}
 EagerSubformula = {
   validate: (vars, arg) ->
     validateSubformula(vars, arg)
+  adaptForTypecheck: (model, vars, arg) ->
+    typecheckFormula(model, vars, arg)
   adapt: (model, vars, arg) ->
     evaluateFormula(model, vars, arg)
 }
 EagerSubformulaCells = {
   validate: (vars, arg) ->
     validateSubformula(vars, arg)
+  adaptForTypecheck: (model, vars, arg) ->
+    type = typecheckFormula(model, vars, arg)
+    valAssert(!typeIsPrimitive(type), "Expected a set of cells, got set of '#{type}'")
+    type
   adapt: (model, vars, arg) ->
-    tset = evaluateFormula(model, vars, arg)
-    evalAssert(!typeIsPrimitive(tset.type), "Expected a set of cells, got set of '#{tset.type}'")
-    tset
-}
-LazySubformula = {
-  validate: (vars, arg) ->
-    validateSubformula(vars, arg)
+    evaluateFormula(model, vars, arg)
 }
 # It might be nicer on the users to not require the extra 2-element array in the
 # input, but for now this goes with our framework.
@@ -64,12 +62,19 @@ Lambda = {
     valAssert(_.isArray(arg) && arg.length == 2,
               'Lambda subformula must be a two-element array')
     [varName, body] = arg
+    valAssert(_.isString(varName) && IDENTIFIER_RE.test(varName),
+              "Lambda variable must be an identifier, got '#{arg}'")
     # Try to save users from themselves.
     valAssert(!vars.has(varName),
               'Lambda shadows variable ' + varName)
     newVars = vars.shallowClone()
     newVars.add(varName)
     validateSubformula(newVars, body)
+  adaptForTypecheck: (model, vars, [varName, body]) ->
+    (argType) ->
+      newVars = vars.shallowClone()
+      newVars.set(varName, argType)
+      typecheckFormula(model, newVars, body)
   adapt: (model, vars, [varName, body]) ->
     # he he he!
     (arg) ->
@@ -80,9 +85,8 @@ Lambda = {
 ColumnId = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Column ID must be a string')
-  adapt: (model, vars, arg) ->
-    if !(model.getColumn(arg))
-      arg = parseColumnRef arg
+  adaptForTypecheck: (model, vars, arg) ->
+    valAssert(model.getColumn(arg)?, "No column exists with ID #{arg}")
     arg
 }
 Type = {
@@ -90,21 +94,32 @@ Type = {
     valAssert(_.isString(arg), 'Type must be a string')
     # Future: Reject unknown primitive types
     #if typeIsPrimitive(arg) ...
-  adapt: (model, vars, arg) ->
+  adaptForTypecheck: (model, vars, arg) ->
     unless typeIsPrimitive(arg)
-      evalAssert(model.getColumn(arg)?, 'Column does not exist')
+      ColumnId.adaptForTypecheck(model, vars, arg)
     arg
 }
 
 getValues = (model, vars, cells) ->
   # XXX: Fail on token columns
-  type = model.getColumn(cells.type)?.type || "_any"
+  type = model.getColumn(cells.type).type
   new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
 
+typecheckUp = (model, vars, startCellsType, targetColId, wantValues) ->
+  [upPath, downPath] = model.findCommonAncestorPaths(startCellsType, targetColId)
+  valAssert(downPath.length == 1,
+             'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not up')
+  if wantValues then model.typecheckColumn(targetColId) else targetColId
+
+typecheckDown = (model, vars, startCellsType, targetColId, wantValues) ->
+  targetCol = model.getColumn(targetColId)
+  valAssert(targetCol.parent == startCellsType,
+             'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not down')
+  if wantValues then model.typecheckColumn(targetColId) else targetColId
+
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
+  # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
   [upPath, downPath] = model.findCommonAncestorPaths(startCellsTset.type, targetColId)
-  evalAssert(downPath.length == 1,
-             'Navigation from ' + startCellsTset.type + ' to ' + targetColId + ' is not up')
 
   # Go up.
   numIdStepsToDrop = upPath.length - 1
@@ -117,21 +132,16 @@ goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
   if wantValues then getValues(model, vars, result) else result
 
 goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
-  [upPath, downPath] = model.findCommonAncestorPaths(startCellsTset.type, targetColId)
-  # Getting the values of the start cells should be done using up, not down.
-  evalAssert(upPath.length == 1 && downPath.length > 1,
-             'Navigation from ' + startCellsTset.type + ' to ' + targetColId + ' is not down')
+  # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
 
   # Go down.
-  cellsTset = startCellsTset
-  for level in [downPath.length-2..0] by -1
-    childColumnId = downPath[level]
-    model.getColumn(childColumnId)
-    cells = new ColumnBinRel(childColumnId).cells()
-    edges = ([cell[0], cellIdChild(cell[0], cell[1])] for cell in cells)
-    cellsTset = new PairsBinRel(edges, downPath[level+1], childColumnId).lookup(cellsTset)
+  targetCellsSet = new EJSONKeyedSet()
+  for cellId in startCellsTset.elements()
+    for value in model.readFamilyForFormula({columnId: targetColId, cellId: cellId}).elements()
+      targetCellsSet.add(cellIdChild(cellId, value))
+  targetCellsTset = new TypedSet(targetColId, targetCellsSet)
 
-  if wantValues then getValues(model, vars, cellsTset) else cellsTset
+  if wantValues then getValues(model, vars, targetCellsTset) else targetCellsTset
 
 dispatch = {
 
@@ -142,6 +152,8 @@ dispatch = {
     validate: (vars, type, list) ->
       valAssert(_.isArray(list), 'Set literal must be an array')
       # Future: Could go ahead and validate primitive-type literals here.
+    typecheck: (model, vars, type, list) ->
+      type
     evaluate: (model, vars, type, list) ->
       # XXXXXXX: Validate members of the type.
       new TypedSet(type, new EJSONKeyedSet(list))
@@ -149,78 +161,33 @@ dispatch = {
   # ["var", varName (string)]:
   # Gets the value of a bound variable.
   var:
-    argAdapters: [VarName]
+    argAdapters: [{}]
     validate: (vars, varName) ->
-      unless vars.has(varName)
-        throw new FormulaValidationError('Undefined variable ' + varName)
+      valAssert(_.isString(varName) && IDENTIFIER_RE.test(varName),
+                "Variable name must be an identifier, got '#{varName}'")
+      valAssert(vars.has(varName),
+                "Undefined variable #{varName}")
+    typecheck: (model, vars, varName) ->
+      vars.get(varName)
     evaluate: (model, vars, varName) ->
       vars.get(varName)
-
-  ########
-  # I anticipate translating the concrete syntax only into calls to "up" and
-  # "down", not the functions from "col" to "xpose". ~ Matt
-
-  # ["col", columnId]
-  # Returns all the cells of the column as pairs
-  col:
-    argAdapters: [ColumnId]
-    evaluate: (model, vars, columnId) ->
-      column = model.getColumn(columnId)
-      new ColumnBinRel(columnId).cellset()
-
-  "col->":
-    argAdapters: [ColumnId]
-    evaluate: (model, vars, columnId) ->
-      column = model.getColumn(columnId) #Columns.findOne(columnId)
-      cells = new ColumnBinRel(columnId).cells()
-      edgeset = set([cell[0], cellIdChild(cell[0], cell[1])] for cell in cells)
-      new TypedSet([column.parent, columnId], edgeset)
-
-  # ["*", cells]
-  # Gets the values of the cells
-  "*":
-    argAdapters: [EagerSubformula]
-    evaluate: getValues
-
-  # shortcut for ["*", ["var", "this"]]
-  "_":
-    argAdapters: []
-    evaluate: (model, vars) ->
-      getValues(model, vars, vars.get("this") ? new TypedSet("_nothing", set()))
-
-  # shortcut for ["lit", "_root", [[]]]
-  "::":
-    argAdapters: []
-    evaluate: (model, vars) ->
-      new TypedSet('_root', set([[]]))
-
-  # ["compose", set-of-values, set-of-pairs]
-  # Relational composition between a unary relation (set) and a binary relation
-  # (set of pairs)
-  compose:
-    argAdapters: [EagerSubformula, EagerSubformula]
-    evaluate: (model, vars, keys, binrel) ->
-      [dom, ran] = binrel.type
-      new PairsBinRel(binrel.elements(), dom, ran).lookup(keys)
-
-  # ["xpose", set-of-pairs]
-  # Transposes a binary relation
-  xpose:
-    argAdapters: [EagerSubformula]
-    evaluate: (model, vars, binrel) ->
-      [dom, ran] = binrel.type
-      new PairsBinRel(binrel.elements(), dom, ran).transpose().cellset()
-
-  ########
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
   up:
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
+    validate: (vars, startCellsFmla, targetColumnId, wantValues) ->
+      valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
+    typecheck: typecheckUp
     evaluate: goUp
 
   # ["down", startCells, targetColumnId, wantValues (bool)]
+  # Currently allows only one step, matching the concrete syntax.  This makes
+  # life easier for now.
   down:
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
+    validate: (vars, startCellsFmla, targetColumnId, wantValues) ->
+      valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
+    typecheck: typecheckDown
     evaluate: goDown
 
   # ["filter", domain (subformula), [varName, predicate (subformula)]]:
@@ -229,8 +196,14 @@ dispatch = {
   # domain cells for which the predicate returned true.
   filter:
     argAdapters: [EagerSubformula, Lambda]
+    typecheck: (model, vars, domainType, predicateLambda) ->
+      predicateType = predicateLambda(domainType)
+      valAssert(predicateType == '_bool',
+                "Predicate should return _bool, not #{predicateType}")
+      domainType
     evaluate: (model, vars, domainTset, predicateLambda) ->
       new TypedSet(
+        # XXX Use the checked type instead?
         domainTset.type,
         new EJSONKeyedSet(
           _.filter(domainTset.set.elements(), (x) ->
@@ -244,9 +217,11 @@ dispatch = {
   # Returns a singleton boolean.
   '=':
     argAdapters: [EagerSubformula, EagerSubformula]
+    typecheck: (model, vars, lhsType, rhsType) ->
+      valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
+                 "Mismatched types to = operator (#{lhsType} and #{rhsType})")
+      '_bool'
     evaluate: (model, vars, lhs, rhs) ->
-      evalAssert(mergeTypes(lhs.type, rhs.type) != TYPE_MIXED,
-                 "Mismatched types to = operator (#{lhs.type} and #{rhs.type})")
       new TypedSet('_bool', new EJSONKeyedSet([EJSON.equals(lhs.set, rhs.set)]))
 
   # ["=", lhs (subformula), rhs (subformula)]
@@ -254,9 +229,11 @@ dispatch = {
   # Returns a singleton boolean.
   'in':
     argAdapters: [EagerSubformula, EagerSubformula]
+    typecheck: (model, vars, lhsType, rhsType) ->
+      valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
+                 "Mismatched types to 'in' operator (#{lhsType} and #{rhsType})")
+      '_bool'
     evaluate: (model, vars, lhs, rhs) ->
-      evalAssert(mergeTypes(lhs.type, rhs.type) != TYPE_MIXED,
-                 "Mismatched types to 'in' operator (#{lhs.type} and #{rhs.type})")
       new TypedSet('_bool', set([rhs.set.hasAll lhs.set]))
 
 }
@@ -298,6 +275,21 @@ validateSubformula = (vars, formula) ->
   __proto__: model
 
 # Assumes formula has passed validation.
+# vars: EJSONKeyedMap<string, type (nullable string)>
+# Returns type (nullable string).
+@typecheckFormula = (model, vars, formula) ->
+  opName = formula[0]
+  args = formula[1..]
+  d = dispatch[opName]
+  adaptedArgs =
+    for adapter, i in d.argAdapters
+      if adapter.adaptForTypecheck?
+        adapter.adaptForTypecheck(model, vars, args[i])
+      else
+        args[i]
+  d.typecheck(model, vars, adaptedArgs...)
+
+# Assumes formula has passed typechecking.
 # vars: EJSONKeyedMap<string, TypedSet>
 @evaluateFormula = (model, vars, formula) ->
   opName = formula[0]
@@ -307,3 +299,6 @@ validateSubformula = (vars, formula) ->
     for adapter, i in d.argAdapters
       if adapter.adapt? then adapter.adapt(model, vars, args[i]) else args[i]
   d.evaluate(model, vars, adaptedArgs...)
+
+# vars: EJSONKeyedMap<string, type (string)>
+@resolveNavigation = (model, vars, startCellsFmla, targetName) ->

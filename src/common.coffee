@@ -21,9 +21,10 @@ class SemanticError extends Error
 #@parent: column ID
 #@children: array of column IDs, now in the user's desired order
 #@childByName: EJSONKeyedMap<name, column ID>
-#@numStateCells: integer (state columns only)
 #@name: string or null
-#@type: column ID or primitive; null for formula columns
+#@specifiedType: type specified by user (required for state columns)
+#@type: checked type (always set during evaluation)
+#@typecheckError: string or null, formula type checking error message
 #@cellName: string or null
 #@formula: some JSON data structure, or null
 
@@ -52,22 +53,12 @@ class SemanticError extends Error
       throw new SemanticError("column lookup failed: '#{s}'")
   return colId
 
-# CacheEntry:
-#@state: one of FAMILY_{IN_PROGRESS,SUCCESS,ERROR}
-##@deps: array of QFamilyId - Only needed if we want to revalidate existing results.
-#@content: TypedSet if state is SUCCESS, otherwise null
-
-@FAMILY_DATA_COLLECTION = 'familyData'
-@FAMILY_IN_PROGRESS = 1  # should not be seen by the client
-@FAMILY_SUCCESS = 2
-@FAMILY_ERROR = 3
-
 if Meteor.isClient
   @getColumn = (id) -> Columns.findOne(id)
 
-# {_id: formula column ID, _type: type}
-@FORMULA_COLUMN_TYPE_COLLECTION = 'formulaColumnType'
-@TYPE_MIXED = '_mixed'
+# Literal empty sets, etc.
+@TYPE_ANY = '_any'
+@TYPE_ERROR = '_error'
 
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...
@@ -135,20 +126,10 @@ class @EJSONKeyedMapToSet
   has: (k, v) -> (s = @map.get(k))? && s.has(v)
   elementsFor: (k) -> @map.get(k)?.elements() ? []
 
-@EJSONtoMongoFieldName = (x) ->
-  # JSON may contain '.', which is special in Mongo field names, as part of a
-  # floating point or string literal.  We need to escape it somehow.  '!' should
-  # only appear as a character in a string literal, so if we replace it by its
-  # escaped form, then we can use '!' to represent '.'.
-  EJSON.stringify(x).replace('!', '\\x21').replace('.', '!')
-
-@EJSONfromMongoFieldName = (f) ->
-  EJSON.parse(f.replace('!', '.'))
-
 @mergeTypes = (t1, t2) ->
-  if t1?
-    if t2? && t2 != t1
-      TYPE_MIXED
+  if t1 != TYPE_ANY
+    if t2 != TYPE_ANY && t2 != t1
+      TYPE_ERROR
     else
       t1
   else
@@ -156,9 +137,9 @@ class @EJSONKeyedMapToSet
 
 class @TypedSet
   # public fields
-  #@type: column ID or primitive, or null if we don't know because the set is empty.
+  #@type: column ID or primitive, or TYPE_ANY if we don't know because the set is empty.
   #@set: EJSONKeyedSet<@type>
-  constructor: (@type = null, @set = new EJSONKeyedSet()) ->
+  constructor: (@type = TYPE_ANY, @set = new EJSONKeyedSet()) ->
 
   # Note, these can make a meaningless mess if the types are mixed.  The caller
   # has to check @type afterwards.

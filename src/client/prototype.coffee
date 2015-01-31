@@ -55,8 +55,7 @@ gridMergedCell = (height, width, value = '', cssClasses = []) ->
   grid
 
 class ViewVlist
-  # @hlists == null means error.
-  constructor: (@parentCellId, @minHeight, @hlists) ->
+  constructor: (@parentCellId, @minHeight, @hlists, @error) ->
 
 class ViewHlist
   constructor: (@cellId, @minHeight, @value, @vlists) ->
@@ -97,11 +96,11 @@ class ViewSection
     @headerMinHeight = 1 + @headerHeightBelow  # cellName
 
   prerenderVlist: (parentCellId) ->
-    column = new ColumnBinRel(@columnId)
-    familyData = column.lookup(set([parentCellId]))
-    if 1  # TODO familyData.state == FAMILY_SUCCESS
+    # XXX: Detect NotReadyError
+    ce = Cells.findOne({column: @columnId, key: parentCellId}) ? {values: []}
+    if ce.values?
       hlists =
-        for value in familyData.set.elements()
+        for value in ce.values
           @prerenderHlist(parentCellId, value)
       minHeight = 0
       for hlist in hlists
@@ -110,7 +109,7 @@ class ViewSection
       # columns are plural, we can reconsider adding extra rows.
       new ViewVlist(parentCellId, minHeight, hlists)
     else
-      new ViewVlist(parentCellId, 1, null)
+      new ViewVlist(parentCellId, 1, null, ce.error)
 
   prerenderHlist: (parentCellId, value) ->
     cellId = if @columnId == rootColumnId then [] else cellIdChild(parentCellId, value)
@@ -124,7 +123,6 @@ class ViewSection
       #if @type == '_unit' then 'X'
       # Should be OK if the user knows which columns are string-typed.
       if typeof value == 'string' then value
-      else if value?.error? then {text: "!", fullText: value.error}
       # Make sure IDs (especially) are unambiguous.
       else JSON.stringify(value)
     vlists =
@@ -145,17 +143,16 @@ class ViewSection
         bottomGrid[0][0].qFamilyId = qFamilyId
         gridVertExtend(grid, bottomGrid)
     else
-      grid = gridMergedCell(height, @width, 'ERROR')
+      grid = gridMergedCell(height, @width, '!')
+      grid[0][0].fullText = vlist.error
       grid[0][0].qFamilyId = qFamilyId
     grid
 
   renderHlist: (hlist, height) ->
     # Value
     value = hlist.value
-    grid = gridMergedCell(height, 1, value.text ? value)
+    grid = gridMergedCell(height, 1, value)
     grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
-    if value.fullText?
-      grid[0][0].fullText = value.fullText
     # This logic could be in a ViewCell accessor instead, but for now it isn't
     # duplicated so there's no need.
     if @columnId != rootColumnId
@@ -180,12 +177,18 @@ class ViewSection
     idCell.fullText = @columnId
     typeName = (s) ->
       if !s then ''
-      else if _.isArray(s) then (typeName(x) for x in s)
       else if typeIsPrimitive(s) then s
       else Columns.findOne(s)?.cellName ? (""+s)[...4]
+    # XXX: The value in the cell is not consistent with what we allow the user
+    # to type in the cell!
     typeCell = new ViewCell(
-      (if @col.formula? then '=' else '') + typeName(@type))
-    typeCell.fullText = (@type ? '') + (if @col.formula? then ' (formula)' else '')
+      (if @col.formula? then '=' else '') +
+      (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
+      (if @col.typecheckError? then '!' else ''))
+    typeCell.fullText = (
+      (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
+      (if @col.formula? then ' (formula)' else '') +
+      (if @col.typecheckError? then " (TYPECHECK ERROR: #{@col.typecheckError})" else ''))
     typeCell.columnId = @columnId
     typeCell.kind = 'type'
     gridVertExtend(gridBelow, [[idCell]])
@@ -408,7 +411,7 @@ class View
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
           readOnly: !(cell.kind in ['top', 'below'] ||
-                      cell.kind == 'type' && columnIsState(getColumn(cell.columnId)) ||
+                      cell.kind == 'type' && cell.columnId != rootColumnId ||
                       cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
@@ -440,8 +443,15 @@ class View
             Meteor.call 'changeColumnName', cell.columnId, newVal,
                         standardServerCallback
           if cell.kind == 'type'
-            Meteor.call 'changeColumnType', cell.columnId, newVal,
-                        standardServerCallback
+            parsed = false
+            try
+              type = if newVal == '' then null else parseTypeStr(newVal)
+              parsed = true
+            catch e
+              alert('Invalid type.')
+            if parsed
+              Meteor.call 'changeColumnSpecifiedType', cell.columnId, type,
+                          standardServerCallback
           if cell.qCellId?
             if newVal
               StateEdit.modifyCell cell.qCellId, newVal

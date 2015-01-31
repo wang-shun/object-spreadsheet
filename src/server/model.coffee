@@ -1,3 +1,4 @@
+# Used also for typechecking.
 class @FormulaValidationError
   constructor: (@message) ->
 
@@ -8,18 +9,12 @@ class Model
 
   # TODO: Indicate which methods are intended to be public!
 
-  #@state: EJSONKeyedMapToSet<QFamilyId, value>
-  #@familyCache: EJSONKeyedMap<QFamilyId, CacheEntry>
   #@columns: EJSONKeyedMap<ColumnId, Column>
-  #@formulaColumnType: EJSONKeyedMap<ColumnId, type>.
-  #  A column ID will be absent if no evaluated family has a known type, i.e.,
-  #  there are no evaluated families or all evaluated families are empty with
-  #  unknown type.
 
   initializeColumnTempData: (col) ->
     col.childByName = new EJSONKeyedMap()
-    if columnIsState(col)
-      col.numStateCells = 0
+    #if columnIsState(col)
+    #  col.numStateCells = 0
 
   registerColumnWithParent: (col) ->
     parentColId = col.parent
@@ -39,38 +34,38 @@ class Model
       parentCol.childByName.delete(col.cellName)
 
   constructor: ->
-    @publishers = []
-
     @columns = new EJSONKeyedMap()
-    @state = new EJSONKeyedMapToSet()
-    @familyCache = null
-
-    @dependencies = new Digraph
 
     # Load from DB.
     # Future: Need a way to make a temporary model for a transaction without reloading.
     for col in Columns.find().fetch()
+      if col.formula?
+        # A mitigation for the common problem of formula operations being
+        # removed.  There are obviously many other ways a bad database can break
+        # us.
+        try
+          validateFormula(col.formula)
+        catch e
+          unless e instanceof Meteor.Error && e.error == 'invalid-formula'
+            throw e
+          console.log("Resetting invalid formula in column #{col._id}: #{e.message}")
+          col.formula = ['lit', '_unit', []]
+          col.specifiedType = null
+          Columns.update(col._id, col)
       @columns.set(col._id, col)
       @initializeColumnTempData(col)
-      for cellIdStr of {} #col.cells ? {}
-        cellId = EJSONfromMongoFieldName(cellIdStr)
-        @state.add({columnId: col._id, cellId: cellIdParent(cellId)},
-                   cellIdLastStep(cellId))
-        col.numStateCells++
-      # Don't store a duplicate copy.  So, careful about writing col back to DB.
-      delete col.cells
 
     # Special case: create root column if missing.
     unless @columns.get(rootColumnId)?
       # None of the other properties should be used.
       col = {
         _id: rootColumnId
+        # Close enough to the truth?
+        specifiedType: '_token'
         children: []
-        cells: {}
       }
       @columns.set(rootColumnId, col)
       Columns.insert(col)
-      delete col.cells
       @initializeColumnTempData(col)
 
     # Now go back and link things up.
@@ -84,10 +79,6 @@ class Model
         # XXX: Assert parent existence
         @registerColumnWithParent(col)
     # Future: validate that type usage is acyclic.
-
-    for colId in @columns.keys()
-      for publisher in @publishers
-        @publishColumn(colId, publisher)
 
   getColumn: (columnId) ->
     # Treat as read-only and valid only until the model is next modified.
@@ -114,8 +105,7 @@ class Model
     ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
     return [ancestors1, ancestors2]
 
-  defineColumn: (parentId, index, name, type, cellName, formula, attrs) ->
-    # Future: specify order rather than always at the end
+  defineColumn: (parentId, index, name, specifiedType, cellName, formula, attrs) ->
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
     parentCol = @columns.get(parentId)
@@ -128,17 +118,15 @@ class Model
       if parentCol.formula?
         throw new Meteor.Error('defineColumn-state-under-formula',
                                'Creating a state column as child of a formula column is currently not allowed.')
-      if !type?
-        type = '_any'
+      if !specifiedType?
+        # XXX We should never allow this, but it is pointless to fix when we
+        # don't validate the values anyway.
+        specifiedType = '_any'
         # TODO perhaps a better flow would be to leave undefined, but check when
         #  user enters data
         #throw new Meteor.Error('defineColumn-type-required',
         #                       'Must specify type for a state column')
     if formula?
-      if type?
-        # For now, with dynamic typing.  This might change.
-        throw new Meteor.Error('defineColumn-type-not-allowed',
-                               'Cannot specify type for a formula column')
       validateFormula(formula)
     @invalidateCache()
     thisId = Random.id()
@@ -146,7 +134,9 @@ class Model
       _id: thisId
       parent: parentId
       name: name
-      type: type
+      specifiedType: specifiedType
+      type: null
+      typecheckError: null
       cellName: cellName
       formula: formula
       children: []
@@ -156,18 +146,11 @@ class Model
       col[k] = v
     @columns.set(thisId, col)
     Columns.insert(col)
-    # Silly... "cells" is for DB only.
-    delete col.cells
     @initializeColumnTempData(col)
     parentCol.children.splice(index, 0, thisId)
     # Meteor is nice for so many things, but not ORM...
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     @registerColumnWithParent(col)
-
-    for publisher in @publishers
-      @publishColumn(thisId, publisher)
-      @unpublishColumn(parentId, publisher)
-      @publishColumn(parentId, publisher)
 
     return thisId
 
@@ -183,11 +166,6 @@ class Model
     col.name = name
     @registerColumnWithParent(col)
     Columns.update(columnId, {$set: {name: name}})
-    for publisher in @publishers
-      @unpublishColumn(columnId, publisher)
-      @publishColumn(columnId, publisher)
-      @unpublishColumn(parentId, publisher)
-      @publishColumn(parentId, publisher)
 
   changeColumnCellName: (columnId, cellName) ->
     col = @columns.get(columnId)
@@ -201,24 +179,22 @@ class Model
     col.cellName = cellName
     @registerColumnWithParent(col)
     Columns.update(columnId, {$set: {cellName: cellName}})
-    for publisher in @publishers
-      @unpublishColumn(columnId, publisher)
-      @publishColumn(columnId, publisher)
-      @unpublishColumn(parentId, publisher)
-      @publishColumn(parentId, publisher)
 
-  changeColumnType: (columnId, type) ->
+  changeColumnSpecifiedType: (columnId, specifiedType) ->
+    @invalidateCache()
     col = @columns.get(columnId)
-    if col.formula?
-      throw new Meteor.Error('formula-type', 'Cannot set the type for a formula column.')
-    col.type = type
-    Columns.update columnId, {$set: {type}}
+    col.specifiedType = specifiedType
+    Columns.update(columnId, {$set: {specifiedType}})
 
-  # Skips formula check
   _changeColumnType: (columnId, type) ->
     col = @columns.get(columnId)
     col.type = type
-    Columns.update columnId, {$set: {type}}
+    Columns.update(columnId, {$set: {type}})
+
+  _changeColumnTypecheckError: (columnId, typecheckError) ->
+    col = @columns.get(columnId)
+    col.typecheckError = typecheckError
+    Columns.update(columnId, {$set: {typecheckError}})
 
   # Future: API to move and copy groups of columns.  This is an order of
   # magnitude more complicated.
@@ -232,9 +208,6 @@ class Model
     @invalidateCache()
     col.formula = formula
     Columns.update(columnId, {$set: {formula: formula}})
-    for publisher in @publishers
-      @unpublishColumn(columnId, publisher)
-      @publishColumn(columnId, publisher)
 
   deleteColumn: (columnId) ->
     if columnId == rootColumnId
@@ -246,9 +219,10 @@ class Model
       throw new Meteor.Error('delete-column-has-children',
                              'Please delete all child columns first.')
     # Assert col.childByName also empty
-    if columnIsState(col) && col.numStateCells > 0
-      throw new Meteor.Error('delete-column-has-state-cells',
-                             'Please delete all state cells first.')
+    # XXX: Make this work again.
+    #if columnIsState(col) && col.numStateCells > 0
+    #  throw new Meteor.Error('delete-column-has-state-cells',
+    #                         'Please delete all state cells first.')
     parentId = col.parent
     parentCol = @columns.get(parentId)
     @invalidateCache()
@@ -257,222 +231,112 @@ class Model
     @unregisterColumnWithParent(col)
     @columns.delete(columnId)
     Columns.remove(columnId)
-    for publisher in @publishers
-      @unpublishColumn(columnId, publisher)
-      @unpublishColumn(parentId, publisher)
-      @publishColumn(parentId, publisher)
-
-  # Future: Token order and API to change it
-  writeState: (qFamilyId, value, present) ->
-    # Future: Validate everything.
-    cellId = cellIdChild(qFamilyId.cellId, value)
-    mongoUpdateThing = {}
-    mongoUpdateThing['cells.' + EJSONtoMongoFieldName(cellId)] = true
-    if present
-      if !@state.has(qFamilyId, value)
-        # XXXXXXXX: Validate data type!
-        @invalidateCache()
-        @state.add(qFamilyId, value)
-        Columns.update(qFamilyId.columnId, {$set: mongoUpdateThing})
-        @columns.get(qFamilyId.columnId).numStateCells++
-        for publisher in @publishers
-          @unpublishColumn(qFamilyId.columnId, publisher)
-          @publishColumn(qFamilyId.columnId, publisher)
-    else
-      if @state.has(qFamilyId, value)
-        cellId = cellIdChild(qFamilyId.cellId, value)
-        col = @columns.get(qFamilyId.columnId)
-
-        # Check we are not orphaning descendant state cells.
-        for childColumnId in col.children
-          childCol = @columns.get(childColumnId)
-          if @state.elementsFor({columnId: childColumnId, cellId: cellId}).length > 0
-            throw new Meteor.Error('delete-state-cell-has-descendants',
-                                   'Please delete descendant state cells first.')
-
-        @invalidateCache()
-        @state.delete(qFamilyId, value)
-        Columns.update(qFamilyId.columnId, {$unset: mongoUpdateThing})
-        col.numStateCells--
-        for publisher in @publishers
-          @unpublishColumn(qFamilyId.columnId, publisher)
-          @publishColumn(qFamilyId.columnId, publisher)
 
   evaluateFamily1: (qFamilyId) ->
     col = @columns.get(qFamilyId.columnId)
     if col.formula?
+      if col.typecheckError?
+        throw new EvaluationError("Formula failed type checking: #{col.typecheckError}")
       vars = new EJSONKeyedMap(
         [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
       return evaluateFormula(this, vars, col.formula)
     else
       # State column (there are no domain columns yet)
-      return new TypedSet(col.type, new EJSONKeyedSet(@state.elementsFor(qFamilyId)))
+      # If it were nonempty, we wouldn't have gotten here.
+      # XXX: Be consistent about which state families exist in the DB.
+      return new TypedSet(col.type)
 
   evaluateFamily: (qFamilyId) ->
-    ce = @familyCache.get(qFamilyId)
+    keyFields = {column: qFamilyId.columnId, key: qFamilyId.cellId}
+    ce = Cells.findOne(keyFields)
     unless ce?
-      ce = {state: FAMILY_IN_PROGRESS, content: null}
-      @familyCache.set(qFamilyId, ce)
+      Cells.insert(keyFields)
       try
-        ce.content = @evaluateFamily1(qFamilyId)
-        ce.state = FAMILY_SUCCESS
-
-        if @columns.get(qFamilyId.columnId).formula?
-          # Update formulaColumnType
-          oldFCT = @formulaColumnType.get(qFamilyId.columnId)
-          newFCT = mergeTypes(oldFCT, ce.content.type)
-          if newFCT != oldFCT
-            if oldFCT?
-              for publisher in @publishers
-                @unpublishFormulaColumnType(qFamilyId.columnId, publisher)
-            @formulaColumnType.set(qFamilyId.columnId, newFCT)
-            for publisher in @publishers
-              @publishFormulaColumnType(qFamilyId.columnId, publisher)
-
+        content = @evaluateFamily1(qFamilyId)
+        Cells.update(keyFields, {$set: {values: content.elements()}})
       catch e
         if e instanceof EvaluationError
-          ce.state = FAMILY_ERROR
+          Cells.update(keyFields, {$set: {error: e.message}})
         else
           throw e
+      ce = Cells.findOne(keyFields)
 
-    return ce
+    if ce.values?
+      return new TypedSet(@getColumn(qFamilyId.columnId).type,
+                          new EJSONKeyedSet(ce.values))
+    else
+      return null
 
   readFamilyForFormula: (qFamilyId) ->
-    ce = @evaluateFamily(qFamilyId)
-    if ce.state == FAMILY_SUCCESS
-      return ce.content
+    tset = @evaluateFamily(qFamilyId)
+    if tset?
+      return tset
     else
-      # Includes FAMILY_IN_PROGRESS, which means a newly detected cycle.
-      # Future: 'Reference to CELL, which failed', precise cycle detection with
-      # different message.
-      throw new EvaluationError()
+      # Includes the case of a newly detected cycle.
+      # Future: Specifically state that there was a cycle.
+      throw new EvaluationError('Reference to #{qFamilyId}, which failed to evaluate')
 
-  readFamily: (qFamilyId) ->
-    ce = @familyCache.get(qFamilyId)
-    # Assert it has been evaluated (i.e., watches are correct).
-    return ce.content
+  # This method serves two purposes:
+  # - Determine the type that the column should be assumed to have for the
+  #   purposes of other formulas.
+  # - Determine whether the formula passes type checking before we try to
+  #   evaluate it.
+  # These don't have to be done at the same time, but for now that's convenient.
+  typecheckColumn: (columnId) ->
+    col = @columns.get(columnId)
+    unless col.type?
+      # Formula columns of unspecified type are set to TYPE_ERROR at the
+      # beginning for cycle detection, analogous to how family evaluation works.
+      @_changeColumnType(columnId, col.specifiedType ? TYPE_ERROR)
+      if col.formula?
+        try
+          vars = new EJSONKeyedMap([['this', col.parent]])
+          type = typecheckFormula(this, vars, col.formula)
+          if col.specifiedType?
+            valAssert(mergeTypes(col.specifiedType, type) != TYPE_ERROR,
+                      "Column #{columnId} type is specified as #{col.specifiedType} but formula returns type #{type}")
+          else
+            @_changeColumnType(columnId, type)
+        catch e
+          unless e instanceof FormulaValidationError
+            throw e
+          # If type was unspecified, it is left as TYPE_ERROR, i.e., unknown
+          # for the purposes of other formulas.
+          @_changeColumnTypecheckError(columnId, e.message)
+    return col.type
 
   evaluateAll: ->
-    if @familyCache?
-      return  # already valid
-    @familyCache = new EJSONKeyedMap()
-    @formulaColumnType = new EJSONKeyedMap()
+    # XXX: Detect if already valid?
+    # Be sure to start clean.
+    @invalidateCache()
+
+    for columnId in @columns.keys()
+      @typecheckColumn(columnId)
 
     evaluateSubtree = (qCellId) =>
       col = @columns.get(qCellId.columnId)
       for childColId in col.children
-        ce = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
-        if ce.state == FAMILY_SUCCESS
-          for value in ce.content.set.elements()
+        tset = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
+        if tset?
+          for value in tset.elements()
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             evaluateSubtree(childQCellId)
 
     # Future: Only evaluate what users are viewing.
     evaluateSubtree({columnId: rootColumnId, cellId: rootCellId})
 
-    # Consider publishing as we go?
-    for qFamilyId in @familyCache.keys()
-      for publisher in @publishers
-        @publishFamily(qFamilyId, publisher)
-
-  evaluateColumn: (column) ->
-    if _.isString(column)
-      column = getColumn(column)
-    if column.formula?
-      parent = new ColumnBinRel(column.parent)
-      tmodel = trackerModel @
-      tmodel.depends.add parent
-      for cell in parent.cells()
-        cellId = cellIdChild(cell[0], cell[1])
-        try
-          values = tmodel.evaluateFamily1 {columnId: column._id, cellId}
-        catch e
-          if e instanceof EvaluationError
-            # Hack.  If you're lucky, the _error shows up in the UI.
-            console.log("(evaluating '#{column.name ? column.cellName}') #{e.message}")
-            values = new TypedSet('_error', set([{error: e.message}]))
-          else
-            throw e
-        Cells.upsert {column: column._id, key: cellId}, {$set: {values: values.elements()}}
-        @_changeColumnType column._id, values.type
-      # update dependencies
-      if (u = @dependencies.findNode column._id)?
-        @dependencies.disconnectIn u
-      @dependencies.fromPairs ([dep, column._id] for dep in tmodel.depends.elements())
-
-  evaluateAllFlat: ->
-    order = @dependencies.topologicalSort()
-    computed = Columns.find({formula: {$ne: null}}).fetch()
-        .sort by_ (x) => order.indexOf @dependencies.findNode x._id
-    for column in computed
-      @evaluateColumn column
-
   ## Removes all column definitions and data!
   drop: ->
     Columns.remove({_id: {$ne: rootColumnId}})
     Columns.update(rootColumnId, {$set: {children: []}})
     Cells.remove({})
-    # TODO this is clearly not enough
-    @columns = new EJSONKeyedMap()
-    @state = new EJSONKeyedMapToSet()
-
-  unpublishFormulaColumnType: (columnId, publisher) ->
-    publisher.removed(FORMULA_COLUMN_TYPE_COLLECTION, columnId)
-
-  publishFormulaColumnType: (columnId, publisher) ->
-    publisher.added(FORMULA_COLUMN_TYPE_COLLECTION, columnId,
-                    {type: @formulaColumnType.get(columnId)})
-
-  # I (Matt) believe that each formula column should have a single type, but
-  # right now it is determined only during formula evaluation and not stored in
-  # the column object.  So this is how you get it.
-  getFormulaColumnType: (columnId) -> @formulaColumnType.get(columnId)
-
-  unpublishFamily: (qFamilyId, publisher) ->
-    publisher.removed(FAMILY_DATA_COLLECTION, EJSON.stringify(qFamilyId))
-
-  publishFamily: (qFamilyId, publisher) ->
-    # Everything in the CacheEntry is OK to publish.
-    publisher.added(FAMILY_DATA_COLLECTION, EJSON.stringify(qFamilyId),
-                    @familyCache.get(qFamilyId))
-
-  unpublishColumn: (columnId, publisher) ->
-    #publisher.removed(COLUMN_COLLECTION, columnId)
-
-  publishColumn: (columnId, publisher) ->
-    #publisher.added(COLUMN_COLLECTION, columnId, @columns.get(columnId))
 
   invalidateCache: ->
-    if @familyCache?
-      for qFamilyId in @familyCache.keys()
-        for publisher in @publishers
-          @unpublishFamily(qFamilyId, publisher)
-      @familyCache = null
-      for columnId in @formulaColumnType.keys()
-        for publisher in @publishers
-          @unpublishFormulaColumnType(columnId, publisher)
-      @formulaColumnType = null
-
-  # CLEANUP: Rewrite this to keep a set of published objects from all
-  # collections.  Then we can replay them to a new publisher and write a wrapper
-  # to publish/unpublish an object to all publishers.
-  addPublisher: (publisher) ->
-    @publishers.push(publisher)
-    for columnId in @columns.keys()
-      @publishColumn(columnId, publisher)
-    if @familyCache?
-      for qFamilyId in @familyCache.keys()
-        @publishFamily(qFamilyId, publisher)
-      for columnId in @formulaColumnType.keys()
-        @publishFormulaColumnType(columnId, publisher)
-    publisher.ready()
-
-  removePublisher: (publisher) ->
-    @publishers.splice(@publishers.indexOf(publisher), 1)
-
-# helper functions
-cmp = (a,b) -> if a<b then -1 else if a>b then 1 else 0
-by_ = (f) -> (x,y) -> cmp f(x), f(y)
+    for [columnId, col] in @columns.entries() when columnId != rootColumnId
+      @_changeColumnType(columnId, null)
+      @_changeColumnTypecheckError(columnId, null)
+      if col.formula?
+        Cells.remove({column: columnId})
 
 
 Meteor.startup () ->
@@ -482,25 +346,19 @@ Meteor.startup () ->
   else
     @model = loadSampleData()
   @getColumn = (id) -> model.getColumn(id)
-  model.evaluateAllFlat()
+  model.evaluateAll()
 
 Meteor.publish "columns", -> Columns.find()
 Meteor.publish "cells", -> Cells.find()
 Meteor.publish "views", -> Views.find()
-# Publish everything for now.
-# Future: Reduce amount of add/remove thrashing.
-#Meteor.publish(null, () ->
-#  @onStop(() -> model.removePublisher(this))
-#  model.addPublisher(this)
-#)
 Meteor.methods({
   # The model methods do not automatically evaluate so that we can do bulk
   # changes from the server side, but for now we always evaluate after each
   # change from the client.  It would be a little harder for the client itself
   # to request this via another method (it would require a callback).
   # Future: validation!
-  defineColumn: (parentId, index, name, type, cellName, formula) ->
-    model.defineColumn(parentId, index, name, type, cellName, formula)
+  defineColumn: (parentId, index, name, specifiedType, cellName, formula) ->
+    model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
     #model.evaluateAll()
   changeColumnName: (columnId, name) ->
     model.changeColumnName(columnId, name)
@@ -508,17 +366,15 @@ Meteor.methods({
   changeColumnCellName: (columnId, cellName) ->
     model.changeColumnCellName(columnId, cellName)
     #model.evaluateAll()
-  changeColumnType: (columnId, typeRef) ->
-    model.changeColumnType(columnId, parseTypeStr(typeRef))
+  changeColumnSpecifiedType: (columnId, specifiedType) ->
+    model.changeColumnSpecifiedType(columnId, specifiedType)
+    model.evaluateAll()
   changeColumnFormula: (columnId, formula) ->
     model.changeColumnFormula(columnId, formula)
-    model.evaluateAllFlat()
+    model.evaluateAll()
   deleteColumn: (columnId) ->
     model.deleteColumn(columnId)
-    #model.evaluateAll()
+    model.evaluateAll()
   notifyChange: ->
-    model.evaluateAllFlat()
-  writeState: (qFamilyId, value, present) ->
-    model.writeState(qFamilyId, value, present)
     model.evaluateAll()
 })
