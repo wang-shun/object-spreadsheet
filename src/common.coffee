@@ -9,7 +9,19 @@
 @cellIdChild = (cellId, value) -> cellId.concat([value])
 @cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
 
-class SemanticError extends Error
+# N.B. Meteor.makeErrorType is the way to make a subclass of Error so that both
+# instanceof and stack traces work.
+
+# Used also for typechecking.
+@FormulaValidationError = Meteor.makeErrorType('FormulaValidationError',
+  class FormulaValidationError
+    constructor: (@message) ->
+)
+
+SemanticError = Meteor.makeErrorType('SemanticError',
+  class SemanticError
+    constructor: (@message) ->
+)
 
 # Model data structures and parameters the client needs to be aware of:
 # (I tried using EJSON custom classes but it was too much of a pain to store in
@@ -52,6 +64,26 @@ class SemanticError extends Error
     if !colId
       throw new SemanticError("column lookup failed: '#{s}'")
   return colId
+
+# Finds the lowest common ancestor of columnId1 and columnId2 and returns a
+# pair of arrays giving the sequences of ancestors from columnId1 and
+# columnId2 (respectively) to the common ancestor, inclusive.
+@findCommonAncestorPaths = (columnId1, columnId2) ->
+  ancestors1 = []
+  cid = columnId1
+  loop
+    ancestors1.push(cid)
+    break if cid == rootColumnId
+    cid = getColumn(cid).parent
+  ancestors2 = []
+  cid = columnId2
+  loop
+    ancestors2.push(cid)
+    # We could make this not O(N^2) if we cared...
+    break if (idx = ancestors1.indexOf(cid)) != -1
+    cid = getColumn(cid).parent
+  ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
+  return [ancestors1, ancestors2]
 
 if Meteor.isClient
   @getColumn = (id) -> Columns.findOne(id)

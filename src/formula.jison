@@ -1,10 +1,3 @@
-/*
-Interactive testing:
-
-$ meteor shell
-> JSON.stringify(Jison.Parsers.formula.parse('{m in ::Meeting | m.slot = Slot}'))
-*/
-
 %lex
 
 int "-"?([0-9]|[1-9][0-9]+)
@@ -33,7 +26,7 @@ frac "."[0-9]+
 "." return '.'
 
 /* Identifiers */
-/* XXX: Allow non-Latin word characters? */ 
+/* XXX: Allow non-Latin word characters? */
 [_A-Za-z][_A-Za-z0-9]* return 'IDENT'
 
 <<EOF>> return 'EOF'
@@ -66,25 +59,34 @@ expression
         { $$ = $1; }
     | setLiteral
         { $$ = $1; }
-    | IDENT  /* could be bound variable or navigation */
-        { $$ = ['identTODO', $1]; }
+    | IDENT  /* could be bound variable or implicit this */
+        { $$ = yy.navigate(null, $1); }
     | ROOT IDENT
-        { $$ = ['navTODO', ['lit', '_root', [[]]], $2]; }
+        { $$ = yy.navigate(['lit', '_root', [[]]], $2); }
     | expression '.' IDENT
-        { $$ = ['navTODO', $1, $3]; }
+        { $$ = yy.navigate($1, $3); }
     | expression '=' expression
         { $$ = ['=', $1, $3]; }
     | expression IN expression
         { $$ = ['in', $1, $3]; }
-    | '{' IDENT IN expression '|' expression '}'
-        { $$ = ['filter', $4, [$2, $6]]; }
+    | '{' binding '|' expression '}'
+        { yy.unbindVar($2.var);
+          $$ = ['filter', $2.domain, [$2.var, $4]]; }
+    ;
+
+/* Could use a mid-rule action if supported.
+   https://github.com/zaach/jison/issues/69 */
+binding
+    : IDENT IN expression
+        { yy.bindVar($1, $3);
+          $$ = {var: $1, domain: $3}; }
     ;
 
 setLiteral
     : '{' '}'
-        { $$ = ['setLiteralTODO', []]; }
+        { $$ = yy.makeSetLiteral([]); }
     | '{' setLiteralMembers optComma '}'
-        { $$ = ['setLiteralTODO', $2]; }
+        { $$ = yy.makeSetLiteral([$2]); }
     ;
 
 setLiteralMembers
@@ -127,9 +129,9 @@ numberLiteral
 
 booleanLiteral
     : TRUE
-        {$$ = ['lit','_bool',true];}
+        {$$ = ['lit','_bool',[true]];}
     | FALSE
-        {$$ = ['lit','_bool',false];}
+        {$$ = ['lit','_bool',[false]];}
     ;
 
 %%

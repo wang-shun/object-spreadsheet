@@ -261,33 +261,36 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  # NOTE: It can be subtle to remember what "this" refers to in a formula, so I
-  # anticipate encouraging users of the concrete syntax to instead use the
-  # cellName of the parent column, which generates a trivial call to "up".
-  # The example formulas reflect this convention.
-  model.defineColumn(parseColumnRef("Person:Student:parent"),
-                     0, "parentName", null, null,
-                     ["down",["up",["var","this"],parseColumnRef("Person:Student:parent"),true],parseColumnRef("Person:name"),true])
-  model.defineColumn(parseColumnRef("Person:Teacher:Slot"),
-                     1, "scheduledMeeting", null, null,
-                     ["filter",["down",["lit","_root",[[]]],parseColumnRef("Meeting"),false],["m",["=",["down",["var","m"],parseColumnRef("Meeting:slot"),true],["up",["var","this"],parseColumnRef("Person:Teacher:Slot"),false]]]])
+  defineParsedFormulaColumn = (parentRef, order, name, cellName, specifiedType, formulaStr, attrs) ->
+    # Ludicrously inefficient, but we need the column type fields to be set in
+    # order to parse formulas.
+    model.evaluateAll()
+    parentId = parseColumnRef(parentRef)
+    model.defineColumn(parentId,
+                       order, name, cellName, specifiedType,
+                       parseFormula(parentId, formulaStr), attrs)
+  defineParsedFormulaColumn("Person:Student:parent",
+                            0, "parentName", null, null,
+                            'parent.name')
+  defineParsedFormulaColumn("Person:Teacher:Slot",
+                            1, "scheduledMeeting", null, null,
+                            '{m in ::Meeting | m.slot = Slot}')
 
-  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduledMeeting"),
-                     0, "discussed", null, null,
-                     ["up",["down",["up",["var","this"],parseColumnRef("Person:Teacher:Slot:scheduledMeeting"),true],parseColumnRef("Meeting:enrollment"),true],parseColumnRef("Class:Section:student"),true])
-  model.defineColumn(parseColumnRef("Person:Teacher:Slot:scheduledMeeting:discussed"),
-                     0, "studentName", null, null,
-                     ["down",["up",["up",["var","this"],parseColumnRef("Person:Teacher:Slot:scheduledMeeting:discussed"),true],parseColumnRef("Person"),false],parseColumnRef("Person:name"),true])
+  defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting",
+                            0, "discussed", null, null,
+                            'scheduledMeeting.enrollment.student')
+  defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting:discussed",
+                            0, "studentName", null, null,
+                            'discussed.Person.name')
 
-  model.defineColumn(parseColumnRef("Person"),
-                     1, "children", null, null,
-                     # {c in Person | this in c.parent}
-                     ["filter",["down",["lit","_root",[[]]],parseColumnRef("Person"),false],["c",["in",["up",["var","this"],parseColumnRef("Person"),false],["down",["var","c"],parseColumnRef("Person:Student:parent"),true]]]],
-                     {view: '1'})
-  model.defineColumn(parseColumnRef("Person:children"),
-                     0, "childName", null, null,
-                     ["down",["up",["var","this"],parseColumnRef("Person:children"),true],parseColumnRef("Person:name"),true],
-                     {view: '1'})
+  defineParsedFormulaColumn("Person",
+                            1, "children", null, null,
+                            '{c in ::Person | Person in c.Student.parent}',
+                            {view: '1'})
+  defineParsedFormulaColumn("Person:children",
+                            0, "childName", null, null,
+                            'children.name',
+                            {view: '1'})
 
   model.evaluateAll()  # prepare dependencies
 

@@ -1,9 +1,7 @@
-# Used also for typechecking.
-class @FormulaValidationError
-  constructor: (@message) ->
-
-class @EvaluationError
-  constructor: (@message) ->
+@EvaluationError = Meteor.makeErrorType('EvaluationError',
+  class EvaluationError
+    constructor: (@message) ->
+)
 
 class Model
 
@@ -85,26 +83,6 @@ class Model
     # XXX: Replace by a real API.  At least the references will be easy to find.
     return @columns.get(columnId)
 
-  # Finds the lowest common ancestor of columnId1 and columnId2 and returns a
-  # pair of arrays giving the sequences of ancestors from columnId1 and
-  # columnId2 (respectively) to the common ancestor, inclusive.
-  findCommonAncestorPaths: (columnId1, columnId2) ->
-    ancestors1 = []
-    cid = columnId1
-    loop
-      ancestors1.push(cid)
-      break if cid == rootColumnId
-      cid = @columns.get(cid).parent
-    ancestors2 = []
-    cid = columnId2
-    loop
-      ancestors2.push(cid)
-      # We could make this not O(N^2) if we cared...
-      break if (idx = ancestors1.indexOf(cid)) != -1
-      cid = @columns.get(cid).parent
-    ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
-    return [ancestors1, ancestors2]
-
   defineColumn: (parentId, index, name, specifiedType, cellName, formula, attrs) ->
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
@@ -155,6 +133,9 @@ class Model
     return thisId
 
   changeColumnName: (columnId, name) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
     col = @columns.get(columnId)
     if name == col.name
       return
@@ -168,6 +149,9 @@ class Model
     Columns.update(columnId, {$set: {name: name}})
 
   changeColumnCellName: (columnId, cellName) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
     col = @columns.get(columnId)
     if cellName == col.cellName
       return
@@ -181,6 +165,9 @@ class Model
     Columns.update(columnId, {$set: {cellName: cellName}})
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
     @invalidateCache()
     col = @columns.get(columnId)
     col.specifiedType = specifiedType
@@ -200,6 +187,9 @@ class Model
   # magnitude more complicated.
 
   changeColumnFormula: (columnId, formula) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
     col = @columns.get(columnId)
     #unless col.formula?
     #  throw new Meteor.Error('changeFormula-on-non-formula-column',
@@ -359,7 +349,7 @@ Meteor.methods({
   # Future: validation!
   defineColumn: (parentId, index, name, specifiedType, cellName, formula) ->
     model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
-    #model.evaluateAll()
+    model.evaluateAll()
   changeColumnName: (columnId, name) ->
     model.changeColumnName(columnId, name)
     #model.evaluateAll()

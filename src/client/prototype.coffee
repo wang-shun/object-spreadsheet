@@ -71,8 +71,6 @@ class ViewSection
     @relationSingular = false
     # Might be undefined (root cell or no cells), fail gently.
     @type = @col.type
-    #  if @col.formula? then FormulaColumnType.findOne(@columnId)?.type
-    #  else @col.type
     @width = 1
     @leftEdgeSingular = true
     @rightEdgeSingular = true
@@ -218,9 +216,11 @@ onSelection = () ->
       []
   )
   changeFormulaArgs.set(
-    if selectedCell? && selectedCell.kind? && selectedCell.colspan == 1 &&
-       !selectedCell.fullText? &&  # <- currently occupies the same spot, looks ugly
-       (ci = selectedCell.columnId)? # && getColumn(ci).formula?
+    # This intentionally shows only for the 'below' cell, because the 'below'
+    # cell represents the values (which is what a formula generates) while the
+    # 'top' cell represents the cells.
+    if selectedCell? && selectedCell.kind == 'below' &&
+       (ci = selectedCell.columnId) != rootColumnId
       [{_id: ci, columnId: ci}]
     else
       []
@@ -286,44 +286,48 @@ class StateEdit
     col? && columnIsState(col) && !columnIsToken(col)
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
+# We mainly care that this doesn't crash.
+origFormulaStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.formula
+  if formula? then stringifyFormula(formula) else ''
 newFormulaStr = new ReactiveVar(null)
 Template.changeFormula.rendered = () ->
-  col = getColumn(Template.currentData().columnId)
-  if col?.formula?
-    orig = JSON.stringify(col.formula)
-    newFormulaStr.set(orig)
+  orig = origFormulaStrForColumnId(Template.currentData().columnId)
+  newFormulaStr.set(orig)
+  # Handles case when showing only the "Create formula" button for a non-formula column.
+  if orig
     @find('input[name=formula]').value = orig
 Template.changeFormula.helpers
   formula: ->
-    col = getColumn @columnId
-    col.formula
+    origFormulaStrForColumnId(@columnId)
   formulaClass: ->
-    col = getColumn @columnId
-    if col?.formula?
-      orig = JSON.stringify(col.formula)
-      entered = newFormulaStr.get()
-      if orig != entered then 'formulaModified' else ''
+    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId)
+      'formulaModified'
+    else
+      ''
 
 Template.changeFormula.events({
   'input .formula': (event, template) ->
     newFormulaStr.set(template.find('input[name=formula]').value)
   'submit form': (event, template) ->
-    formulaStr = template.find('input[name=formula]').value
+    formulaStr = newFormulaStr.get()
     try
-      formula = JSON.parse(formulaStr)
+      formula = parseFormula(getColumn(@columnId).parent, formulaStr)
     catch e
-      alert('Invalid JSON.')
+      unless e instanceof FormulaValidationError
+        throw e
+      alert('Failed to parse formula: ' + e.message)
       return false
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
-    template.find('input[name=formula]').value = JSON.stringify(formula)
+    template.find('input[name=formula]').value = stringifyFormula(formula)
     Meteor.call('changeColumnFormula',
                 @columnId,
                 formula,
                 standardServerCallback)
     false # prevent refresh
   'click [type=reset]': (event, template) ->
-    orig = JSON.stringify(getColumn(@columnId).formula)
+    orig = origFormulaStrForColumnId(@columnId)
     newFormulaStr.set(orig)
     template.find('input[name=formula]').value = orig
     false # prevent clear
@@ -339,13 +343,16 @@ Template.changeFormula.events({
 })
 
 insertBlankColumn = (parentId, index) ->
+  # Obey the restriction on a state column as child of a formula column.
+  # Although changeColumnFormula allows this to be bypassed anyway... :(
+  formula = if getColumn(parentId).formula? then ['lit', '_unit', []] else null
   Meteor.call('defineColumn',
               parentId,
               index,
               null,  # name
               null,  # type
               null,  # cellName
-              null,  # formula
+              formula,  # formula
               standardServerCallback)
 
 
@@ -410,8 +417,7 @@ class View
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
-          readOnly: !(cell.kind in ['top', 'below'] ||
-                      cell.kind == 'type' && cell.columnId != rootColumnId ||
+          readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
                       cell.qCellId? && StateEdit.canEdit(cell.qCellId))
         }
       autoColumnSize: true
@@ -639,12 +645,6 @@ guarded = (op) ->
 Template.Spreadsheet.rendered = ->
   viewId = @data?.viewId
   Tracker.autorun(guarded -> rebuildView readViewDef viewId)
-
-
-Meteor.startup () ->
-  # Load order...
-  @FamilyData = new Mongo.Collection(FAMILY_DATA_COLLECTION)
-  @FormulaColumnType = new Mongo.Collection(FORMULA_COLUMN_TYPE_COLLECTION)
 
 
 Meteor.methods({
