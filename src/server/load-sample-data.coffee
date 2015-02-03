@@ -1,4 +1,4 @@
-@loadSampleData = () ->
+@loadSampleData = (model) ->
   # Sample schema and data in a more human-friendly hierarchical format.
 
   sampleSchema = [
@@ -227,11 +227,10 @@
   superSchema = {children: sampleSchema}
 
   # Delete all existing columns!!
-  new Model().drop()
+  model.drop()
   Views.remove {}
 
-  model = new Model()
-  @getColumn = (id) -> model.getColumn(id)
+  console.log "Loading sample data into tablespace '#{$$.id}'"
 
   scanColumns = (parentId, schema) ->
     schema.children ?= []
@@ -266,6 +265,7 @@
     # order to parse formulas.
     model.evaluateAll()
     parentId = parseColumnRef(parentRef)
+
     model.defineColumn(parentId,
                        order, name, cellName, specifiedType,
                        parseFormula(parentId, formulaStr), attrs)

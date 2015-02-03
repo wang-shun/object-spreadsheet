@@ -58,6 +58,7 @@ class Model
 
     # Special case: create root column if missing.
     unless @columns.get(rootColumnId)?
+      @isEmpty = true
       # None of the other properties should be used.
       col = {
         _id: rootColumnId
@@ -314,6 +315,11 @@ class Model
     Columns.remove({_id: {$ne: rootColumnId}})
     Columns.update(rootColumnId, {$set: {children: []}})
     Cells.remove({})
+    # Ditto for @columns
+    rootColumn = @columns.get(rootColumnId)
+    rootColumn.children = []
+    rootColumn.childByName = new EJSONKeyedMap
+    @columns = new EJSONKeyedMap [[rootColumnId, rootColumn]]
 
   invalidateCache: ->
     for [columnId, col] in @columns.entries() when columnId != rootColumnId
@@ -324,15 +330,19 @@ class Model
 
 
 Meteor.startup () ->
-  exported {Model}
-  if Columns.findOne(rootColumnId)?
-    @model = new Model
-  else
-    @model = loadSampleData()
-  @getColumn = (id) -> model.getColumn(id)
-  model.evaluateAll()
+  Tablespace.onCreate ->
+    @do ->
+      @model = new Model
+      @model.evaluateAll()
 
-Meteor.publish "columns", -> Columns.find()
+  Tablespace.default = tspace = Tablespace.get('')  # mostly for use in the shell
+  tspace.run()
+
+  Tablespace.get('ptc').run ->
+    if $$.model.isEmpty
+      loadSampleData($$.model)
+
+#Meteor.publish "columns", -> Columns.find()
 Meteor.publish "cells", -> Cells.find()
 Meteor.publish "views", -> Views.find()
 Meteor.methods({
@@ -341,24 +351,28 @@ Meteor.methods({
   # change from the client.  It would be a little harder for the client itself
   # to request this via another method (it would require a callback).
   # Future: validation!
-  defineColumn: (parentId, index, name, specifiedType, cellName, formula) ->
-    model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
-    model.evaluateAll()
-  changeColumnName: (columnId, name) ->
-    model.changeColumnName(columnId, name)
-    #model.evaluateAll()
-  changeColumnCellName: (columnId, cellName) ->
-    model.changeColumnCellName(columnId, cellName)
-    #model.evaluateAll()
-  changeColumnSpecifiedType: (columnId, specifiedType) ->
-    model.changeColumnSpecifiedType(columnId, specifiedType)
-    model.evaluateAll()
-  changeColumnFormula: (columnId, formula) ->
-    model.changeColumnFormula(columnId, formula)
-    model.evaluateAll()
-  deleteColumn: (columnId) ->
-    model.deleteColumn(columnId)
-    model.evaluateAll()
-  notifyChange: ->
-    model.evaluateAll()
+  defineColumn: (cc, parentId, index, name, specifiedType, cellName, formula) ->
+    cc.run ->
+      @model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
+      @model.evaluateAll()
+  changeColumnName: (cc, columnId, name) ->
+    cc.run -> @model.changeColumnName(columnId, name)
+  changeColumnCellName: (cc, columnId, cellName) ->
+    cc.run -> @model.changeColumnCellName(columnId, cellName)
+  changeColumnSpecifiedType: (cc, columnId, specifiedType) ->
+    cc.run ->
+      @model.changeColumnSpecifiedType(columnId, specifiedType)
+      @model.evaluateAll()
+  changeColumnFormula: (cc, columnId, formula) ->
+    cc.run ->
+      @model.changeColumnFormula(columnId, formula)
+      @model.evaluateAll()
+  deleteColumn: (cc, columnId) ->
+    cc.run ->
+      @model.deleteColumn(columnId)
+      @model.evaluateAll()
+  notifyChange: (cc) ->
+    cc.run -> @model.evaluateAll()
 })
+
+exported {Model}

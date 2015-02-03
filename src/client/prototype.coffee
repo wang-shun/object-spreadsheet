@@ -16,10 +16,14 @@ andThen = (cont) ->
 # like, it just won't have a stack trace.
 class NotReadyError
 
-Router.route "/", -> @render "Spreadsheet"
-Router.route "/views/:_id", ->
-  @render "Spreadsheet", {data: {viewId: @params._id}}
-Router.route "/schema"
+Router.route "/", -> @render "Spreadsheet"  # @deprecated (should show list of avail sheets)
+
+Router.route "/:sheet", ->
+  @render "Spreadsheet", data: {sheet: @params.sheet}
+Router.route "/:sheet/views/:_id", ->
+  @render "Spreadsheet", data: {sheet: @params.sheet, viewId: @params._id}
+Router.route "/:sheet/schema", ->
+  @render "Schema", data: {sheet: @param.sheet}
 
 # Grid utilities
 
@@ -237,11 +241,15 @@ Template.formulaValueBar.helpers({
 addStateCellArgs = new ReactiveVar([], EJSON.equals)
 Template.addStateCell.events({
   'submit form': (event, template) ->
-    valueStr = template.find('input[name=value]').value
-    StateEdit.addCell @qFamilyId, valueStr,
-    # Clear the field on successful submission (only)
-    andThen -> template.find('input[name=value]').value = ''
-    false # prevent clear
+    try
+      valueStr = template.find('input[name=value]').value
+      StateEdit.addCell @qFamilyId, valueStr,
+      # Clear the field on successful submission (only)
+      andThen -> template.find('input[name=value]').value = ''
+      false # prevent clear
+    catch e
+      console.log e.stack
+      false
 })
 
 class StateEdit
@@ -321,7 +329,7 @@ Template.changeFormula.events({
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
     template.find('input[name=formula]').value = stringifyFormula(formula)
-    Meteor.call('changeColumnFormula',
+    Meteor.call('changeColumnFormula', $$,
                 @columnId,
                 formula,
                 standardServerCallback)
@@ -335,7 +343,7 @@ Template.changeFormula.events({
     # Default formula to get the new column created ASAP.
 	# Then the user can edit it as desired.
     formula = ['lit', '_unit', []]
-    Meteor.call 'changeColumnFormula', @columnId, formula,
+    Meteor.call 'changeColumnFormula', $$, @columnId, formula,
                 standardServerCallback
     # TODO warn user if column has data!!
   'keydown form': (event, template) ->
@@ -346,7 +354,7 @@ insertBlankColumn = (parentId, index) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
   formula = if getColumn(parentId).formula? then ['lit', '_unit', []] else null
-  Meteor.call('defineColumn',
+  Meteor.call('defineColumn', $$,
               parentId,
               index,
               null,  # name
@@ -443,10 +451,10 @@ class View
           cell = @grid[row][col]
           # One of these cases should apply...
           if cell.kind == 'top'
-            Meteor.call 'changeColumnCellName', cell.columnId, newVal,
+            Meteor.call 'changeColumnCellName', $$, cell.columnId, newVal,
                         standardServerCallback
           if cell.kind == 'below'
-            Meteor.call 'changeColumnName', cell.columnId, newVal,
+            Meteor.call 'changeColumnName', $$, cell.columnId, newVal,
                         standardServerCallback
           if cell.kind == 'type'
             parsed = false
@@ -456,7 +464,7 @@ class View
             catch e
               alert('Invalid type.')
             if parsed
-              Meteor.call 'changeColumnSpecifiedType', cell.columnId, type,
+              Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
                           standardServerCallback
           if cell.qCellId?
             if newVal
@@ -528,7 +536,7 @@ class View
               c = @getSingleSelectedCell()
               ci = c && (c.columnId ? c.qFamilyId?.columnId)
               @hot.deselectCell() # <- Otherwise changeFormula form gets hosed.
-              Meteor.call('deleteColumn', ci,
+              Meteor.call('deleteColumn', $$, ci,
                           standardServerCallback)
           }
           sep1: '----------'
@@ -588,15 +596,11 @@ class View
     return false
 
 
-Meteor.subscribe "columns"
 Meteor.subscribe "cells"
 Meteor.subscribe "views"
 
 view = null
 viewHOT = null
-
-#viewId = null
-#layoutTree = null
 
 
 readViewDef = (viewId) ->
@@ -617,6 +621,7 @@ rebuildView = (viewDef) ->
   else
     view.reload viewDef
     view.hotReconfig()
+  exported {view, viewHOT}  # for debugging
   # Try to select a cell similar to the one previously selected.
   if selectedCell?
     ((selectedCell.qCellId? &&
@@ -643,7 +648,9 @@ guarded = (op) ->
 
 
 Template.Spreadsheet.rendered = ->
+  sheet = @data?.sheet || ''
   viewId = @data?.viewId
+  Tablespace.default = Tablespace.get sheet
   Tracker.autorun(guarded -> rebuildView readViewDef viewId)
 
 
@@ -651,9 +658,9 @@ Meteor.methods({
   # Implement these two methods to reduce display jankiness, since they're easy.
   # Hm, doesn't help much, I suspect the bottleneck is rerendering the table,
   # not the server call.
-  changeColumnName: (columnId, name) ->
+  changeColumnName: (cc, columnId, name) ->
     Columns.update(columnId, {$set: {name: name}})
-  changeColumnCellName: (columnId, cellName) ->
+  changeColumnCellName: (cc, columnId, cellName) ->
     Columns.update(columnId, {$set: {cellName: cellName}})
 })
 

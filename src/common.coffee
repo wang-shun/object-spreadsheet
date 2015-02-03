@@ -55,12 +55,12 @@ SemanticError = Meteor.makeErrorType('SemanticError',
   colId = rootColumnId
   for n in s.split(':')
     # XXX: Maybe types should accept cellName only.
-    if Meteor.isServer
-      colId = getColumn(colId).childByName.get(n)
-    else
+    #if Meteor.isServer
+    #  colId = getColumn(colId).childByName.get(n)
+    #else
       # no childByName. make it?
-      colId = Columns.findOne {parent: colId, $or: [ {name: n}, {cellName: n} ]}
-        ?._id
+    col = Columns.findOne {parent: colId, $or: [ {name: n}, {cellName: n} ]}
+    colId = col?._id
     if !colId
       throw new SemanticError("column lookup failed: '#{s}'")
   return colId
@@ -85,8 +85,8 @@ SemanticError = Meteor.makeErrorType('SemanticError',
   ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
   return [ancestors1, ancestors2]
 
-if Meteor.isClient
-  @getColumn = (id) -> Columns.findOne(id)
+#if Meteor.isClient
+@getColumn = (id) -> Columns.findOne(id)
 
 # Literal empty sets, etc.
 @TYPE_ANY = '_any'

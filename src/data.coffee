@@ -2,9 +2,32 @@
 #CELLS_COLLECTION = 'cells'
 # need them for publisher? maybe just use Columns._name, Cells._name?
 
-Columns = new Mongo.Collection "columns"
-Cells = new Mongo.Collection "cells"
-Views = new Mongo.Collection "views"
+scoped = (name, prop) -> Object.defineProperty @, name, prop
+
+scoped '$$', get: -> Tablespace.get()
+scoped 'Columns', get: -> $$.Columns
+scoped 'Cells', value: new Mongo.Collection "cells"
+scoped 'Views', value: new Mongo.Collection "views"
+
+
+class Tablespace extends ControlContext
+  constructor: (@id) ->
+    console.log "created Tablespace[#{@id}]"
+    @Columns = new Mongo.Collection "#{@id}:columns"
+    for c in [@Columns]
+      @publishSubscribe c
+    super()
+
+  publishSubscribe: (collection) ->
+    if Meteor.isServer then Meteor.publish collection._name, -> collection.find()
+    if Meteor.isClient then Meteor.subscribe collection._name
+
+  typeName: -> 'Tablespace'
+  toJSONValue: -> {@id}
+  @fromJSONValue: (json) => @get json.id
+
+EJSON.addType('Tablespace', Tablespace.fromJSONValue)
+
 
 # NOTE: This class treats erroneous families in formula columns as empty!  Do
 # not use it if you care about error propagation.
@@ -23,16 +46,16 @@ class ColumnBinRel
   add: (key, value, callback=->) ->
     if Meteor.isServer
       Cells.upsert {column: @columnId, key}, {$addToSet: {values: value}}
-      Meteor.call 'notifyChange', callback
+      $$.call 'notifyChange', callback
     else
-      Meteor.call 'ColumnBinRel_add', @columnId, key, value, callback
+      $$.call 'ColumnBinRel_add', @columnId, key, value, callback
 
   remove: (key, value, callback=->) ->
     if Meteor.isServer
       Cells.update {column: @columnId, key}, {$pull: {values: value}}
-      Meteor.call 'notifyChange', callback
+      $$.call 'notifyChange', callback
     else
-      Meteor.call 'ColumnBinRel_remove', @columnId, key, value, callback
+      $$.call 'ColumnBinRel_remove', @columnId, key, value, callback
 
   ## remove(key, oldValue) + add(key, newValue) in a single operation
   removeAdd: (key, oldValue, newValue, callback=->) ->
@@ -42,9 +65,9 @@ class ColumnBinRel
         #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}
         Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
         Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
-        Meteor.call 'notifyChange', callback
+        $$.call 'notifyChange', callback
       else
-        Meteor.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
+        $$.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
 
   lookup: (keys) ->
     # @param keys: an EJSONKeyedSet or TypedSet
@@ -79,17 +102,12 @@ class PairsBinRel
 
 if Meteor.isServer
   Meteor.methods
-    ColumnBinRel_add: (columnId, key, value) ->
-      new ColumnBinRel(columnId).add(key, value)
-    ColumnBinRel_remove: (columnId, key, value) ->
-      new ColumnBinRel(columnId).remove(key, value)
-    ColumnBinRel_removeAdd: (columnId, key, oldValue, newValue) ->
-      new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
+    ColumnBinRel_add: (cc, columnId, key, value) ->
+      cc.run -> new ColumnBinRel(columnId).add(key, value)
+    ColumnBinRel_remove: (cc, columnId, key, value) ->
+      cc.run -> new ColumnBinRel(columnId).remove(key, value)
+    ColumnBinRel_removeAdd: (cc, columnId, key, oldValue, newValue) ->
+      cc.run -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
 
-exported = (d) ->
-  for k,v of d
-    @[k] = v
-
-#exported {COLUMN_COLLECTION, CELLS_COLLECTION}
-exported {Columns, Cells, Views, ColumnBinRel, PairsBinRel}
+exported {Tablespace, Cells, Views, ColumnBinRel, PairsBinRel}
