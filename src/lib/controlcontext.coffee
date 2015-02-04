@@ -29,13 +29,10 @@ class ControlContext extends OnDemand
       func.apply @
   do: (task) -> @scheduled.push task
 
-  # Calls a Meteor method, passing the current cc as first argument
-  # For some reason, Meteor.call overwrites process.domain; work around by saving
-  # and restoring.
+  # Convenience method;
+  # calls a Meteor method, passing the current cc as first argument
   call: (method, args...) ->
-    if process? then d = process.domain
     Meteor.call method, @, args...
-    if process? then process.domain = d
 
 
 exported = (d) ->
