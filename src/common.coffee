@@ -48,17 +48,13 @@ SemanticError = Meteor.makeErrorType('SemanticError',
   if typeIsPrimitive(s)
     s
   else
+    # XXX: Maybe types should accept cellName only.
     @parseColumnRef s
 
 @parseColumnRef = (s) ->
   if getColumn(s)? then return s  # Any other way to recognize ids vs. names?
   colId = rootColumnId
   for n in s.split(':')
-    # XXX: Maybe types should accept cellName only.
-    #if Meteor.isServer
-    #  colId = getColumn(colId).childByName.get(n)
-    #else
-      # no childByName. make it?
     col = Columns.findOne {parent: colId, $or: [ {name: n}, {cellName: n} ]}
     colId = col?._id
     if !colId
@@ -85,8 +81,9 @@ SemanticError = Meteor.makeErrorType('SemanticError',
   ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
   return [ancestors1, ancestors2]
 
-#if Meteor.isClient
 @getColumn = (id) -> Columns.findOne(id)
+@childByName = (column, name) ->
+  Columns.findOne {parent: column._id, $or: [ {name: name}, {cellName: name} ]}
 
 # Literal empty sets, etc.
 @TYPE_ANY = '_any'

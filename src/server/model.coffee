@@ -12,31 +12,7 @@ class Model
 
   #@columns: EJSONKeyedMap<ColumnId, Column>
 
-  initializeColumnTempData: (col) ->
-    col.childByName = new EJSONKeyedMap()
-    #if columnIsState(col)
-    #  col.numStateCells = 0
-
-  registerColumnWithParent: (col) ->
-    parentColId = col.parent
-    parentCol = @columns.get(parentColId)
-    # XXX: Assert no duplicate names
-    if col.name?
-      parentCol.childByName.set(col.name, col._id)
-    if col.cellName?
-      parentCol.childByName.set(col.cellName, col._id)
-
-  unregisterColumnWithParent: (col) ->
-    parentColId = col.parent
-    parentCol = @columns.get(parentColId)
-    if col.name?
-      parentCol.childByName.delete(col.name)
-    if col.cellName?
-      parentCol.childByName.delete(col.cellName)
-
   constructor: ->
-    @columns = new EJSONKeyedMap()
-
     # Load from DB.
     # Future: Need a way to make a temporary model for a transaction without reloading.
     for col in Columns.find().fetch()
@@ -53,11 +29,9 @@ class Model
           col.formula = ['lit', '_unit', []]
           col.specifiedType = null
           Columns.update(col._id, col)
-      @columns.set(col._id, col)
-      @initializeColumnTempData(col)
 
     # Special case: create root column if missing.
-    unless @columns.get(rootColumnId)?
+    unless @getColumn(rootColumnId)?
       @isEmpty = true
       # None of the other properties should be used.
       col = {
@@ -66,35 +40,26 @@ class Model
         specifiedType: '_token'
         children: []
       }
-      @columns.set(rootColumnId, col)
       Columns.insert(col)
-      @initializeColumnTempData(col)
-
-    # Now go back and link things up.
-    for colId in @columns.keys()
-      col = @columns.get(colId)
-      # Oops, the DB already stores parents.  Future: Validate.
-      ## XXX: Validate each column (except root) has exactly one parent.
-      #for childId in col.children
-      #  @columns.get(childId).parent = colId
-      if colId != rootColumnId
-        # XXX: Assert parent existence
-        @registerColumnWithParent(col)
-    # Future: validate that type usage is acyclic.
 
   getColumn: (columnId) ->
     # Treat as read-only and valid only until the model is next modified.
     # XXX: Replace by a real API.  At least the references will be easy to find.
-    return @columns.get(columnId)
+    return Columns.findOne(columnId)
+
+  getAllColumns: (columnId=rootColumnId) ->
+    #columnId = columnId ? rootColumnId
+    col = @getColumn columnId
+    [[columnId, col]].concat (@getAllColumns c for c in col.children)...
 
   defineColumn: (parentId, index, name, specifiedType, cellName, formula, attrs) ->
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
-    parentCol = @columns.get(parentId)
+    parentCol = @getColumn.get(parentId)
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
-    if ((name? && parentCol.childByName.get(name)?) ||
-        (cellName? && parentCol.childByName.get(cellName)?))
+    if ((name? && childByName(parentCol, name)?) ||
+        (cellName? && childByName(parentCol, cellName)?))
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     if !formula?
       if parentCol.formula?
@@ -126,13 +91,10 @@ class Model
     }
     for k,v of attrs
       col[k] = v
-    @columns.set(thisId, col)
     Columns.insert(col)
-    @initializeColumnTempData(col)
     parentCol.children.splice(index, 0, thisId)
     # Meteor is nice for so many things, but not ORM...
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
-    @registerColumnWithParent(col)
 
     return thisId
 
@@ -140,32 +102,24 @@ class Model
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
-    col = @columns.get(columnId)
+    col = @getColumn(columnId)
     if name == col.name
       return
-    parentId = col.parent
-    parentCol = @columns.get(parentId)
-    if name? && parentCol.childByName.get(name)?
+    parentCol = @getColumn(col.parent)
+    if name? && childByName(parentCol, name)?
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
-    @unregisterColumnWithParent(col)
-    col.name = name
-    @registerColumnWithParent(col)
     Columns.update(columnId, {$set: {name: name}})
 
   changeColumnCellName: (columnId, cellName) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
-    col = @columns.get(columnId)
+    col = @getColumn(columnId)
     if cellName == col.cellName
       return
-    parentId = col.parent
-    parentCol = @columns.get(parentId)
-    if cellName? && parentCol.childByName.get(cellName)?
+    parentCol = @getColumn(col.parent)
+    if cellName? && childByName(parentCol, cellName)?
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
-    @unregisterColumnWithParent(col)
-    col.cellName = cellName
-    @registerColumnWithParent(col)
     Columns.update(columnId, {$set: {cellName: cellName}})
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
@@ -173,18 +127,12 @@ class Model
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
     @invalidateCache()
-    col = @columns.get(columnId)
-    col.specifiedType = specifiedType
     Columns.update(columnId, {$set: {specifiedType}})
 
   _changeColumnType: (columnId, type) ->
-    col = @columns.get(columnId)
-    col.type = type
     Columns.update(columnId, {$set: {type}})
 
   _changeColumnTypecheckError: (columnId, typecheckError) ->
-    col = @columns.get(columnId)
-    col.typecheckError = typecheckError
     Columns.update(columnId, {$set: {typecheckError}})
 
   # Future: API to move and copy groups of columns.  This is an order of
@@ -194,13 +142,13 @@ class Model
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
-    col = @columns.get(columnId)
+    # TODO check that there are no state cells
     #unless col.formula?
+    # ...
     #  throw new Meteor.Error('changeFormula-on-non-formula-column',
     #                         'Can only changeFormula on a formula column!')
     validateFormula(formula)
     @invalidateCache()
-    col.formula = formula
     Columns.update(columnId, {$set: {formula: formula}})
 
   deleteColumn: (columnId) ->
@@ -208,26 +156,22 @@ class Model
       throw new Meteor.Error('delete-root-column',
                              'Cannot delete the root column.')
     # Assert not root
-    col = @columns.get(columnId)
+    col = @getColumn(columnId)
     if col.children?.length
       throw new Meteor.Error('delete-column-has-children',
                              'Please delete all child columns first.')
-    # Assert col.childByName also empty
     # XXX: Make this work again.
     #if columnIsState(col) && col.numStateCells > 0
     #  throw new Meteor.Error('delete-column-has-state-cells',
     #                         'Please delete all state cells first.')
-    parentId = col.parent
-    parentCol = @columns.get(parentId)
+    parentCol = @getColumn(col.parent)
     @invalidateCache()
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
-    @unregisterColumnWithParent(col)
-    @columns.delete(columnId)
     Columns.remove(columnId)
 
   evaluateFamily1: (qFamilyId) ->
-    col = @columns.get(qFamilyId.columnId)
+    col = @getColumn(qFamilyId.columnId)
     if col.formula?
       if col.typecheckError?
         throw new EvaluationError("Formula failed type checking: #{col.typecheckError}")
@@ -268,11 +212,13 @@ class Model
   #   evaluate it.
   # These don't have to be done at the same time, but for now that's convenient.
   typecheckColumn: (columnId) ->
-    col = @columns.get(columnId)
-    unless col.type?
+    col = @getColumn(columnId)
+    type = col.type
+    unless type?
       # Formula columns of unspecified type are set to TYPE_ERROR at the
       # beginning for cycle detection, analogous to how family evaluation works.
-      @_changeColumnType(columnId, col.specifiedType ? TYPE_ERROR)
+      type = col.specifiedType ? TYPE_ERROR
+      @_changeColumnType(columnId, type)
       if col.formula?
         try
           vars = new EJSONKeyedMap([['this', col.parent]])
@@ -288,18 +234,18 @@ class Model
           # If type was unspecified, it is left as TYPE_ERROR, i.e., unknown
           # for the purposes of other formulas.
           @_changeColumnTypecheckError(columnId, e.message)
-    return col.type
+    type
 
   evaluateAll: ->
     # XXX: Detect if already valid?
     # Be sure to start clean.
     @invalidateCache()
 
-    for columnId in @columns.keys()
+    for [columnId, _] in @getAllColumns()
       @typecheckColumn(columnId)
 
     evaluateSubtree = (qCellId) =>
-      col = @columns.get(qCellId.columnId)
+      col = @getColumn(qCellId.columnId)
       for childColId in col.children
         tset = @evaluateFamily({columnId: childColId, cellId: qCellId.cellId})
         if tset?
@@ -315,14 +261,9 @@ class Model
     Columns.remove({_id: {$ne: rootColumnId}})
     Columns.update(rootColumnId, {$set: {children: []}})
     Cells.remove({})
-    # Ditto for @columns
-    rootColumn = @columns.get(rootColumnId)
-    rootColumn.children = []
-    rootColumn.childByName = new EJSONKeyedMap
-    @columns = new EJSONKeyedMap [[rootColumnId, rootColumn]]
 
   invalidateCache: ->
-    for [columnId, col] in @columns.entries() when columnId != rootColumnId
+    for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       @_changeColumnType(columnId, null)
       @_changeColumnTypecheckError(columnId, null)
       if col.formula?
@@ -342,9 +283,7 @@ Meteor.startup () ->
     if $$.model.isEmpty
       loadSampleData($$.model)
 
-#Meteor.publish "columns", -> Columns.find()
-Meteor.publish "cells", -> Cells.find()
-Meteor.publish "views", -> Views.find()
+
 Meteor.methods({
   # The model methods do not automatically evaluate so that we can do bulk
   # changes from the server side, but for now we always evaluate after each

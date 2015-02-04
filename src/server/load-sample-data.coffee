@@ -251,7 +251,7 @@
   # Insert cells into columns.
   insertCells = (columnId, cellId, cellData) ->
     for childColumnName, childCells of cellData ? {}
-      childColumnId = model.getColumn(columnId).childByName.get(childColumnName)
+      childColumnId = childByName(model.getColumn(columnId), childColumnName)
       childColumn = new ColumnBinRel(childColumnId)
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
