@@ -6,15 +6,17 @@ scoped = (name, prop) -> Object.defineProperty @, name, prop
 
 scoped '$$', get: -> Tablespace.get()
 scoped 'Columns', get: -> $$.Columns
-scoped 'Cells', value: new Mongo.Collection "cells"
-scoped 'Views', value: new Mongo.Collection "views"
+scoped 'Cells',   get: -> $$.Cells
+scoped 'Views',   get: -> $$.Views
 
 
 class Tablespace extends ControlContext
   constructor: (@id) ->
     console.log "created Tablespace[#{@id}]"
     @Columns = new Mongo.Collection "#{@id}:columns"
-    for c in [@Columns]
+    @Cells   = new Mongo.Collection "#{@id}:cells"
+    @Views   = new Mongo.Collection "#{@id}:views"
+    for c in [@Columns,@Cells,@Views]
       @publishSubscribe c
     super()
 
@@ -110,4 +112,4 @@ if Meteor.isServer
       cc.run -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
 
-exported {Tablespace, Cells, Views, ColumnBinRel, PairsBinRel}
+exported {Tablespace, ColumnBinRel, PairsBinRel}

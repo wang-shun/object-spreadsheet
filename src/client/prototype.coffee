@@ -651,6 +651,7 @@ Template.Spreadsheet.rendered = ->
   sheet = @data?.sheet || ''
   viewId = @data?.viewId
   Tablespace.default = Tablespace.get sheet
+  Meteor.call 'open', $$
   Tracker.autorun(guarded -> rebuildView readViewDef viewId)
 
 

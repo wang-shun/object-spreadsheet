@@ -351,6 +351,7 @@ Meteor.methods({
   # change from the client.  It would be a little harder for the client itself
   # to request this via another method (it would require a callback).
   # Future: validation!
+  open: (cc) -> cc.run()
   defineColumn: (cc, parentId, index, name, specifiedType, cellName, formula) ->
     cc.run ->
       @model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
