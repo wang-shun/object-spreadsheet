@@ -18,7 +18,7 @@
 <template name="formulaValueBar">
   {{! Hack to reduce the jerking for addStateCell/changeFormula. }}
   {{#if fullTextToShow}}
-    <div>Full text: {{fullTextToShow}}</div>
+    <div>{{fullTextToShow}}</div>
   {{/if}}
   {{#each addStateCellArgs}}
     {{> addStateCell}}

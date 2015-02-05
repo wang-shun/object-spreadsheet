@@ -150,7 +150,7 @@ class ViewSection
         gridVertExtend(grid, bottomGrid)
     else
       grid = gridMergedCell(height, @width, '!')
-      grid[0][0].fullText = vlist.error
+      grid[0][0].fullText = 'Error: ' + vlist.error
       grid[0][0].qFamilyId = qFamilyId
     grid
 
@@ -180,7 +180,7 @@ class ViewSection
       @col.cellName ? '', ['rsHeaderTop'])
     gridTop[0][0].columnId = @columnId
     gridTop[0][0].kind = 'top'
-    gridTop[0][0].fullText = @columnId
+    gridTop[0][0].fullText = 'Column ID: ' + @columnId
     gridBelow = gridMergedCell(
       if height? then @headerHeightBelow - 1 else 1,
       1, @col.name ? '', ['rsHeaderBelow'])
@@ -197,9 +197,9 @@ class ViewSection
       (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
       (if @col.typecheckError? then '!' else ''))
     typeCell.fullText = (
-      (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
+      'Type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
       (if @col.formula? then ' (formula)' else '') +
-      (if @col.typecheckError? then " (TYPECHECK ERROR: #{@col.typecheckError})" else ''))
+      (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
     typeCell.columnId = @columnId
     typeCell.kind = 'type'
     gridVertExtend(gridBelow, [[typeCell]])
