@@ -87,7 +87,7 @@ class ViewSection
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
     @subsections = []
-    @headerHeightBelow = 3  # name, id, type
+    @headerHeightBelow = 2  # valueName, type
     for sublayout in @layoutTree.subtrees
       subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
@@ -172,15 +172,20 @@ class ViewSection
     grid
 
   renderHeader: (height) ->
-    gridTop = gridMergedCell(height - @headerHeightBelow, @width, @col.cellName ? '', ['rsHeaderTop'])
+    gridTop = gridMergedCell(
+      (if height?
+        [height - @headerHeightBelow, @width]
+      else
+        [1, 1])...,
+      @col.cellName ? '', ['rsHeaderTop'])
     gridTop[0][0].columnId = @columnId
     gridTop[0][0].kind = 'top'
-    gridBelow = gridMergedCell(@headerHeightBelow - 2, 1, @col.name ? '', ['rsHeaderBelow'])
+    gridTop[0][0].fullText = @columnId
+    gridBelow = gridMergedCell(
+      if height? then @headerHeightBelow - 1 else 1,
+      1, @col.name ? '', ['rsHeaderBelow'])
     gridBelow[0][0].columnId = @columnId
     gridBelow[0][0].kind = 'below'
-    # Hack: trim long IDs to not distort layout, unlikely to be nonunique.
-    idCell = new ViewCell(@columnId.substr(0, 4))
-    idCell.fullText = @columnId
     typeName = (s) ->
       if !s then ''
       else if typeIsPrimitive(s) then s
@@ -197,16 +202,23 @@ class ViewSection
       (if @col.typecheckError? then " (TYPECHECK ERROR: #{@col.typecheckError})" else ''))
     typeCell.columnId = @columnId
     typeCell.kind = 'type'
-    gridVertExtend(gridBelow, [[idCell]])
     gridVertExtend(gridBelow, [[typeCell]])
-    # Now gridBelow is (@headerMinHeight - 1) x 1.
-    for subsection, i in @subsections
-      if @haveSeparatorColBefore[i]
-        # Turns out class rsHeaderBelow will work for separators too.
-        gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow'])
-        gridHorizExtend(gridBelow, gridSeparator)
-      gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow))
-    gridVertExtend(gridTop, gridBelow)
+    if height?
+      # Now gridBelow is (@headerMinHeight - 1) x 1.
+      for subsection, i in @subsections
+        if @haveSeparatorColBefore[i]
+          # Turns out class rsHeaderBelow will work for separators too.
+          gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow'])
+          gridHorizExtend(gridBelow, gridSeparator)
+        gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow))
+      gridVertExtend(gridTop, gridBelow)
+    else
+      gridVertExtend(gridTop, gridBelow)
+      for subsection, i in @subsections
+        if @haveSeparatorColBefore[i]
+          gridSeparator = gridMergedCell(gridTop.length, 1)
+          gridHorizExtend(gridTop, gridSeparator)
+        gridHorizExtend(gridTop, subsection.renderHeader(null))
     gridTop
 
 # This may hold a reference to a ViewCell object from an old View.  Weird but
@@ -396,6 +408,10 @@ insertBlankColumn = (parentId, index) ->
               standardServerCallback)
 
 
+headerExpanded = new ReactiveVar(true)
+@toggleHeaderExpanded = () ->
+  headerExpanded.set(!headerExpanded.get())
+
 class View
 
   constructor: (@viewDef) ->
@@ -421,7 +437,8 @@ class View
     # Display the root column for completeness.  However, it doesn't have a real
     # value.
     hlist = @mainSection.prerenderHlist([], '')
-    grid = @mainSection.renderHeader(@mainSection.headerMinHeight)
+    grid = @mainSection.renderHeader(
+      if headerExpanded.get() then @mainSection.headerMinHeight else null)
     for row in grid
       for cell in row
         cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here
@@ -444,18 +461,20 @@ class View
           cell.value = '@' + @qCellIdToRowNum.get(cell.value.qCellId)
     gridVertExtend(grid, gridData)
 
-    gridCaption = gridMergedCell(headerHeight - 3, 1, 'cellName', ['htMiddle', 'rsCaption'])
+    # This is terrible but it will take ten times as long to do properly...
+    cnHtml = ("<input type='button' value='#{if headerExpanded.get() then '-' else '+'}'" +
+              " onclick='toggleHeaderExpanded();'/>CN")
+    gridCaption = gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption'])
     gridCaption.push(
-      [new ViewCell('name', 1, 1, ['rsCaption'])],
-      [new ViewCell('id', 1, 1, ['rsCaption'])],
-      [new ViewCell('type', 1, 1, ['rsCaption'])])
+      [new ViewCell('VN', 1, 1, ['rsCaption'])],
+      [new ViewCell('Type', 1, 1, ['rsCaption'])])
     gridVertExtend(gridCaption,
                    ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0..gridData.length-1]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
     @grid = grid
 
-    separatorColumns = (i for cell,i in grid[headerHeight - 2] when !(cell.value))
+    separatorColumns = (i for cell,i in grid[headerHeight - 1] when i != 0 && !cell.columnId)
     @separatorColumns = separatorColumns
 
     d = {
@@ -470,6 +489,7 @@ class View
         colClasses = if col in @separatorColumns then ['separator'] else
                      if adjcol in @separatorColumns then ['incomparable'] else []
         {
+          renderer: if col == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat colClasses).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
