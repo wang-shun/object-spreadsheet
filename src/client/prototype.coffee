@@ -35,6 +35,12 @@ class ViewCell
     @kind = null
     @fullText = null
 
+# Object that can be used as ViewCell.value or ViewHlist.value to defer the
+# resolution of the target cell ID to a row number.  I'm a terrible person for
+# taking advantage of heterogeneous fields in JavaScript... ~ Matt
+class CellReference
+  constructor: (@qCellId) ->
+
 # Mutate "orig" by adding "extension" at the bottom.
 # This would be a good place to add some assertions...
 gridVertExtend = (orig, extension) ->
@@ -103,7 +109,7 @@ class ViewSection
     if ce.values?
       hlists =
         for value in ce.values
-          @prerenderHlist(parentCellId, value)
+          @prerenderHlist(cellIdChild(parentCellId, value), value)
       minHeight = 0
       for hlist in hlists
         minHeight += hlist.minHeight
@@ -113,18 +119,16 @@ class ViewSection
     else
       new ViewVlist(parentCellId, 1, null, ce.error)
 
-  prerenderHlist: (parentCellId, value) ->
-    cellId = if @columnId == rootColumnId then [] else cellIdChild(parentCellId, value)
+  prerenderHlist: (cellId, value) ->
     minHeight = 1
     # TODO: More type-specific rendering?
     displayValue =
-      # For now, we need to see token values in order to interpret IDs.
-      # Future: Enable this again when we have a better way of rendering IDs.
-      #if @type == '_token' then '*'
+      if @type == '_token' then '*'
       # Show _unit values for now so we can see if they aren't 'X'.
       #if @type == '_unit' then 'X'
+      else if !typeIsPrimitive(@type) then new CellReference({columnId: @type, cellId: value})
       # Should be OK if the user knows which columns are string-typed.
-      if typeof value == 'string' then value
+      else if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
       else JSON.stringify(value)
     vlists =
@@ -214,8 +218,17 @@ onSelection = () ->
   fullTextToShow.set(selectedCell?.fullText)
   # _id: Hacks to get the #each to clear the forms when the cell changes.
   addStateCellArgs.set(
-    if (qf = selectedCell?.qFamilyId)? && columnIsState(getColumn(qf.columnId))
-      [{_id: EJSON.stringify(qf), qFamilyId: qf}]
+    if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
+      [{
+        _id: EJSON.stringify(qf)
+        qFamilyId: qf
+        canAddValue: col.type not in ['_token', '_unit']
+        canAddToken: col.type == '_token'
+        # Adding a duplicate value has no effect, but disallow it as a
+        # hint to the user.
+        canAddUnit: (col.type == '_unit' &&
+                     !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
+      }]
     else
       []
   )
@@ -242,10 +255,11 @@ addStateCellArgs = new ReactiveVar([], EJSON.equals)
 Template.addStateCell.events({
   'submit form': (event, template) ->
     try
-      valueStr = template.find('input[name=value]').value
+      inputField = template.find('input[name=value]')
+      valueStr = inputField?.value
       StateEdit.addCell @qFamilyId, valueStr,
       # Clear the field on successful submission (only)
-      andThen -> template.find('input[name=value]').value = ''
+      andThen -> if inputField? then inputField.value = ''
       false # prevent clear
     catch e
       console.log e.stack
@@ -254,44 +268,62 @@ Template.addStateCell.events({
 
 class StateEdit
 
-  @parseValue: (type, text) ->
-    if type in ['_string', '_token', '_unit']
+  @parseValue: (qFamilyId, text) ->
+    type = getColumn(qFamilyId.columnId).type
+    if !typeIsPrimitive(type)
+      if (m = /^@(\d+)$/.exec(text))
+        wantRowNum = Number.parseInt(m[1])
+        for [qCellId, rowNum] in view.qCellIdToRowNum.entries()
+          if qCellId.columnId == type && rowNum == wantRowNum
+            return qCellId.cellId
+        throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
+      else
+        throw new Error('Malformed cell reference.')
+    else if type == '_unit'
+      'X'
+    else if type == '_token'
+      # XXX: Is this OK or do we want the server to generate the token?  For
+      # unprivileged users, we probably want the server to generate it, but we
+      # may not reuse this code for unprivileged users anyway.
+      Random.id()
+    else if type == '_string'
       text
     else
       JSON.parse text
 
-  @parseValueUi: (columnId, text) ->
-    col = getColumn(columnId)
+  @parseValueUi: (qFamilyId, text) ->
     try
-      @parseValue col.type, text
+      @parseValue qFamilyId, text
     catch e
       alert('Invalid value: ' + e.message)
       null
 
   @addCell: (qFamilyId, enteredValue, callback=->) ->
-    if (value = @parseValueUi qFamilyId.columnId, enteredValue)?
-      key = qFamilyId.cellId
+    key = qFamilyId.cellId
+    if (newValue = @parseValueUi qFamilyId, enteredValue)?
       new ColumnBinRel(qFamilyId.columnId)
-        .add key, value, callback
+        .add key, newValue, callback
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
-    if (newValue = @parseValueUi qCellId.columnId, enteredValue)?
-      key = cellIdParent(qCellId.cellId)
-      value = cellIdLastStep(qCellId.cellId)
+    key = cellIdParent(qCellId.cellId)
+    oldValue = cellIdLastStep(qCellId.cellId)
+    if (newValue = @parseValueUi(
+        {columnId: qCellId.columnId, cellId: key}, enteredValue))?
       # TODO check if cell has children!
       new ColumnBinRel(qCellId.columnId)
-        .removeAdd key, value, newValue, callback
+        .removeAdd key, oldValue, newValue, callback
 
   @removeCell: (qCellId, callback=->) ->
     key = cellIdParent(qCellId.cellId)
-    value = cellIdLastStep(qCellId.cellId)
+    oldValue = cellIdLastStep(qCellId.cellId)
     # TODO check if cell has children!
     new ColumnBinRel(qCellId.columnId)
-      .remove key, value, callback
+      .remove key, oldValue, callback
 
-  @canEdit: (qCellId) ->
-    col = getColumn(qCellId.columnId)
-    col? && columnIsState(col) && !columnIsToken(col)
+  @canEdit: (columnId) ->
+    col = getColumn(columnId)
+    # May as well not let the user try to edit _unit.
+    col? && columnIsState(col) && col.type not in ['_token', '_unit']
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 # We mainly care that this doesn't crash.
@@ -387,22 +419,38 @@ class View
   hotConfig: ->
     thisView = this
     # Display the root column for completeness.  However, it doesn't have a real
-    # parentCellId or value.
-    hlist = @mainSection.prerenderHlist(null, '')
+    # value.
+    hlist = @mainSection.prerenderHlist([], '')
     grid = @mainSection.renderHeader(@mainSection.headerMinHeight)
     for row in grid
       for cell in row
         cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here
     headerHeight = grid.length
-    gridVertExtend(grid, @mainSection.renderHlist(hlist, hlist.minHeight))
+    gridData = @mainSection.renderHlist(hlist, hlist.minHeight)
+
+    # Resolve cell cross-references.
+    @qCellIdToRowNum = new EJSONKeyedMap()
+    for row, i in gridData
+      for cell in row
+        if cell.qCellId?
+          # User-facing row numbers are one-based.
+          @qCellIdToRowNum.set(cell.qCellId, i+1)
+    for row in gridData
+      for cell in row
+        if cell.value instanceof CellReference
+          # Future: We might want to save the original ID if it helps us jump to
+          # the cell.  In general, we might want to save the original value to
+          # facilitate editing it in an appropriate widget.
+          cell.value = '@' + @qCellIdToRowNum.get(cell.value.qCellId)
+    gridVertExtend(grid, gridData)
 
     gridCaption = gridMergedCell(headerHeight - 3, 1, 'cellName', ['htMiddle', 'rsCaption'])
     gridCaption.push(
       [new ViewCell('name', 1, 1, ['rsCaption'])],
       [new ViewCell('id', 1, 1, ['rsCaption'])],
       [new ViewCell('type', 1, 1, ['rsCaption'])])
-    gridVertExtend(gridCaption, gridMergedCell(
-      grid.length - headerHeight, 1, 'data', ['rsCaption']))
+    gridVertExtend(gridCaption,
+                   ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0..gridData.length-1]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
     @grid = grid
@@ -426,7 +474,7 @@ class View
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
-                      cell.qCellId? && StateEdit.canEdit(cell.qCellId))
+                      cell.qCellId? && StateEdit.canEdit(cell.qCellId.columnId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -543,6 +591,35 @@ class View
                           standardServerCallback)
           }
           sep1: '----------'
+          # Future: Consider enabling.  I'm not sure what is the best UI. ~ Matt
+          ###
+          addAutomaticStateCell: {
+            name: 'Add cell'
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !(c? && (qf = c.qFamilyId)? &&
+                columnIsState(col = getColumn(qf.columnId)) &&
+                # Adding a duplicate value has no effect, but disallow it as a
+                # hint to the user.
+                !(col.type == '_unit' &&
+                  Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length))
+            callback: () =>
+              c = @getSingleSelectedCell()
+              qf = c.qFamilyId
+              if getColumn(qf.columnId).type in ['_unit', '_token']
+                StateEdit.addCell c.qFamilyId, null, standardServerCallback
+              else
+                # Didn't work without the setTimeout.  Maybe the dismissal of
+                # the context menu is reselecting the table cell?  Obviously
+                # this approach doesn't scale when Handsontable starts using
+                # setTimeout(0)...
+                # - Doesn't work when the form hasn't been rendered yet!
+                setTimeout((=>
+                    @hot.unlisten()
+                    $('#addStateCell-value')[0].focus()),
+                  0)
+          }
+          ###
           deleteStateCell: {
             name: 'Delete cell'
             disabled: () =>

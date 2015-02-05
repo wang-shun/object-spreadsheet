@@ -39,7 +39,10 @@
           # time a direct child of Teacher when it has no direct meaning in the
           # context of the Teacher.  Such decisions won't always be clear. ~ Matt
           name: 'time'
-          type: '_datetime' # TODO: define format
+          # TODO: Change to _datetime once supported.  As long as we are using
+          # strings as placeholder values, set this to _string so editing
+          # behaves sensibly.
+          type: '_string' # TODO: define format
           }
         ]
         }

@@ -29,11 +29,25 @@
 </template>
 
 <template name="addStateCell">
+  {{#if canAddValue}}
   <form>
-    <label for="addStateCell-value">Add value (JSON):</label>
+    <label for="addStateCell-value">Add value:</label>
     <input id="addStateCell-value" type="text" name="value" size="40"/>
     <input type="submit" value="Add"/>
   </form>
+  {{else}}
+  {{#if canAddToken}}
+  <form>
+    <input type="submit" value="Add token"/>
+  </form>
+  {{else}}
+  {{#if canAddUnit}}
+  <form>
+    <input type="submit" value="Add X"/>
+  </form>
+  {{/if}}
+  {{/if}}
+  {{/if}}
 </template>
 
 <template name="changeFormula">
