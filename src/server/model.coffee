@@ -55,7 +55,7 @@ class Model
   defineColumn: (parentId, index, name, specifiedType, cellName, formula, attrs) ->
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
-    parentCol = @getColumn.get(parentId)
+    parentCol = @getColumn(parentId)
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
     if ((name? && childByName(parentCol, name)?) ||

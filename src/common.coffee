@@ -83,7 +83,7 @@ SemanticError = Meteor.makeErrorType('SemanticError',
 
 @getColumn = (id) -> Columns.findOne(id)
 @childByName = (column, name) ->
-  Columns.findOne {parent: column._id, $or: [ {name: name}, {cellName: name} ]}
+  Columns.findOne({parent: column._id, $or: [ {name: name}, {cellName: name} ]})?._id
 
 # Literal empty sets, etc.
 @TYPE_ANY = '_any'
