@@ -482,12 +482,12 @@ class View
           # Future: Would be nice to move selection appropriately on column
           # insert/delete, but this is a less common case.
 
-          # addColumnLeft is redundant but nice for users.
-          addColumnLeft: {
-            name: 'Insert column on the left'
+          # addSiblingLeft is redundant but nice for users.
+          addSiblingLeft: {
+            name: 'Insert left sibling column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId && c.kind == 'top')
+              !((ci = c?.columnId)? && ci != rootColumnId)
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
@@ -498,26 +498,31 @@ class View
               @hot.deselectCell()
               insertBlankColumn parentId, index
           }
-          addColumnRight: {
-            name: 'Insert column on the right'
+          addSiblingRight: {
+            name: 'Insert right sibling column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              # TODO refine this condition
-              !((ci = c?.columnId)? && (c.kind == 'top' && ci != rootColumnId ||
-                                        c.kind =='below'))
+              !((ci = c?.columnId)? && ci != rootColumnId)
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              if c.kind == 'top'
-                # Like addColumnLeft except + 1
-                col = getColumn(ci)
-                parentId = col.parent
-                parentCol = getColumn(parentId)
-                index = parentCol.children.indexOf(ci) + 1
-              else
-                # Child of the selected column
-                parentId = ci
-                index = 0
+              col = getColumn(ci)
+              parentId = col.parent
+              parentCol = getColumn(parentId)
+              index = parentCol.children.indexOf(ci) + 1
+              @hot.deselectCell()
+              insertBlankColumn parentId, index
+          }
+          addChildFirst: {
+            name: 'Insert first child column'
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !(c?.columnId)?
+            callback: () =>
+              c = @getSingleSelectedCell()
+              ci = c.columnId
+              parentId = ci
+              index = 0
               @hot.deselectCell()
               insertBlankColumn parentId, index
           }
@@ -529,9 +534,7 @@ class View
               # Future: Support recursive delete.
               # CLEANUP: This is a mess; find a way to share the code or publish from the server.
               !(ci? && ci != rootColumnId &&
-                !((col = getColumn(ci))?.children?.length) &&
-                !(columnIsState(col) && col.numStateCells > 0))
-
+                !((col = getColumn(ci))?.children?.length))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c && (c.columnId ? c.qFamilyId?.columnId)
