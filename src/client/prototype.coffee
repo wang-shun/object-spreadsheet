@@ -394,7 +394,7 @@ Template.changeFormula.events({
     if (event.which == 27) then template.find("[type=reset]")?.click()
 })
 
-insertBlankColumn = (parentId, index) ->
+insertBlankColumn = (parentId, index, view) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
   formula = if getColumn(parentId).formula? then ['lit', '_unit', []] else null
@@ -405,6 +405,7 @@ insertBlankColumn = (parentId, index) ->
               null,  # type
               null,  # cellName
               formula,  # formula
+              view?.id,
               standardServerCallback)
 
 
@@ -412,24 +413,14 @@ headerExpanded = new ReactiveVar(true)
 @toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
 
-class View
+class ClientView
 
-  constructor: (@viewDef) ->
+  constructor: (@view) ->
     @reload()
     @hot = null
 
-  @rootLayout: -> @drillDown(rootColumnId).filter (x) => !@ownerView(x)
-
-  @drillDown: (startingColumnId) ->
-    children = Columns.findOne(startingColumnId)?.children || []
-    new Tree(startingColumnId, (@drillDown child for child in children))
-
-  @ownerView: (columnId) ->
-    Columns.findOne(columnId)?.view
-
-  reload: (viewDef) ->
-    @viewDef = viewDef || @viewDef
-    @layoutTree = @viewDef?.layout || View.rootLayout()
+  reload: () ->
+    @layoutTree = @view?.def()?.layout || View.rootLayout()
     @mainSection = new ViewSection(@layoutTree)
 
   hotConfig: ->
@@ -564,7 +555,7 @@ class View
               parentCol = getColumn(parentId)
               index = parentCol.children.indexOf(ci)
               @hot.deselectCell()
-              insertBlankColumn parentId, index
+              insertBlankColumn parentId, index, @view
           }
           addSiblingRight: {
             name: 'Insert right sibling column'
@@ -579,7 +570,7 @@ class View
               parentCol = getColumn(parentId)
               index = parentCol.children.indexOf(ci) + 1
               @hot.deselectCell()
-              insertBlankColumn parentId, index
+              insertBlankColumn parentId, index, @view
           }
           addChildFirst: {
             name: 'Insert first child column'
@@ -592,7 +583,7 @@ class View
               parentId = ci
               index = 0
               @hot.deselectCell()
-              insertBlankColumn parentId, index
+              insertBlankColumn parentId, index, @view
           }
           deleteColumn: {
             name: 'Delete column'
@@ -696,30 +687,20 @@ class View
     return false
 
 
-Meteor.subscribe "cells"
-Meteor.subscribe "views"
-
 view = null
 viewHOT = null
 
 
-readViewDef = (viewId) ->
-  if viewId?
-    if (v = Views.findOne "" + viewId)? then v
-    else throw new NotReadyError
-  else
-    null
-
-rebuildView = (viewDef) ->
+rebuildView = (viewId) ->
   if !view || !viewHOT
     if viewHOT
       viewHOT.destroy()
       viewHOT = null
       view = null
-    view = new View viewDef
+    view = new ClientView(new View(viewId))
     viewHOT = view.hotCreate $('#View')[0]
   else
-    view.reload viewDef
+    view.reload() #viewDef
     view.hotReconfig()
   exported {view, viewHOT}  # for debugging
   # Try to select a cell similar to the one previously selected.
@@ -752,7 +733,7 @@ Template.Spreadsheet.rendered = ->
   viewId = @data?.viewId
   Tablespace.default = Tablespace.get sheet
   Meteor.call 'open', $$
-  Tracker.autorun(guarded -> rebuildView readViewDef viewId)
+  Tracker.autorun(guarded -> rebuildView viewId)
 
 
 Meteor.methods({

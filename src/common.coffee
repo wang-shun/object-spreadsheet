@@ -200,6 +200,15 @@ class Tree
       new Tree @root, ((s.filter pred for s in @subtrees).filter (x) -> x?)
     else null
 
+  find: (value) ->
+    @findT (n) -> n.root == value
+
+  findT: (pred) ->
+    if pred @ then @
+    else
+      for s in @subtrees
+        if (n = s.findT(pred))? then return n
+
   typeName: -> 'Tree'
   toJSONValue: -> {@root, subtrees: (s.toJSONValue() for s in @subtrees)}
   @fromJSONValue: (json) ->

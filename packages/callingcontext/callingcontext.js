@@ -9,8 +9,12 @@ CallingContext = {
     var d = domain.create();
     d.cc = cc;
     od = process.domain  /* going to get overwritten by Domain.run() */
-    d.run(func);
-    process.domain = od
+    try {
+      return d.run(func);
+    }
+    finally {
+      process.domain = od
+    }
   }
 }
 

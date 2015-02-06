@@ -276,7 +276,7 @@ Meteor.startup () ->
       @model = new Model
       @model.evaluateAll()
 
-  Tablespace.default = tspace = Tablespace.get('')  # mostly for use in the shell
+  Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
   tspace.run()
 
   Tablespace.get('ptc').run ->
@@ -291,9 +291,11 @@ Meteor.methods({
   # to request this via another method (it would require a callback).
   # Future: validation!
   open: (cc) -> cc.run()
-  defineColumn: (cc, parentId, index, name, specifiedType, cellName, formula) ->
+  defineColumn: (cc, parentId, index, name, specifiedType, cellName, formula, viewId) ->
     cc.run ->
-      @model.defineColumn(parentId, index, name, specifiedType, cellName, formula)
+      attrs = if viewId? then {view: viewId} else {}
+      id = @model.defineColumn(parentId, index, name, specifiedType, cellName, formula, attrs)
+      if viewId? then new View(viewId).addColumn(id)
       @model.evaluateAll()
   changeColumnName: (cc, columnId, name) ->
     cc.run -> @model.changeColumnName(columnId, name)
@@ -310,6 +312,7 @@ Meteor.methods({
   deleteColumn: (cc, columnId) ->
     cc.run ->
       @model.deleteColumn(columnId)
+      View.removeColumnFromAll(columnId)
       @model.evaluateAll()
   notifyChange: (cc) ->
     cc.run -> @model.evaluateAll()
