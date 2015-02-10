@@ -171,19 +171,20 @@ class ViewSection
       gridHorizExtend(grid, subsectionGrid)
     grid
 
-  renderHeader: (height) ->
+  renderHeader: (height, depth) ->
+    myColorClass = "headerColor#{depth % 6}"
     gridTop = gridMergedCell(
       (if height?
         [height - @headerHeightBelow, @width]
       else
         [1, 1])...,
-      @col.cellName ? '', ['rsHeaderTop'])
+      @col.cellName ? '', ['rsHeaderTop', myColorClass])
     gridTop[0][0].columnId = @columnId
     gridTop[0][0].kind = 'top'
     gridTop[0][0].fullText = 'Column ID: ' + @columnId
     gridBelow = gridMergedCell(
       if height? then @headerHeightBelow - 1 else 1,
-      1, @col.name ? '', ['rsHeaderBelow'])
+      1, @col.name ? '', ['rsHeaderBelow', myColorClass])
     gridBelow[0][0].columnId = @columnId
     gridBelow[0][0].kind = 'below'
     typeName = (s) ->
@@ -197,7 +198,8 @@ class ViewSection
     typeCell = new ViewCell(
       (if @col.formula? then '=' else '') +
       (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
-      (if @col.typecheckError? then '!' else ''))
+      (if @col.typecheckError? then '!' else ''),
+      1, 1, [myColorClass])
     typeCell.fullText = (
       'Type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
       (if @col.formula? then ' (formula)' else '') +
@@ -210,17 +212,17 @@ class ViewSection
       for subsection, i in @subsections
         if @haveSeparatorColBefore[i]
           # Turns out class rsHeaderBelow will work for separators too.
-          gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow'])
+          gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow', myColorClass])
           gridHorizExtend(gridBelow, gridSeparator)
-        gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow))
+        gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow, depth+1))
       gridVertExtend(gridTop, gridBelow)
     else
       gridVertExtend(gridTop, gridBelow)
       for subsection, i in @subsections
         if @haveSeparatorColBefore[i]
-          gridSeparator = gridMergedCell(gridTop.length, 1)
+          gridSeparator = gridMergedCell(gridTop.length, 1, '', [myColorClass])
           gridHorizExtend(gridTop, gridSeparator)
-        gridHorizExtend(gridTop, subsection.renderHeader(null))
+        gridHorizExtend(gridTop, subsection.renderHeader(null, depth+1))
     gridTop
 
 # This may hold a reference to a ViewCell object from an old View.  Weird but
@@ -431,7 +433,8 @@ class ClientView
     # value.
     hlist = @mainSection.prerenderHlist([], '')
     grid = @mainSection.renderHeader(
-      if headerExpanded.get() then @mainSection.headerMinHeight else null)
+      if headerExpanded.get() then @mainSection.headerMinHeight else null,
+      0)
     for row in grid
       for cell in row
         cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here

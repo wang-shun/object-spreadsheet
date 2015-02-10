@@ -28,6 +28,25 @@ body { margin: 0; }
   border-top: 1px dashed #CCC;
 }
 
+.handsontable td.headerColor0:not(.area) {
+  background-color: #FAA;
+}
+.handsontable td.headerColor1:not(.area) {
+  background-color: #FFA;
+}
+.handsontable td.headerColor2:not(.area) {
+  background-color: #AFA;
+}
+.handsontable td.headerColor3:not(.area) {
+  background-color: #AFF;
+}
+.handsontable td.headerColor4:not(.area) {
+  background-color: #AAF;
+}
+.handsontable td.headerColor5:not(.area) {
+  background-color: #FAF;
+}
+
 .handsontable td.rsCaption:not(.area) {
   background-color: #888;
   color: #FFF;
