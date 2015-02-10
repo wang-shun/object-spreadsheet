@@ -7,43 +7,91 @@ body { margin: 0; }
   overflow-x: scroll;
 }
 
-.separator {
+.separator:not(.rsHeader) {
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
 }
 
 .incomparable {
-   border-right: none !important;
+  /*
+  Work around https://bugzilla.mozilla.org/show_bug.cgi?id=332740 in Firefox.
+  Unfortunately, this takes a one-pixel bite out of some of the other borders.
+  */
+  border-right: 1px solid transparent !important;
+}
+
+/*
+Override some Handsontable styles.  div.htContainer is an extra selector that
+will always match, just to get higher priority.
+*/
+.handsontable div.htContainer td {
+  /* Allow height to be determined by settings. */
+  height: auto;
+}
+.handsontable div.htContainer table.htCore {
+  /*
+  Allows the right border of a cell to be used interchangeably with the left
+  border of the next cell to the right, and similarly for horizontal borders;
+  otherwise, the borders would be slightly misaligned.  This is used for
+  rsHeaderCorner.
+  */
+  border-collapse: collapse;
 }
 
 .handsontable td.rsHeader {
-  background-color: #EEE;
+  /*background-color: #EEE;*/
 }
 
-.handsontable td.rsHeaderTop {
+.handsontable td.rsHeaderNonfinal {
+  border-right: none;
+}
+
+.handsontable td.rsHeader.rsHeaderCorner {
+  border-left: 1px solid #CCC;
   border-top: 1px solid #CCC;
   border-bottom: none;
 }
 
+.handsontable td.rsHeaderPadding {
+  border-top: 1px solid #CCC;
+  border-bottom: none;
+}
+
+.handsontable td.rsHeader.separator {
+  border-right: none;
+}
+
+.handsontable td.rsHeader.rsFullHeightSeparator {
+  border-top: 1px solid #CCC;
+}
+
 .handsontable td.rsHeaderBelow {
+  border-left: 1px solid #CCC;
+}
+
+.handsontable td.rsHeaderNameAlone {
+  border-top: 1px solid #CCC;
+}
+
+.handsontable td.rsHeaderName {
   border-top: 1px dashed #CCC;
 }
 
-.handsontable td.headerColor0:not(.area) {
+.handsontable td.rsHeaderColor0:not(.area) {
   background-color: #FAA;
 }
-.handsontable td.headerColor1:not(.area) {
+.handsontable td.rsHeaderColor1:not(.area) {
   background-color: #FFA;
 }
-.handsontable td.headerColor2:not(.area) {
+.handsontable td.rsHeaderColor2:not(.area) {
   background-color: #AFA;
 }
-.handsontable td.headerColor3:not(.area) {
+.handsontable td.rsHeaderColor3:not(.area) {
   background-color: #AFF;
 }
-.handsontable td.headerColor4:not(.area) {
+.handsontable td.rsHeaderColor4:not(.area) {
   background-color: #AAF;
 }
-.handsontable td.headerColor5:not(.area) {
+.handsontable td.rsHeaderColor5:not(.area) {
   background-color: #FAF;
 }
 

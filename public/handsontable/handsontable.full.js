@@ -18690,15 +18690,14 @@ WalkontableTableRenderer.prototype.renderRows = function (totalRows, cloneLimit,
       this.resetOversizedRow(sourceRowIndex);
     }
 
-
-    if (TR.firstChild) {
-      var height = this.instance.wtTable.getRowHeight(sourceRowIndex); //if I have 2 fixed columns with one-line content and the 3rd column has a multiline content, this is the way to make sure that the overlay will has same row height
-      if (height) {
-        TR.firstChild.style.height = height + 'px';
-      }
-      else {
-        TR.firstChild.style.height = '';
-      }
+    // Set height on TR.  This seems to work and doesn't have problems with cell merging.
+    // ~ Matt 2015-02-10
+    var height = this.instance.wtTable.getRowHeight(sourceRowIndex); //if I have 2 fixed columns with one-line content and the 3rd column has a multiline content, this is the way to make sure that the overlay will has same row height
+    if (height) {
+      TR.style.height = height + 'px';
+    }
+    else {
+      TR.style.height = '';
     }
 
     visibleRowIndex++;

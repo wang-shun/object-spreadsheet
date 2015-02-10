@@ -70,12 +70,15 @@ class ViewVlist
 class ViewHlist
   constructor: (@cellId, @minHeight, @value, @vlists) ->
 
+colorIndexForDepth = (depth) -> depth % 6
+
 class ViewSection
 
   constructor: (@layoutTree) ->
     @columnId = @layoutTree.root
     @col = getColumn(@columnId)
-    unless @col?
+    # Typechecking should always fill in a type, even _error.
+    unless @col? && @col.type?
       throw new NotReadyError()
     # Future: Set this when we know it.
     @relationSingular = false
@@ -87,7 +90,7 @@ class ViewSection
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
     @subsections = []
-    @headerHeightBelow = 2  # valueName, type
+    @headerMinHeight = @col.cellName? + 2  # valueName, type
     for sublayout in @layoutTree.subtrees
       subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
@@ -98,15 +101,14 @@ class ViewSection
       if haveSep
         @width++
       @width += subsection.width
-      @headerHeightBelow = Math.max(@headerHeightBelow, subsection.headerMinHeight)
+      @headerMinHeight = Math.max(@headerMinHeight, 1 + subsection.headerMinHeight)
       @rightEdgeSingular =
         subsection.relationSingular && subsection.rightEdgeSingular
-    @headerMinHeight = 1 + @headerHeightBelow  # cellName
+    @headerHeightBelow = @headerMinHeight - 1
 
   prerenderVlist: (parentCellId) ->
-    # XXX: Detect NotReadyError
-    ce = Cells.findOne({column: @columnId, key: parentCellId}) ? {values: []}
-    if ce.values?
+    ce = Cells.findOne({column: @columnId, key: parentCellId})
+    if ce?.values?
       hlists =
         for value in ce.values
           @prerenderHlist(cellIdChild(parentCellId, value), value)
@@ -116,8 +118,10 @@ class ViewSection
       # Don't add any extra rows: it's looking ridiculous.  Once we know which
       # columns are plural, we can reconsider adding extra rows.
       new ViewVlist(parentCellId, minHeight, hlists)
-    else
+    else if ce?.error?
       new ViewVlist(parentCellId, 1, null, ce.error)
+    else
+      throw new NotReadyError()
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
@@ -171,22 +175,16 @@ class ViewSection
       gridHorizExtend(grid, subsectionGrid)
     grid
 
-  renderHeader: (height, depth) ->
-    myColorClass = "headerColor#{depth % 6}"
-    gridTop = gridMergedCell(
-      (if height?
-        [height - @headerHeightBelow, @width]
-      else
-        [1, 1])...,
-      @col.cellName ? '', ['rsHeaderTop', myColorClass])
-    gridTop[0][0].columnId = @columnId
-    gridTop[0][0].kind = 'top'
-    gridTop[0][0].fullText = 'Column ID: ' + @columnId
-    gridBelow = gridMergedCell(
-      if height? then @headerHeightBelow - 1 else 1,
-      1, @col.name ? '', ['rsHeaderBelow', myColorClass])
-    gridBelow[0][0].columnId = @columnId
-    gridBelow[0][0].kind = 'below'
+  # As long as siblings are always separated by a separator, we can color just
+  # based on depth.
+  renderHeader: (expanded, depth) ->
+    # Part that is always the same.
+    myColorClass = "rsHeaderColor" + if @headerMinHeight == 2 then depth-1 else depth
+    nameCell = new ViewCell(
+      @col.name ? '', 1, 1,
+      ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderNameAlone' else 'rsHeaderName'), myColorClass])
+    nameCell.columnId = @columnId
+    nameCell.kind = 'below'
     typeName = (s) ->
       if !s then ''
       else if s == '_token' then '*'
@@ -199,31 +197,58 @@ class ViewSection
       (if @col.formula? then '=' else '') +
       (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
       (if @col.typecheckError? then '!' else ''),
-      1, 1, [myColorClass])
+      1, 1, ['rsHeaderBelow', myColorClass])
     typeCell.fullText = (
-      'Type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
+      'Column ID ' + @columnId + ': ' +
+      'type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
       (if @col.formula? then ' (formula)' else '') +
       (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
     typeCell.columnId = @columnId
     typeCell.kind = 'type'
-    gridVertExtend(gridBelow, [[typeCell]])
-    if height?
-      # Now gridBelow is (@headerMinHeight - 1) x 1.
-      for subsection, i in @subsections
-        if @haveSeparatorColBefore[i]
-          # Turns out class rsHeaderBelow will work for separators too.
-          gridSeparator = gridMergedCell(@headerHeightBelow, 1, '', ['rsHeaderBelow', myColorClass])
-          gridHorizExtend(gridBelow, gridSeparator)
-        gridHorizExtend(gridBelow, subsection.renderHeader(@headerHeightBelow, depth+1))
-      gridVertExtend(gridTop, gridBelow)
-    else
-      gridVertExtend(gridTop, gridBelow)
-      for subsection, i in @subsections
-        if @haveSeparatorColBefore[i]
-          gridSeparator = gridMergedCell(gridTop.length, 1, '', [myColorClass])
-          gridHorizExtend(gridTop, gridSeparator)
-        gridHorizExtend(gridTop, subsection.renderHeader(null, depth+1))
-    gridTop
+    grid = [[nameCell], [typeCell]]
+
+    if @headerMinHeight == 2
+      return grid
+
+    height = if expanded then @headerMinHeight else 3
+    currentHeight = 2
+    makeCorner = (isFinal) =>
+      classes = ['rsHeaderCorner']
+      unless isFinal
+        classes.push('rsHeaderNonfinal')
+      classes.push(myColorClass)
+      corner = gridMergedCell(height - 2, grid[0].length,
+                              @col.cellName ? '', classes)
+      corner[0][0].columnId = @columnId
+      corner[0][0].kind = 'top'
+      gridVertExtend(corner, grid)
+      grid = corner
+      currentHeight = height
+
+    for subsection, i in @subsections
+      if @haveSeparatorColBefore[i]
+        gridSeparator = gridMergedCell(
+          currentHeight, 1, '',
+          [(if currentHeight == height then ['rsFullHeightSeparator'] else [])..., myColorClass])
+        gridHorizExtend(grid, gridSeparator)
+      if currentHeight == 2 && subsection.headerMinHeight > 2
+        makeCorner(false)
+      subsectionGrid = subsection.renderHeader(expanded, depth+1)
+      if subsectionGrid.length < currentHeight
+        paddingGrid = gridMergedCell(
+          currentHeight - subsectionGrid.length, subsection.width,
+          '',
+          [
+            'rsHeaderPadding',
+            (if i < @subsections.length - 1 then ['rsHeaderNonfinal'] else [])...,
+            myColorClass
+          ])
+        gridVertExtend(paddingGrid, subsectionGrid)
+        subsectionGrid = paddingGrid
+      gridHorizExtend(grid, subsectionGrid)
+    if currentHeight == 2
+      makeCorner(true)
+    grid
 
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
@@ -413,7 +438,7 @@ insertBlankColumn = (parentId, index, view) ->
               standardServerCallback)
 
 
-headerExpanded = new ReactiveVar(true)
+headerExpanded = new ReactiveVar(false)
 @toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
 
@@ -457,10 +482,13 @@ class ClientView
           cell.value = '@' + @qCellIdToRowNum.get(cell.value.qCellId)
     gridVertExtend(grid, gridData)
 
-    # This is terrible but it will take ten times as long to do properly...
-    cnHtml = ("<input type='button' value='#{if headerExpanded.get() then '-' else '+'}'" +
-              " onclick='toggleHeaderExpanded();'/>CN")
-    gridCaption = gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption'])
+    gridCaption = []
+    if headerHeight > 2
+      # This is terrible but it will take ten times as long to do properly...
+      # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
+      cnHtml = ("<input style='width: 40px;' type='button' value='#{if headerExpanded.get() then '-' else '+'}'" +
+                " onclick='toggleHeaderExpanded();'/>CN")
+      gridVertExtend(gridCaption, gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
     gridCaption.push(
       [new ViewCell('VN', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
@@ -478,6 +506,12 @@ class ClientView
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for i in [0..@mainSection.width]
                     if i in separatorColumns then 10 else undefined)
+      rowHeights:
+        if headerExpanded.get()
+          for i in [0...@grid.length]
+            if i < headerHeight - 3 then 10 else undefined
+        else
+          undefined
       cells: (row, col, prop) =>
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
@@ -548,6 +582,22 @@ class ClientView
           # Future: Would be nice to move selection appropriately on column
           # insert/delete, but this is a less common case.
 
+          setCellName: {
+            # For use only when the cell-name cell is not already visible.
+            name: 'Set column cell-name'
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !((ci = c?.columnId)? && ci != rootColumnId &&
+                !(col = getColumn(ci)).cellName? &&
+                !col.children.length)
+            callback: () =>
+              c = @getSingleSelectedCell()
+              ci = c.columnId
+              cellName = prompt('Cell name:')
+              if cellName
+                Meteor.call 'changeColumnCellName', $$, ci, cellName,
+                            standardServerCallback
+          }
           # addSiblingLeft is redundant but nice for users.
           addSiblingLeft: {
             name: 'Insert left sibling column'
@@ -658,6 +708,7 @@ class ClientView
     @hot = new Handsontable(domElement, @hotConfig())
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
+    @hot
 
   hotReconfig: (hot) ->
     d = @hotConfig()
@@ -666,7 +717,7 @@ class ClientView
     MergeCells = hot.mergeCells.constructor
     hot.mergeCells = new MergeCells(d.mergeCells)
     hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
-    hot.updateSettings {colWidths: d.colWidths}
+    hot.updateSettings {colWidths: d.colWidths, rowHeights: d.rowHeights}
     hot.loadData d.data
     #hot.render()
 
