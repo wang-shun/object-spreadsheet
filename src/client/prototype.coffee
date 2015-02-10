@@ -654,6 +654,8 @@ class ClientView
 
   hotCreate: (domElement) ->
     @hot = new Handsontable(domElement, @hotConfig())
+    # Monkey patch: Don't let the user merge or unmerge cells.
+    @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
 
   hotReconfig: (hot) ->
     d = @hotConfig()
@@ -661,6 +663,7 @@ class ClientView
     @hot = hot = hot ? @hot
     MergeCells = hot.mergeCells.constructor
     hot.mergeCells = new MergeCells(d.mergeCells)
+    hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
     hot.updateSettings {colWidths: d.colWidths}
     hot.loadData d.data
     #hot.render()
