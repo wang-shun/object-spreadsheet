@@ -188,6 +188,8 @@ class ViewSection
     gridBelow[0][0].kind = 'below'
     typeName = (s) ->
       if !s then ''
+      else if s == '_token' then '*'
+      else if s == '_unit' then 'X'
       else if typeIsPrimitive(s) then s
       else Columns.findOne(s)?.cellName ? (""+s)[...4]
     # XXX: The value in the cell is not consistent with what we allow the user
