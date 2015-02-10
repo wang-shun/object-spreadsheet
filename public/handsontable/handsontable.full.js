@@ -1976,7 +1976,9 @@ Handsontable.Core = function (rootElement, userSettings) {
   this.getColWidth = function (col) {
     var width = instance._getColWidthFromSettings(col);
     if (!width) {
-      width = 50;
+      // ~ Matt 2015-02-10
+      //width = 50;
+      width = 24;
     }
     width = Handsontable.hooks.execute(instance, 'modifyColWidth', width, col);
     return width;
@@ -8669,6 +8671,12 @@ Handsontable.PluginHooks = Handsontable.hooks; //in future move this line to leg
       var samples = {};
       var maxLen = 0;
       for (var r = 0; r < rows; r++) {
+        // ~ Matt 2015-02-10
+        var mergeInfo = instance.mergeCells.mergedCellInfoCollection.getInfo(r, col);
+        if (mergeInfo && mergeInfo.colspan > 1) {
+          continue;
+        }
+        ////////
         var value = Handsontable.helper.stringify(instance.getDataAtCell(r, col));
         var len = value.length;
         if (len > maxLen) {
