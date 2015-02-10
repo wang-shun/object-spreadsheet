@@ -515,10 +515,12 @@ class ClientView
           cell = @grid[row][col]
           # One of these cases should apply...
           if cell.kind == 'top'
-            Meteor.call 'changeColumnCellName', $$, cell.columnId, newVal,
+            name = if newVal == '' then null else newVal
+            Meteor.call 'changeColumnCellName', $$, cell.columnId, name,
                         standardServerCallback
           if cell.kind == 'below'
-            Meteor.call 'changeColumnName', $$, cell.columnId, newVal,
+            name = if newVal == '' then null else newVal
+            Meteor.call 'changeColumnName', $$, cell.columnId, name,
                         standardServerCallback
           if cell.kind == 'type'
             parsed = false
