@@ -68,7 +68,7 @@ class ViewVlist
   constructor: (@parentCellId, @minHeight, @hlists, @error) ->
 
 class ViewHlist
-  constructor: (@cellId, @minHeight, @value, @vlists) ->
+  constructor: (@cellId, @minHeight, @value, @vlists, @cssClasses=[]) ->
 
 colorIndexForDepth = (depth) -> depth % 6
 
@@ -127,7 +127,7 @@ class ViewSection
     minHeight = 1
     # TODO: More type-specific rendering?
     displayValue =
-      if @type == '_token' then '*'
+      if @type == '_token' then '•'
       # Show _unit values for now so we can see if they aren't 'X'.
       #if @type == '_unit' then 'X'
       else if !typeIsPrimitive(@type) then new CellReference({columnId: @type, cellId: value})
@@ -135,11 +135,12 @@ class ViewSection
       else if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
       else JSON.stringify(value)
+    displayClass = if @type in ['_token', '_unit'] then ['centered'] else []
     vlists =
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
     minHeight = Math.max(1, (vlist.minHeight for vlist in vlists)...)
-    new ViewHlist(cellId, minHeight, displayValue, vlists)
+    new ViewHlist(cellId, minHeight, displayValue, vlists, displayClass)
 
   renderVlist: (vlist, height) ->
     qFamilyId = {columnId: @columnId, cellId: vlist.parentCellId}
@@ -161,7 +162,7 @@ class ViewSection
   renderHlist: (hlist, height) ->
     # Value
     value = hlist.value
-    grid = gridMergedCell(height, 1, value)
+    grid = gridMergedCell(height, 1, value, hlist.cssClasses)
     grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
     # This logic could be in a ViewCell accessor instead, but for now it isn't
     # duplicated so there's no need.
@@ -187,17 +188,18 @@ class ViewSection
     nameCell.kind = 'below'
     typeName = (s) ->
       if !s then ''
-      else if s == '_token' then '*'
+      else if s == '_token' then '•'
       else if s == '_unit' then 'X'
       else if typeIsPrimitive(s) then s
       else Columns.findOne(s)?.cellName ? (""+s)[...4]
+    typeClass = (s) -> if s in ['_token', '_unit'] then ['centered'] else []
     # XXX: The value in the cell is not consistent with what we allow the user
     # to type in the cell!
     typeCell = new ViewCell(
       (if @col.formula? then '=' else '') +
       (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
       (if @col.typecheckError? then '!' else ''),
-      1, 1, ['rsHeaderBelow', myColorClass])
+      1, 1, ['rsHeaderBelow', myColorClass].concat(typeClass(@col.type)))
     typeCell.fullText = (
       'Column ID ' + @columnId + ': ' +
       'type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
@@ -481,7 +483,7 @@ class ClientView
           # Future: We might want to save the original ID if it helps us jump to
           # the cell.  In general, we might want to save the original value to
           # facilitate editing it in an appropriate widget.
-          cell.value = '@' + @qCellIdToRowNum.get(cell.value.qCellId)
+          cell.value = '@' + (@qCellIdToRowNum.get(cell.value.qCellId) || '?')
     gridVertExtend(grid, gridData)
 
     gridCaption = []

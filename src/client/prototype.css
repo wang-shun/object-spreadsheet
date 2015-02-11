@@ -10,10 +10,14 @@ body { margin: 0; }
 }
 
 .separator:not(.rsHeader) {
+  background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
 }
 
-.incomparable {
+.incomparable.rsHeader {
+  border-right: none !important;
+}
+.incomparable:not(.rsHeader) {
   /*
   Work around https://bugzilla.mozilla.org/show_bug.cgi?id=332740 in Firefox.
   Unfortunately, this takes a one-pixel bite out of some of the other borders.
@@ -100,6 +104,11 @@ will always match, just to get higher priority.
 .handsontable td.rsCaption:not(.area) {
   background-color: #888;
   color: #FFF;
+}
+
+.handsontable td.centered {
+  text-align: center;
+  vertical-align: middle;
 }
 
 /* Ugly but at least recognizable. */
