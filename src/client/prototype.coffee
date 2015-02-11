@@ -513,11 +513,15 @@ class ClientView
       colWidths: (for i in [0..@mainSection.width]
                     if i in separatorColumns then 10 else undefined)
       rowHeights:
+        # Specify all the row heights (23 pixels is the Handsontable default),
+        # otherwise the fixed clone of the left column sometimes reduced the
+        # cellName row to zero height because it wasn't constrained by the
+        # content of the real table.  We can look out for any similar glitches.
         if headerExpanded.get()
           for i in [0...@grid.length]
-            if i < headerHeight - 3 then 10 else undefined
+            if i < headerHeight - 3 then 10 else 23
         else
-          undefined
+          23 for i in [0...@grid.length]
       cells: (row, col, prop) =>
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
