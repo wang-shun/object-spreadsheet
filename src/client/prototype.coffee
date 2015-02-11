@@ -505,6 +505,10 @@ class ClientView
 
     d = {
       data: ((cell.value for cell in row) for row in grid)
+      # Future: Fixing the ancestors of the leftmost visible column would be
+      # clever, though with carefully designed individual views, we may never
+      # need it.  We may also want to fix the header for large data sets.
+      fixedColumnsLeft: 1
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for i in [0..@mainSection.width]
                     if i in separatorColumns then 10 else undefined)

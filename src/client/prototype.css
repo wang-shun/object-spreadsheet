@@ -1,10 +1,12 @@
 body { margin: 0; }
 
-#View {
+#ViewWrapper {
   box-sizing: border-box;
   padding: 9px;
   width: 100%;
-  overflow-x: scroll;
+}
+#View {
+  width: 100%;
 }
 
 .separator:not(.rsHeader) {

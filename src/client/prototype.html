@@ -12,7 +12,11 @@
   <div id="ActionBar">
     {{> formulaValueBar}}
   </div>
-  <div id="View"></div>
+  <div id="ViewWrapper">
+    <!-- Handsontable (i.e., WalkontableOverlay.prototype.getScrollableElement)
+         requires an inline style for fixed rows/columns to work. -->
+    <div id="View" style="overflow: scroll;"></div>
+  </div>
 </template>
 
 <template name="formulaValueBar">
