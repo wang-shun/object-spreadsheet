@@ -490,8 +490,8 @@ class ClientView
     if headerHeight > 2
       # This is terrible but it will take ten times as long to do properly...
       # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
-      cnHtml = ("<input style='width: 40px;' type='button' value='#{if headerExpanded.get() then '-' else '+'}'" +
-                " onclick='toggleHeaderExpanded();'/>CN")
+      cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
+                "#{if headerExpanded.get() then '-' else '+'}</button> CN")
       gridVertExtend(gridCaption, gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
     gridCaption.push(
       [new ViewCell('VN', 1, 1, ['rsCaption'])],
