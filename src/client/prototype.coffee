@@ -285,8 +285,10 @@ onSelection = () ->
   )
 
 fullTextToShow = new ReactiveVar(null)
+isLoading = new ReactiveVar(true)
 
 Template.formulaValueBar.helpers({
+  loading: () -> isLoading.get()
   fullTextToShow: () -> fullTextToShow.get()
   addStateCellArgs: () -> addStateCellArgs.get()
   changeFormulaArgs: () -> changeFormulaArgs.get()
@@ -777,6 +779,7 @@ rebuildView = (viewId) ->
       view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
                                      EJSON.equals(selectedCell.columnId, c.columnId))) ||
      false)
+  isLoading.set(false)
 
 # Helper decorator for use with Tracker.autorun
 guarded = (op) ->

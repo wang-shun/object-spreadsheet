@@ -266,7 +266,7 @@
   defineParsedFormulaColumn = (parentRef, order, name, cellName, specifiedType, formulaStr, attrs) ->
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
-    model.evaluateAll()
+    model.typecheckAll()
     parentId = parseColumnRef(parentRef)
 
     model.defineColumn(parentId,

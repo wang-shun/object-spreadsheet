@@ -48,6 +48,7 @@ class ColumnBinRel
   add: (key, value, callback=->) ->
     if Meteor.isServer
       Cells.upsert {column: @columnId, key}, {$addToSet: {values: value}}
+      $$.model.invalidateCache()
       $$.call 'notifyChange', callback
     else
       $$.call 'ColumnBinRel_add', @columnId, key, value, callback
@@ -55,6 +56,7 @@ class ColumnBinRel
   remove: (key, value, callback=->) ->
     if Meteor.isServer
       Cells.update {column: @columnId, key}, {$pull: {values: value}}
+      $$.model.invalidateCache()
       $$.call 'notifyChange', callback
     else
       $$.call 'ColumnBinRel_remove', @columnId, key, value, callback
@@ -67,6 +69,7 @@ class ColumnBinRel
         #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}
         Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
         Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
+        $$.model.invalidateCache()
         $$.call 'notifyChange', callback
       else
         $$.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
