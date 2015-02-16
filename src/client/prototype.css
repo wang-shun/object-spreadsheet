@@ -145,7 +145,7 @@ will always match, just to get higher priority.
 }
 
 #ActionBar {
-  min-height: 3em;
+  height: 4em;
   padding: 9px;
   background: rgb(133,178,211); /* Old browsers */
   background: -moz-linear-gradient(top, rgba(133,178,211,1) 0%, rgba(167,199,220,1) 100%); /* FF3.6+ */

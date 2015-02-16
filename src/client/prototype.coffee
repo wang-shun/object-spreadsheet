@@ -421,6 +421,7 @@ class ClientView
   constructor: (@view) ->
     @reload()
     @hot = null
+    @renderTimeoutId = null
 
   reload: () ->
     @layoutTree = @view?.def()?.layout || View.rootLayout()
@@ -527,15 +528,7 @@ class ClientView
       afterDeselect: () ->
         thisView.onSelection()
 
-      afterSelectionEnd: (r1, c1, r2, c2) ->
-        # This re-renders the table (in case of changed referent highlighting),
-        # which is slow, so we don't want to do it in afterSelection since that
-        # makes mouse selection very laggy.  However, when the user
-        # right-clicks to select a cell and open the context menu, the menu
-        # callbacks correctly see the new selection but afterSelectionEnd is not
-        # called until the menu is dismissed, so the table appearance would be
-        # out of date while the menu is open.  We patch this up by calling
-        # onSelection when the context menu opens.
+      afterSelection: (r1, c1, r2, c2) ->
         thisView.onSelection()
 
       beforeChange: (changes, source) =>
@@ -715,9 +708,6 @@ class ClientView
     @hot = new Handsontable(domElement, @hotConfig())
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
-    # See explanation in afterSelectionEnd.
-    Handsontable.eventManager(@hot).addEventListener(
-      @hot.rootElement, 'contextmenu', @onSelection)
     @hot
 
   hotReconfig: (hot) ->
@@ -748,15 +738,23 @@ class ClientView
     else
       return null
 
+  delayedRender: ->
+    if @renderTimeoutId?
+      window.clearTimeout(@renderTimeoutId)
+    @renderTimeoutId = window.setTimeout((=>
+        @hot.render()
+        @renderTimeoutId = null), 200)
+
   onSelection: =>  # => needed by event listener in hotConfig
     selectedCell = view.getSingleSelectedCell()  # global variable
     # If the referent cell to highlight changed, make HOT notice that the return
-    # value of our "cells" function has changed.
+    # value of our "cells" function has changed.  Even doing this on every
+    # afterSelectionEnd makes keyboard navigation annoyingly slow, so delay it.
     # XXX: Faster way to do this?  There doesn't appear to be API to re-render a
     # single cell (for example, Matt tested setDataAtCell and it re-renders the
     # entire table), and mutating the TD directly is more error-prone (e.g., it
     # doesn't work with fixed rows/columns, although that isn't a problem yet).
-    @hot.render()
+    @delayedRender()
     fullTextToShow.set(selectedCell?.fullText)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
     addStateCellArgs.set(
