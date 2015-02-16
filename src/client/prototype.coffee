@@ -422,7 +422,6 @@ class ClientView
   constructor: (@view) ->
     @reload()
     @hot = null
-    @renderTimeoutId = null
 
   reload: () ->
     @layoutTree = @view?.def()?.layout || View.rootLayout()
@@ -724,9 +723,6 @@ class ClientView
     #hot.render()
 
   getSingleSelectedCell: =>
-    # This can be called from hotConfig().cells before @hot is created.
-    unless @hot
-      return null
     s = @hot.getSelected()
     unless s?
       # Unsure under what circumstances this can happen.  Whatever.
@@ -752,17 +748,10 @@ class ClientView
       if refc?
         $(".ref-#{refc}").addClass("referent")
 
-  delayedRender: ->
-    if @renderTimeoutId?
-      window.clearTimeout(@renderTimeoutId)
-    @renderTimeoutId = window.setTimeout((=>
-        @hot.render()
-        @renderTimeoutId = null), 200)
-
-  onSelection: =>  # => needed by event listener in hotConfig
+  onSelection: ->
     selectedCell = view.getSingleSelectedCell()  # global variable
     fullTextToShow.set(selectedCell?.fullText)
-    @highlightReferent(selectedCell.referent)
+    @highlightReferent(selectedCell?.referent)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
     addStateCellArgs.set(
       if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
