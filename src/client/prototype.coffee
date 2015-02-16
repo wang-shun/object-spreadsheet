@@ -127,7 +127,7 @@ class ViewSection
     minHeight = 1
     # TODO: More type-specific rendering?
     displayValue =
-      if @type == '_token' then '•'
+      if @type == '_token' && @col._id != rootColumnId then '•'
       # Show _unit values for now so we can see if they aren't 'X'.
       #if @type == '_unit' then 'X'
       else if !typeIsPrimitive(@type) then new CellReference({columnId: @type, cellId: value})
@@ -186,8 +186,9 @@ class ViewSection
       ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderNameAlone' else 'rsHeaderName'), myColorClass])
     nameCell.columnId = @columnId
     nameCell.kind = 'below'
-    typeName = (s) ->
+    typeName = (col, s=col?.type) ->
       if !s then ''
+      else if col._id == rootColumnId then ''
       else if s == '_token' then '•'
       else if s == '_unit' then 'X'
       else if typeIsPrimitive(s) then s
@@ -197,7 +198,7 @@ class ViewSection
     # to type in the cell!
     typeCell = new ViewCell(
       (if @col.formula? then '=' else '') +
-      (if @col.specifiedType? then typeName(@type) else "(#{typeName(@type)})") +
+      (if @col.specifiedType? then typeName(@col) else "(#{typeName(@col)})") +
       (if @col.typecheckError? then '!' else ''),
       1, 1, ['rsHeaderBelow', myColorClass].concat(typeClass(@col.type)))
     typeCell.fullText = (
@@ -453,10 +454,8 @@ class ClientView
     for row in gridData
       for cell in row
         if cell.value instanceof CellReference
-          # Future: In general, we might want to save the original value to
-          # facilitate editing it in an appropriate widget.
           cell.referent = cell.value.qCellId
-          cell.value = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
+          cell.display = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
     gridVertExtend(grid, gridData)
 
     gridCaption = []
@@ -479,7 +478,7 @@ class ClientView
     @separatorColumns = separatorColumns
 
     d = {
-      data: ((cell.value for cell in row) for row in grid)
+      data: ((cell.display || cell.value for cell in row) for row in grid)
       # Future: Fixing the ancestors of the leftmost visible column would be
       # clever, though with carefully designed individual views, we may never
       # need it.  We may also want to fix the header for large data sets.
@@ -503,16 +502,16 @@ class ClientView
         adjcol = col+cell.colspan
         classes = if col in @separatorColumns then ['separator'] else
                   if adjcol in @separatorColumns then ['incomparable'] else []
-        selectedReferent = thisView.getSingleSelectedCell()?.referent
-        if selectedReferent? && EJSON.equals(selectedReferent, cell.qCellId)
-          classes.push('referent')
+        if cell.qCellId? && (refc = @refId(cell.qCellId))?
+          classes.push("ref-#{refc}")
         {
           renderer: if col == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
-                      cell.qCellId? && StateEdit.canEdit(cell.qCellId.columnId))
+                      cell.qCellId? && StateEdit.canEdit(cell.qCellId.columnId) ||
+                      cell.qFamilyId? && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -558,6 +557,9 @@ class ClientView
               StateEdit.modifyCell cell.qCellId, newVal
             else
               StateEdit.removeCell cell.qCellId
+          else if cell.qFamilyId?
+            if newVal
+              StateEdit.addCell cell.qFamilyId, newVal
         # Don't apply the changes directly; let them come though the Meteor
         # stubs.  This ensures that they get reverted by Meteor if the server
         # call fails.
@@ -738,6 +740,18 @@ class ClientView
     else
       return null
 
+  refId: (qCellId) ->
+    loc = @qCellIdToGridCoords.get(qCellId)
+    if loc?
+      "#{loc.row}-#{loc.col}"
+
+  highlightReferent: (referent) ->
+    $(".referent").removeClass("referent")
+    if referent?
+      refc = @refId(referent)
+      if refc?
+        $(".ref-#{refc}").addClass("referent")
+
   delayedRender: ->
     if @renderTimeoutId?
       window.clearTimeout(@renderTimeoutId)
@@ -747,15 +761,8 @@ class ClientView
 
   onSelection: =>  # => needed by event listener in hotConfig
     selectedCell = view.getSingleSelectedCell()  # global variable
-    # If the referent cell to highlight changed, make HOT notice that the return
-    # value of our "cells" function has changed.  Even doing this on every
-    # afterSelectionEnd makes keyboard navigation annoyingly slow, so delay it.
-    # XXX: Faster way to do this?  There doesn't appear to be API to re-render a
-    # single cell (for example, Matt tested setDataAtCell and it re-renders the
-    # entire table), and mutating the TD directly is more error-prone (e.g., it
-    # doesn't work with fixed rows/columns, although that isn't a problem yet).
-    @delayedRender()
     fullTextToShow.set(selectedCell?.fullText)
+    @highlightReferent(selectedCell.referent)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
     addStateCellArgs.set(
       if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))

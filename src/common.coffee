@@ -104,6 +104,7 @@ class @EJSONKeyedMap
   get: (k) -> @obj[wrapKey(k)]
   set: (k, v) -> @obj[wrapKey(k)] = v
   delete: (k) -> delete @obj[wrapKey(k)]
+  size: -> _.size(@obj)
   keys: -> unwrapKey(wk) for wk of @obj
   entries: -> [unwrapKey(wk), v] for wk, v of @obj
   shallowClone: -> new EJSONKeyedMap(@entries())
