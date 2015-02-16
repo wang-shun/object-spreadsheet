@@ -463,10 +463,10 @@ class ClientView
       # This is terrible but it will take ten times as long to do properly...
       # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
       cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-                "#{if headerExpanded.get() then '-' else '+'}</button> CN")
+                "#{if headerExpanded.get() then '-' else '+'}</button> ON")
       gridVertExtend(gridCaption, gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
     gridCaption.push(
-      [new ViewCell('VN', 1, 1, ['rsCaption'])],
+      [new ViewCell('FN', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
     gridVertExtend(gridCaption,
                    ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0..gridData.length-1]))
@@ -578,7 +578,7 @@ class ClientView
 
           setCellName: {
             # For use only when the cell-name cell is not already visible.
-            name: 'Set column cell-name'
+            name: 'Set object name'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
@@ -587,7 +587,7 @@ class ClientView
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              cellName = prompt('Cell name:')
+              cellName = prompt('Object name:')
               if cellName
                 Meteor.call 'changeColumnCellName', $$, ci, cellName,
                             standardServerCallback
