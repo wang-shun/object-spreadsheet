@@ -141,6 +141,10 @@ will always match, just to get higher priority.
   margin: 9px;
 }
 
+.formula {
+  font-size: 150%;
+}
+
 .formulaModified {
   background-color: #FF0;
 }
