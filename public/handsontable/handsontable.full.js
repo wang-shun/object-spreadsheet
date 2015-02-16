@@ -12049,7 +12049,8 @@ if (typeof Handsontable !== 'undefined') {
       instance.dragToScrollListening = false;
     });
 
-    eventManager.addEventListener(document,'mousemove', function () {
+    // Fix: Add "event" parameter. ~ Matt 2015-02-15
+    eventManager.addEventListener(document,'mousemove', function (event) {
       if (instance.dragToScrollListening) {
         dragToScroll.check(event.clientX, event.clientY);
       }
