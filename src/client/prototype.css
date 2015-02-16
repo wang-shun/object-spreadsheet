@@ -25,6 +25,10 @@ body { margin: 0; }
   border-right: 1px solid transparent !important;
 }
 
+.handsontable td.referent {
+  background-color: #FF0;
+}
+
 /*
 Override some Handsontable styles.  div.htContainer is an extra selector that
 will always match, just to get higher priority.

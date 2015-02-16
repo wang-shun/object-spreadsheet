@@ -256,36 +256,6 @@ class ViewSection
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
 
-onSelection = () ->
-  selectedCell = view.getSingleSelectedCell()
-  fullTextToShow.set(selectedCell?.fullText)
-  # _id: Hacks to get the #each to clear the forms when the cell changes.
-  addStateCellArgs.set(
-    if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-      [{
-        _id: EJSON.stringify(qf)
-        qFamilyId: qf
-        canAddValue: col.type not in ['_token', '_unit']
-        canAddToken: col.type == '_token'
-        # Adding a duplicate value has no effect, but disallow it as a
-        # hint to the user.
-        canAddUnit: (col.type == '_unit' &&
-                     !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
-      }]
-    else
-      []
-  )
-  changeFormulaArgs.set(
-    # This intentionally shows only for the 'below' cell, because the 'below'
-    # cell represents the values (which is what a formula generates) while the
-    # 'top' cell represents the cells.
-    if selectedCell? && selectedCell.kind == 'below' &&
-       (ci = selectedCell.columnId) != rootColumnId
-      [{_id: ci, columnId: ci}]
-    else
-      []
-  )
-
 fullTextToShow = new ReactiveVar(null)
 isLoading = new ReactiveVar(true)
 
@@ -318,8 +288,8 @@ class StateEdit
     if !typeIsPrimitive(type)
       if (m = /^@(\d+)$/.exec(text))
         wantRowNum = Number.parseInt(m[1])
-        for [qCellId, rowNum] in view.qCellIdToRowNum.entries()
-          if qCellId.columnId == type && rowNum == wantRowNum
+        for [qCellId, coords] in view.qCellIdToGridCoords.entries()
+          if qCellId.columnId == type && coords.dataRow == wantRowNum
             return qCellId.cellId
         throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
       else
@@ -471,19 +441,21 @@ class ClientView
     gridData = @mainSection.renderHlist(hlist, hlist.minHeight)
 
     # Resolve cell cross-references.
-    @qCellIdToRowNum = new EJSONKeyedMap()
-    for row, i in gridData
-      for cell in row
+    @qCellIdToGridCoords = new EJSONKeyedMap()
+    for rowCells, i in gridData
+      for cell, j in rowCells
         if cell.qCellId?
-          # User-facing row numbers are one-based.
-          @qCellIdToRowNum.set(cell.qCellId, i+1)
+          # dataRow is user-facing row number, one-based.
+          # row/col: Account for header rows and caption column.  We could
+          # compute these later but this is easier for now.
+          @qCellIdToGridCoords.set(cell.qCellId, {row: headerHeight + i, col: j+1, dataRow: i+1})
     for row in gridData
       for cell in row
         if cell.value instanceof CellReference
-          # Future: We might want to save the original ID if it helps us jump to
-          # the cell.  In general, we might want to save the original value to
+          # Future: In general, we might want to save the original value to
           # facilitate editing it in an appropriate widget.
-          cell.value = '@' + (@qCellIdToRowNum.get(cell.value.qCellId) || '?')
+          cell.referent = cell.value.qCellId
+          cell.value = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
     gridVertExtend(grid, gridData)
 
     gridCaption = []
@@ -528,11 +500,14 @@ class ClientView
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
         adjcol = col+cell.colspan
-        colClasses = if col in @separatorColumns then ['separator'] else
-                     if adjcol in @separatorColumns then ['incomparable'] else []
+        classes = if col in @separatorColumns then ['separator'] else
+                  if adjcol in @separatorColumns then ['incomparable'] else []
+        selectedReferent = thisView.getSingleSelectedCell()?.referent
+        if selectedReferent? && EJSON.equals(selectedReferent, cell.qCellId)
+          classes.push('referent')
         {
           renderer: if col == 0 then 'html' else 'text'
-          className: (cell.cssClasses.concat colClasses).join(' ')
+          className: (cell.cssClasses.concat(classes)).join(' ')
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the cellName and name respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
@@ -549,12 +524,19 @@ class ClientView
       # See if we have trouble with the user needing to "escape" from the table.
       outsideClickDeselects: false
 
-      # Try to put the selection somewhere reasonable after the table is reloaded.
       afterDeselect: () ->
-        onSelection()
+        thisView.onSelection()
 
       afterSelectionEnd: (r1, c1, r2, c2) ->
-        onSelection()
+        # This re-renders the table (in case of changed referent highlighting),
+        # which is slow, so we don't want to do it in afterSelection since that
+        # makes mouse selection very laggy.  However, when the user
+        # right-clicks to select a cell and open the context menu, the menu
+        # callbacks correctly see the new selection but afterSelectionEnd is not
+        # called until the menu is dismissed, so the table appearance would be
+        # out of date while the menu is open.  We patch this up by calling
+        # onSelection when the context menu opens.
+        thisView.onSelection()
 
       beforeChange: (changes, source) =>
         for [row, col, oldVal, newVal] in changes
@@ -700,6 +682,19 @@ class ClientView
                   0)
           }
           ###
+          jumpToReferent: {
+            name: 'Jump to referent'
+            # Future: There should be some way to take advantage of this feature
+            # without needing the referent to be in the same view as the
+            # selected cell.
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !(c?.referent? && @qCellIdToGridCoords.get(c.referent)?)
+            callback: () =>
+              c = @getSingleSelectedCell()
+              coords = @qCellIdToGridCoords.get(c.referent)
+              @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
+          }
           deleteStateCell: {
             name: 'Delete cell'
             disabled: () =>
@@ -720,6 +715,9 @@ class ClientView
     @hot = new Handsontable(domElement, @hotConfig())
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
+    # See explanation in afterSelectionEnd.
+    Handsontable.eventManager(@hot).addEventListener(
+      @hot.rootElement, 'contextmenu', @onSelection)
     @hot
 
   hotReconfig: (hot) ->
@@ -734,6 +732,9 @@ class ClientView
     #hot.render()
 
   getSingleSelectedCell: =>
+    # This can be called from hotConfig().cells before @hot is created.
+    unless @hot
+      return null
     s = @hot.getSelected()
     unless s?
       # Unsure under what circumstances this can happen.  Whatever.
@@ -746,6 +747,43 @@ class ClientView
       return cell
     else
       return null
+
+  onSelection: =>  # => needed by event listener in hotConfig
+    selectedCell = view.getSingleSelectedCell()  # global variable
+    # If the referent cell to highlight changed, make HOT notice that the return
+    # value of our "cells" function has changed.
+    # XXX: Faster way to do this?  There doesn't appear to be API to re-render a
+    # single cell (for example, Matt tested setDataAtCell and it re-renders the
+    # entire table), and mutating the TD directly is more error-prone (e.g., it
+    # doesn't work with fixed rows/columns, although that isn't a problem yet).
+    @hot.render()
+    fullTextToShow.set(selectedCell?.fullText)
+    # _id: Hacks to get the #each to clear the forms when the cell changes.
+    addStateCellArgs.set(
+      if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
+        [{
+          _id: EJSON.stringify(qf)
+          qFamilyId: qf
+          canAddValue: col.type not in ['_token', '_unit']
+          canAddToken: col.type == '_token'
+          # Adding a duplicate value has no effect, but disallow it as a
+          # hint to the user.
+          canAddUnit: (col.type == '_unit' &&
+                       !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
+        }]
+      else
+        []
+    )
+    changeFormulaArgs.set(
+      # This intentionally shows only for the 'below' cell, because the 'below'
+      # cell represents the values (which is what a formula generates) while the
+      # 'top' cell represents the cells.
+      if selectedCell? && selectedCell.kind == 'below' &&
+         (ci = selectedCell.columnId) != rootColumnId
+        [{_id: ci, columnId: ci}]
+      else
+        []
+    )
 
   selectSingleCell: (r1, c1) ->
     cell = @grid[r1][c1]
