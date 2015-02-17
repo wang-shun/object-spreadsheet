@@ -1,6 +1,7 @@
 %lex
 
-int "-"?([0-9]|[1-9][0-9]+)
+/* Don't allow leading - here; parse it as an operator instead. */
+int ([0-9]|[1-9][0-9]+)
 exp [eE][-+]?[0-9]+
 frac "."[0-9]+
 
@@ -9,20 +10,37 @@ frac "."[0-9]+
 
 /* Primitive literals */
 {int}{frac}?{exp}?\b return 'NUMBER'
+/* Hm, this does not match the unescaping code below. ~ Matt 2015-02-05 */
 \"(?:'\\'[\\"bfnrt/]|'\\u'[a-fA-F0-9]{4}|[^\\\0-\x09\x0a-\x1f"])*\" yytext = yytext.substr(1,yyleng-2); return 'STRING'
 "true" return 'TRUE'
 "false" return 'FALSE'
 
-/* Set literals, operators, etc. */
+/*
+Set literals, operators, etc.
+
+Careful: earlier entries take priority, so longer operators should go earlier.
+*/
 "(" return '('
 ")" return ')'
 "{" return '{'
 "}" return '}'
 "," return ','
+"::" return 'ROOT'
+":" return ':'
 "|" return '|'
 "=" return '='
+"!=" return '!='
+"<=" return '<='
+"<" return '<'
+">=" return '>='
+">" return '>'
+"if" return 'IF'
 "in" return 'IN'
-"::" return 'ROOT'
+"+" return '+'
+"-" return '-'
+"*" return '*'
+"/" return '/'
+"^" return '^'
 "." return '.'
 
 /* Identifiers */
@@ -37,8 +55,19 @@ frac "."[0-9]+
 
 %start expressionEOF
 
-%nonassoc '=' IN
-%left '.'
+/*
+Precedence level numbers are as used in stringify functions in
+formulas.coffee.
+
+Compare to:
+http://www.gnu.org/software/bison/manual/html_node/Infix-Calc.html
+*/
+%nonassoc '=' '!=' '<' '<=' '>' '>=' IN  /* 1 */
+%left '+' '-'     /* 2 */
+%left '*' '/'     /* 3 */
+%precedence NEG   /* 4 */
+%right '^'        /* 5 */
+%left '.'         /* 6 */
 
 %%
 
@@ -55,9 +84,11 @@ expressionEOF
 expression
     : '(' expression ')'
         { $$ = $2; }
-    | singletonLiteral
-        { $$ = $1; }
-    | setLiteral
+    | '{' '}'
+        { $$ = ['union', []]; }
+    | '{' commaSeparatedExpressions optComma '}'
+        { $$ = ['union', $2]; }
+    | atomicLiteral
         { $$ = $1; }
     | IDENT  /* could be bound variable or implicit this */
         { $$ = yy.navigate(null, $1); }
@@ -65,34 +96,51 @@ expression
         { $$ = yy.navigate(['lit', '_root', [[]]], $2); }
     | expression '.' IDENT
         { $$ = yy.navigate($1, $3); }
+    | '-' expression %prec NEG
+        { $$ = ['neg', $2]; }
+    | expression '+' expression
+        { $$ = ['+', $1, $3]; }
+    | expression '-' expression
+        { $$ = ['-', $1, $3]; }
+    | expression '*' expression
+        { $$ = ['*', $1, $3]; }
+    | expression '/' expression
+        { $$ = ['/', $1, $3]; }
+    | expression '^' expression
+        { $$ = ['^', $1, $3]; }
     | expression '=' expression
         { $$ = ['=', $1, $3]; }
+    | expression '!=' expression
+        { $$ = ['!=', $1, $3]; }
+    | expression '<' expression
+        { $$ = ['<', $1, $3]; }
+    | expression '<=' expression
+        { $$ = ['<=', $1, $3]; }
+    | expression '>' expression
+        { $$ = ['>', $1, $3]; }
+    | expression '>=' expression
+        { $$ = ['>=', $1, $3]; }
     | expression IN expression
         { $$ = ['in', $1, $3]; }
     | '{' binding '|' expression '}'
         { yy.unbindVar($2.var);
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
+    | 'IF' '(' expression ',' expression ',' expression ')'
+        { $$ = ['if', $3, $5, $7]; }
     ;
 
 /* Could use a mid-rule action if supported.
    https://github.com/zaach/jison/issues/69 */
 binding
-    : IDENT IN expression
+    : IDENT ':' expression
         { yy.bindVar($1, $3);
           $$ = {var: $1, domain: $3}; }
     ;
 
-setLiteral
-    : '{' '}'
-        { $$ = yy.makeSetLiteral([]); }
-    | '{' setLiteralMembers optComma '}'
-        { $$ = yy.makeSetLiteral([$2]); }
-    ;
-
-setLiteralMembers
-    : singletonLiteral
+commaSeparatedExpressions
+    : expression
         { $$ = [$1]; }
-    | setLiteralMembers ',' singletonLiteral
+    | commaSeparatedExpressions ',' expression
         { $$ = $1.concat([$3]); }
     ;
 
@@ -101,13 +149,7 @@ optComma
     |
     ;
 
-singletonLiteral
-    : stringLiteral  { $$ = $1; }
-    | numberLiteral  { $$ = $1; }
-    | booleanLiteral { $$ = $1; }
-    ;
-
-stringLiteral
+atomicLiteral
     : STRING
         { // replace escaped characters with actual character
           $$ = ['lit','_string',[
@@ -120,15 +162,9 @@ stringLiteral
                        .replace(/\\b/g,'\b')
                ]];
         }
-    ;
-
-numberLiteral
-    : NUMBER
+    | NUMBER
         {$$ = ['lit','_number',[Number(yytext)]];}
-    ;
-
-booleanLiteral
-    : TRUE
+    | TRUE
         {$$ = ['lit','_bool',[true]];}
     | FALSE
         {$$ = ['lit','_bool',[false]];}

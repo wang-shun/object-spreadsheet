@@ -376,7 +376,9 @@ Template.changeFormula.events({
       return false
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
-    template.find('input[name=formula]').value = stringifyFormula(formula)
+    formulaStr = stringifyFormula(formula)
+    template.find('input[name=formula]').value = formulaStr
+    newFormulaStr.set(formulaStr)
     Meteor.call('changeColumnFormula', $$,
                 @columnId,
                 formula,
@@ -390,7 +392,11 @@ Template.changeFormula.events({
   'click .create': (event, template) ->
     # Default formula to get the new column created ASAP.
 	# Then the user can edit it as desired.
-    formula = ['lit', '_unit', []]
+    formula = DUMMY_FORMULA
+    # XXXXXX: Hack around a hack...
+    if getColumn(@columnId).specifiedType == '_any'
+      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, null,
+                  standardServerCallback
     Meteor.call 'changeColumnFormula', $$, @columnId, formula,
                 standardServerCallback
     # TODO warn user if column has data!!
@@ -401,7 +407,7 @@ Template.changeFormula.events({
 insertBlankColumn = (parentId, index, view) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
-  formula = if getColumn(parentId).formula? then ['lit', '_unit', []] else null
+  formula = if getColumn(parentId).formula? then DUMMY_FORMULA else null
   Meteor.call('defineColumn', $$,
               parentId,
               index,
@@ -821,6 +827,9 @@ rebuildView = (viewId) ->
       view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
                                      EJSON.equals(selectedCell.columnId, c.columnId))) ||
      false)
+  # Make sure various things are consistent with change in table data or
+  # selection (view.selectMatchingCell doesn't seem to trigger this).
+  view.onSelection()
   isLoading.set(false)
 
 # Helper decorator for use with Tracker.autorun

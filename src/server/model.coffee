@@ -227,6 +227,10 @@ class Model
         try
           vars = new EJSONKeyedMap([['this', col.parent]])
           type = typecheckFormula(this, vars, col.formula)
+          unless type?
+            # This kind of bug would otherwise cause the client to be
+            # permanently not ready, which is tedious to debug.
+            throw new Error('typecheckFormula returned null/undefined')
           if col.specifiedType?
             valAssert(mergeTypes(col.specifiedType, type) != TYPE_ERROR,
                       "Column #{columnId} type is specified as #{col.specifiedType} but formula returns type #{type}")

@@ -40,14 +40,14 @@ readColumnTypeForFormula = (model, columnId) ->
     throw new FormulaValidationError("Reference to column #{columnId} of unknown type.  " +
                                      "Fix its formula or manually specify the type if needed to break a cycle.")
 
+valExpectType = (what, actualType, expectedType) ->
+  valAssert(mergeTypes(actualType, expectedType) != TYPE_ERROR,
+            "#{what} has type #{actualType}, wanted #{expectedType}")
+
 evalAsSingleton = (set) ->
   elements = set.elements()
   evalAssert(elements.length == 1, 'Expected a singleton')
   elements[0]
-evalAsType = (tset, type) ->
-  evalAssert(mergeTypes(tset.type, type) != TYPE_ERROR,
-             "Expected a set of type '#{type}', got '#{tset.type}'")
-  tset.set
 
 IDENTIFIER_RE = /[_A-Za-z][_A-Za-z0-9]*/
 
@@ -67,16 +67,39 @@ EagerSubformula = {
     stringifySubformula(arg)
 }
 EagerSubformulaCells = {
-  validate: (vars, arg) ->
-    validateSubformula(vars, arg)
+  validate: EagerSubformula.validate
   typecheck: (model, vars, arg) ->
     type = typecheckFormula(model, vars, arg)
     valAssert(!typeIsPrimitive(type), "Expected a set of cells, got set of '#{type}'")
     type
-  evaluate: (model, vars, arg) ->
-    evaluateFormula(model, vars, arg)
-  stringify: (arg) ->
-    stringifySubformula(arg)
+  evaluate: EagerSubformula.evaluate
+  stringify: EagerSubformula.stringify
+}
+HomogeneousEagerSubformulaList = {
+  validate: (vars, arg) ->
+    valAssert(_.isArray(arg),
+              'Expected a list of subformulas')
+    for item in arg
+      validateSubformula(vars, item)
+  typecheck: (model, vars, termFmlas) ->
+    typeSoFar = TYPE_ANY
+    for fmla in termFmlas
+      termType = typecheckFormula(model, vars, fmla)
+      newType = mergeTypes(typeSoFar, termType)
+      valAssert(newType != TYPE_ERROR,
+                "Mismatched types in list (#{typeSoFar} and #{termType})")
+      typeSoFar = newType
+    typeSoFar
+  evaluate: (model, vars, termFmlas) ->
+    (evaluateFormula(model, vars, fmla) for fmla in termFmlas)
+  stringify: (termFmlas) ->
+    (stringifySubformula(fmla) for fmla in termFmlas)
+}
+LazySubformula = {
+  validate: EagerSubformula.validate
+  typecheck: EagerSubformula.typecheck
+  # No evaluate.
+  stringify: EagerSubformula.stringify
 }
 # It might be nicer on the users to not require the extra 2-element array in the
 # input, but for now this goes with our framework.
@@ -174,12 +197,42 @@ stringifyNavigation = (startCellsSinfo, targetColumnId, wantValues) ->
   column = getColumn(targetColumnId) ? {name: '<deleted>', cellName: '<deleted>'}
   {
     str:
-      (if startCellsSinfo.strFor(1) == '::' then '::'
-      else if startCellsSinfo.strFor(1) == 'this' then ''
-      else startCellsSinfo.strFor(1) + '.') +
+      (if startCellsSinfo.strFor(6) == '::' then '::'
+      else if startCellsSinfo.strFor(6) == 'this' then ''
+      else startCellsSinfo.strFor(6) + '.') +
       (if wantValues then column.name else column.cellName)
-    outerPrecedence: 2
+    outerPrecedence: 6
   }
+
+ASSOCIATIVITY_LEFT = 'left'
+ASSOCIATIVITY_RIGHT = 'right'
+ASSOCIATIVITY_NONE = null
+
+binaryOperationStringify = (symbol, precedence, associativity) -> (lhsSinfo, rhsSinfo) ->
+  str: (lhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_LEFT)) +
+        ' ' + symbol + ' ' +
+        rhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_RIGHT)))
+  outerPrecedence: precedence
+
+numberInfixOperator = (symbol, precedence, associativity, resultType, evaluateFn) ->
+  argAdapters: [EagerSubformula, EagerSubformula]
+  typecheck: (model, vars, lhsType, rhsType) ->
+    valExpectType("Left operand of '#{symbol}'", lhsType, '_number')
+    valExpectType("Right operand of '#{symbol}'", rhsType, '_number')
+    resultType
+  evaluate: (model, vars, lhs, rhs) ->
+    new TypedSet('_number', set([evaluateFn(evalAsSingleton(lhs.set), evalAsSingleton(rhs.set))]))
+  stringify: binaryOperationStringify(symbol, precedence, associativity)
+
+sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
+  argAdapters: [EagerSubformula, EagerSubformula]
+  typecheck: (model, vars, lhsType, rhsType) ->
+    valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
+              "Mismatched types to '#{symbol}' operator (#{lhsType} and #{rhsType})")
+    '_bool'
+  evaluate: (model, vars, lhs, rhs) ->
+    new TypedSet('_bool', new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)]))
+  stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 dispatch = {
 
@@ -187,6 +240,9 @@ dispatch = {
   # A literal set of elements of the specified type.
   # Concrete syntax: 2, {3,4}, {5,6,7,} etc.  The elements may be JSON booleans,
   # numbers, or strings.
+  # XXX: Now that we have union, we could change lit to accept only a single
+  # element, but that will break existing abstract formulas.  Maybe do it
+  # if/when we add data type validation?
   lit:
     argAdapters: [Type, {}]
     validate: (vars, type, list) ->
@@ -199,6 +255,9 @@ dispatch = {
       new TypedSet(type, new EJSONKeyedSet(list))
     stringify: (type, list) ->
       str:
+        # Obviously, if someone manually creates a literal that requires a
+        # leading minus or set notation, those constructs will be re-parsed as
+        # operators rather than as part of the literal.
         if type == '_root'
           # See stringifyNavigation.  This shouldn't be exposed anywhere else.
           '::'
@@ -207,7 +266,12 @@ dispatch = {
         else
           # XXX: Canonicalize order?
           '{' + (JSON.stringify(x) for x in list).join(',') + '}'
-      outerPrecedence: 2
+      outerPrecedence:
+        if type == '_number' and list.length == 1 and list[0] < 0
+          # Should never be reached by parsing concrete syntax.
+          4
+        else
+          6
 
   # ["var", varName (string)]:
   # Gets the value of a bound variable.
@@ -225,7 +289,7 @@ dispatch = {
       vars.get(varName)
     stringify: (varName) ->
       str: varName
-      outerPrecedence: 2
+      outerPrecedence: 6
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
   # Concrete syntax: foo, FooCell, (expression).foo, etc.
@@ -253,17 +317,34 @@ dispatch = {
     evaluate: goDown
     stringify: stringifyNavigation
 
+  # ["if", condition, thenFmla, elseFmla]
+  # Concrete syntax: if(condition, thenFmla, elseFmla)
+  # (Can we think of a better concrete syntax?)
+  if:
+    argAdapters: [EagerSubformula, LazySubformula, LazySubformula]
+    typecheck: (model, vars, conditionType, thenType, elseType) ->
+      type = mergeTypes(thenType, elseType)
+      valAssert(type != TYPE_ERROR,
+                "Mismatched types in if branches (#{thenType} and #{elseType})")
+      type
+    evaluate: (model, vars, conditionTset, thenFmla, elseFmla) ->
+      evaluateFormula(model, vars,
+                      if evalAsSingleton(conditionTset.set) then thenFmla else elseFmla)
+    stringify: (conditionSinfo, thenSinfo, elseSinfo) ->
+      str: "if(#{conditionSinfo.strFor(1)}, #{thenSinfo.strFor(1)}, #{elseSinfo.strFor(1)})"
+      outerPrecedence: 6
+
   # ["filter", domain (subformula), [varName, predicate (subformula)]]:
   # For each cell in the domain, evaluates the predicate with varName bound to
   # the domain cell, which must return a singleton boolean.  Returns the set of
   # domain cells for which the predicate returned true.
-  # Concrete syntax: {x in expr | predicate}
+  # Concrete syntax: {x : expr | predicate}
+  # XXX: {foo : ::Foo | predicate} is hard to read; come up with a better syntax.
   filter:
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, predicateLambda) ->
       predicateType = predicateLambda(domainType)
-      valAssert(predicateType == '_bool',
-                "Predicate should return _bool, not #{predicateType}")
+      valExpectType('Predicate', predicateType, '_bool')
       domainType
     evaluate: (model, vars, domainTset, predicateLambda) ->
       new TypedSet(
@@ -273,44 +354,53 @@ dispatch = {
           _.filter(domainTset.set.elements(), (x) ->
             # Future: Figure out where to put this code once we start duplicating it.
             tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
-            evalAsSingleton(evalAsType(predicateLambda(tset), '_bool'))
+            evalAsSingleton(predicateLambda(tset).set)
           )))
     stringify: (domainSinfo, predicateSinfo) ->
-      str: "{#{predicateSinfo[0]} in #{domainSinfo.strFor(1)} " +
-           "| #{predicateSinfo[1].strFor(0)}}"
-      outerPrecedence: 2
+      str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(2)} " +
+           "| #{predicateSinfo[1].strFor(1)}}"
+      outerPrecedence: 6
 
-  # ["=", lhs (subformula), rhs (subformula)]
-  # Compares two _singleton_ sets (currently) of the same type for equality.
-  # Returns a singleton boolean.
-  # Concrete syntax: lhs = rhs
-  '=':
-    argAdapters: [EagerSubformula, EagerSubformula]
-    typecheck: (model, vars, lhsType, rhsType) ->
-      valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
-                 "Mismatched types to = operator (#{lhsType} and #{rhsType})")
-      '_bool'
-    evaluate: (model, vars, lhs, rhs) ->
-      new TypedSet('_bool', new EJSONKeyedSet([EJSON.equals(lhs.set, rhs.set)]))
-    stringify: (lhsSinfo, rhsSinfo) ->
-      str: "#{lhsSinfo.strFor(1)} = #{rhsSinfo.strFor(1)}"
-      outerPrecedence: 1
+  # Predicates on two sets of the same type.
+  '=': sameTypeSetsInfixPredicate('=', 1, ASSOCIATIVITY_NONE, EJSON.equals)
+  '!=': sameTypeSetsInfixPredicate('!=', 1, ASSOCIATIVITY_NONE, (x, y) -> !EJSON.equals(x, y))
+  'in': sameTypeSetsInfixPredicate('in', 1, ASSOCIATIVITY_NONE, (x, y) -> y.hasAll(x))
 
-  # ["in", lhs (subformula), rhs (subformula)]
-  # Compares two sets of the same type for containment.
-  # Returns a singleton boolean.
-  # Concrete syntax: lhs in rhs
-  'in':
-    argAdapters: [EagerSubformula, EagerSubformula]
-    typecheck: (model, vars, lhsType, rhsType) ->
-      valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
-                 "Mismatched types to 'in' operator (#{lhsType} and #{rhsType})")
-      '_bool'
-    evaluate: (model, vars, lhs, rhs) ->
-      new TypedSet('_bool', set([rhs.set.hasAll lhs.set]))
+  # Unary minus.
+  'neg':
+    argAdapters: [EagerSubformula]
+    typecheck: (model, vars, argType) ->
+      valExpectType("Operand of unary '-'", argType, '_number')
+      '_number'
+    evaluate: (model, vars, arg) ->
+      new TypedSet('_number', set([-evalAsSingleton(arg.set)]))
     stringify: (lhsSinfo, rhsSinfo) ->
-      str: "#{lhsSinfo.strFor(1)} in #{rhsSinfo.strFor(1)}"
-      outerPrecedence: 1
+      str: "-#{lhsSinfo.strFor(4)}"
+      outerPrecedence: 4
+
+  '+' : numberInfixOperator('+' , 2, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x +  y)
+  '-' : numberInfixOperator('-' , 2, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x -  y)
+  '*' : numberInfixOperator('*' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x *  y)
+  '/' : numberInfixOperator('/' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x /  y)
+  '^' : numberInfixOperator('^' , 5, ASSOCIATIVITY_RIGHT,'_number', Math.pow)
+  '<' : numberInfixOperator('<' , 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x <  y)
+  '<=': numberInfixOperator('<=', 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x <= y)
+  '>' : numberInfixOperator('>' , 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x >  y)
+  '>=': numberInfixOperator('>=', 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x >= y)
+
+  # ["union", list of subformulas]
+  # Union of a fixed number of sets.
+  union:
+    argAdapters: [HomogeneousEagerSubformulaList]
+    typecheck: (model, vars, termsType) -> termsType
+    evaluate: (model, vars, terms) ->
+      res = new TypedSet()
+      for term in terms
+        res.addAll(term)
+      res
+    stringify: (termSinfos) ->
+      str: '{' + (termSinfo.strFor(1) for termSinfo in termSinfos).join(', ') + '}'
+      outerPrecedence: 0
 
 }
 
@@ -362,6 +452,8 @@ dispatchFormula = (action, formula, contextArgs...) ->
 # vars: EJSONKeyedMap<string, TypedSet>
 @evaluateFormula = (model, vars, formula) ->
   dispatchFormula('evaluate', formula, model, vars)
+
+@DUMMY_FORMULA = ['union', []]
 
 # BELOW: Concrete syntax support.  However, this is used on the server, by
 # loadSampleData!
@@ -433,12 +525,6 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
     vars.delete(varName)
   parser.yy.navigate = (startCellsFmla, targetName) ->
     resolveNavigation(liteModel, vars, startCellsFmla, targetName)
-  parser.yy.makeSetLiteral = (items) ->
-    tset = new TypedSet()
-    for [lit, type, val] in items
-      tset.add(type, val)
-    valAssert(tset.type != TYPE_ERROR, 'Heterogeneous set literal')
-    return ['lit', tset.type, tset.elements()]
 
   try
     return parser.parse(fmlaString)
@@ -452,8 +538,8 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
 stringifySubformula = (formula) ->
   res = dispatchFormula('stringify', formula)
   {
-    strFor: (contextPrecedence) ->
-      if res.outerPrecedence > contextPrecedence
+    strFor: (lowestSafePrecedence) ->
+      if res.outerPrecedence >= lowestSafePrecedence
         res.str
       else
         "(#{res.str})"
