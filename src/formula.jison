@@ -26,7 +26,6 @@ Careful: earlier entries take priority, so longer operators should go earlier.
 "}" return '}'
 "," return ','
 "::" return 'ROOT'
-":" return ':'
 "|" return '|'
 "=" return '='
 "!=" return '!='
@@ -34,6 +33,7 @@ Careful: earlier entries take priority, so longer operators should go earlier.
 "<" return '<'
 ">=" return '>='
 ">" return '>'
+"all" return 'ALL'
 "if" return 'IF'
 "in" return 'IN'
 "+" return '+'
@@ -132,9 +132,9 @@ expression
 /* Could use a mid-rule action if supported.
    https://github.com/zaach/jison/issues/69 */
 binding
-    : IDENT ':' expression
-        { yy.bindVar($1, $3);
-          $$ = {var: $1, domain: $3}; }
+    : ALL IDENT IN expression
+        { yy.bindVar($2, $4);
+          $$ = {var: $2, domain: $4}; }
     ;
 
 commaSeparatedExpressions

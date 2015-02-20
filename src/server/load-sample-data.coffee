@@ -277,7 +277,7 @@
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
                             1, "scheduledMeeting", null, null,
-                            '{m : ::Meeting | m.slot = Slot}')
+                            '{all m in ::Meeting | m.slot = Slot}')
 
   defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting",
                             0, "discussed", null, null,
@@ -288,7 +288,7 @@
 
   defineParsedFormulaColumn("Person",
                             1, "children", null, null,
-                            '{c : ::Person | Person in c.Student.parent}',
+                            '{all c in ::Person | Person in c.Student.parent}',
                             {view: '1'})
   defineParsedFormulaColumn("Person:children",
                             0, "childName", null, null,

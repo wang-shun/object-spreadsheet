@@ -338,8 +338,10 @@ dispatch = {
   # For each cell in the domain, evaluates the predicate with varName bound to
   # the domain cell, which must return a singleton boolean.  Returns the set of
   # domain cells for which the predicate returned true.
-  # Concrete syntax: {x : expr | predicate}
-  # XXX: {foo : ::Foo | predicate} is hard to read; come up with a better syntax.
+  # Concrete syntax: {all x in expr | predicate}
+  # XXX: The "all" is to avoid a parser conflict.  It's arguable whether we'd
+  # actually like to have both {x in foo | bar} and {x in foo, bar} or this is
+  # confusing to users too.  Find a different compromise?
   filter:
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, predicateLambda) ->
@@ -357,7 +359,7 @@ dispatch = {
             evalAsSingleton(predicateLambda(tset).set)
           )))
     stringify: (domainSinfo, predicateSinfo) ->
-      str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(2)} " +
+      str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(2)} " +
            "| #{predicateSinfo[1].strFor(1)}}"
       outerPrecedence: 6
 
