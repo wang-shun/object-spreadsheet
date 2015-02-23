@@ -33,12 +33,12 @@ SemanticError = Meteor.makeErrorType('SemanticError',
 #@parent: column ID
 #@children: array of column IDs, now in the user's desired order
 #@childByName: EJSONKeyedMap<name, column ID>
-#@name: string or null
+#@fieldName: string or null
 #@specifiedType: type specified by user (required for state columns)
 #@type: checked type (always set during evaluation)
 #@typecheckError: string or null, formula type checking error message
-#@cellName: string or null
-#@formula: some JSON data structure, or null
+#@objectName: string or null
+#@formula: some JSON data structure, or null for a state column
 
 @columnIsState = (col) -> col._id != rootColumnId && !col.formula?
 
@@ -47,14 +47,14 @@ SemanticError = Meteor.makeErrorType('SemanticError',
   if typeIsPrimitive(s)
     s
   else
-    # XXX: Maybe types should accept cellName only.
+    # XXX: Maybe types should accept objectName only.
     @parseColumnRef s
 
 @parseColumnRef = (s) ->
   if getColumn(s)? then return s  # Any other way to recognize ids vs. names?
   colId = rootColumnId
   for n in s.split(':')
-    col = Columns.findOne {parent: colId, $or: [ {name: n}, {cellName: n} ]}
+    col = Columns.findOne {parent: colId, $or: [ {fieldName: n}, {objectName: n} ]}
     colId = col?._id
     if !colId
       throw new SemanticError("column lookup failed: '#{s}'")
@@ -82,7 +82,7 @@ SemanticError = Meteor.makeErrorType('SemanticError',
 
 @getColumn = (id) -> Columns.findOne(id)
 @childByName = (column, name) ->
-  Columns.findOne({parent: column._id, $or: [ {name: name}, {cellName: name} ]})?._id
+  Columns.findOne({parent: column._id, $or: [ {fieldName: name}, {objectName: name} ]})?._id
 
 # Literal empty sets, etc.
 @TYPE_ANY = '_any'

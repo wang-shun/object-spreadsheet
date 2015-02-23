@@ -194,13 +194,13 @@ goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
 stringifyNavigation = (startCellsSinfo, targetColumnId, wantValues) ->
   # XXX: What if the name is ambiguous in this context?
   # To detect, we would need to know the type; too much work.
-  column = getColumn(targetColumnId) ? {name: '<deleted>', cellName: '<deleted>'}
+  column = getColumn(targetColumnId) ? {fieldName: '<deleted>', objectName: '<deleted>'}
   {
     str:
       (if startCellsSinfo.strFor(6) == '::' then '::'
       else if startCellsSinfo.strFor(6) == 'this' then ''
       else startCellsSinfo.strFor(6) + '.') +
-      (if wantValues then column.name else column.cellName)
+      (if wantValues then column.fieldName else column.objectName)
     outerPrecedence: 6
   }
 
@@ -474,7 +474,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   unless startCellsFmla?
     valAssert(targetName != 'this',
               'Explicit "this" is not allowed in concrete syntax.  ' +
-              'Please use the cellName for clarity.')
+              'Please use the object name for clarity.')
     if vars.get(targetName)?
       interpretations.push(['var', targetName])
     startCellsFmla = ['var', 'this']
@@ -484,8 +484,8 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   valAssert(!typeIsPrimitive(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
   columnsInScope = new EJSONKeyedMap()  # column id -> up/down
 
-  # Note, it's impossible to navigate to the root column since it has no name or
-  # cellName.
+  # Note, it's impossible to navigate to the root column since it has no field name or
+  # object name.
   [upPath, downPath] = findCommonAncestorPaths(startCellsType, rootColumnId)
   for upColumnId in upPath
     columnsInScope.set(upColumnId, 'up')
@@ -494,9 +494,9 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
 
   for [columnId, direction] in columnsInScope.entries()
     col = model.getColumn(columnId)
-    if col.name == targetName
+    if col.fieldName == targetName
       interpretations.push([direction, startCellsFmla, columnId, true])
-    if col.cellName == targetName
+    if col.objectName == targetName
       interpretations.push([direction, startCellsFmla, columnId, false])
 
   # Future: Enforce uniqueness of interpretations in any scope?

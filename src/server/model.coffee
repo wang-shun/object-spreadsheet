@@ -56,14 +56,14 @@ class Model
     col = @getColumn columnId
     [[columnId, col]].concat (@getAllColumns c for c in col.children)...
 
-  defineColumn: (parentId, index, name, specifiedType, cellName, formula, attrs) ->
+  defineColumn: (parentId, index, fieldName, specifiedType, objectName, formula, attrs) ->
     # Future: validate everything
     # Future: validate no name for type = _unit or _token
     parentCol = @getColumn(parentId)
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
-    if ((name? && childByName(parentCol, name)?) ||
-        (cellName? && childByName(parentCol, cellName)?))
+    if ((fieldName? && childByName(parentCol, fieldName)?) ||
+        (objectName? && childByName(parentCol, objectName)?))
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     if !formula?
       if parentCol.formula?
@@ -84,11 +84,11 @@ class Model
     col = {
       _id: thisId
       parent: parentId
-      name: name
+      fieldName: fieldName
       specifiedType: specifiedType
       type: null
       typecheckError: null
-      cellName: cellName
+      objectName: objectName
       formula: formula
       children: []
       cells: {}
@@ -102,29 +102,29 @@ class Model
 
     return thisId
 
-  changeColumnName: (columnId, name) ->
+  changeColumnFieldName: (columnId, fieldName) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
     col = @getColumn(columnId)
-    if name == col.name
+    if fieldName == col.fieldName
       return
     parentCol = @getColumn(col.parent)
-    if name? && childByName(parentCol, name)?
+    if fieldName? && childByName(parentCol, fieldName)?
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
-    Columns.update(columnId, {$set: {name: name}})
+    Columns.update(columnId, {$set: {fieldName: fieldName}})
 
-  changeColumnCellName: (columnId, cellName) ->
+  changeColumnObjectName: (columnId, objectName) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
     col = @getColumn(columnId)
-    if cellName == col.cellName
+    if objectName == col.objectName
       return
     parentCol = @getColumn(col.parent)
-    if cellName? && childByName(parentCol, cellName)?
+    if objectName? && childByName(parentCol, objectName)?
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
-    Columns.update(columnId, {$set: {cellName: cellName}})
+    Columns.update(columnId, {$set: {objectName: objectName}})
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
     if columnId == rootColumnId
@@ -301,16 +301,16 @@ Meteor.methods({
   # to request this via another method (it would require a callback).
   # Future: validation!
   open: (cc) -> cc.run()
-  defineColumn: (cc, parentId, index, name, specifiedType, cellName, formula, viewId) ->
+  defineColumn: (cc, parentId, index, fieldName, specifiedType, objectName, formula, viewId) ->
     cc.run ->
       attrs = if viewId? then {view: viewId} else {}
-      id = @model.defineColumn(parentId, index, name, specifiedType, cellName, formula, attrs)
+      id = @model.defineColumn(parentId, index, fieldName, specifiedType, objectName, formula, attrs)
       if viewId? then new View(viewId).addColumn(id)
       @model.evaluateAll()
-  changeColumnName: (cc, columnId, name) ->
-    cc.run -> @model.changeColumnName(columnId, name)
-  changeColumnCellName: (cc, columnId, cellName) ->
-    cc.run -> @model.changeColumnCellName(columnId, cellName)
+  changeColumnFieldName: (cc, columnId, fieldName) ->
+    cc.run -> @model.changeColumnFieldName(columnId, fieldName)
+  changeColumnObjectName: (cc, columnId, objectName) ->
+    cc.run -> @model.changeColumnObjectName(columnId, objectName)
   changeColumnSpecifiedType: (cc, columnId, specifiedType) ->
     cc.run ->
       @model.changeColumnSpecifiedType(columnId, specifiedType)

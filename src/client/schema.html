@@ -3,17 +3,17 @@
   <div id="Schema">
     <table>
       <tr>
-        <td></td><th>name / cellName</th><th>parent</th><th>type</th>
+        <td></td><th>fieldName / objectName</th><th>parent</th><th>type</th>
       </tr>
       {{#each columns}}
       <tr>
         <th class="noisy">{{short _id}}</th>
         <td>
-          {{#if name}}
-            {{name}}
+          {{#if fieldName}}
+            {{fieldName}}
           {{/if}}
-          {{#if cellName}}
-            / {{cellName}}
+          {{#if objectName}}
+            / {{objectName}}
           {{/if}}
         </td>
         <td class="noisy">{{short parent}}</td>

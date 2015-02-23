@@ -90,7 +90,7 @@ class ViewSection
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
     @subsections = []
-    @headerMinHeight = @col.cellName? + 2  # valueName, type
+    @headerMinHeight = @col.objectName? + 2  # fieldName, type
     for sublayout in @layoutTree.subtrees
       subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
@@ -181,18 +181,18 @@ class ViewSection
   renderHeader: (expanded, depth) ->
     # Part that is always the same.
     myColorClass = "rsHeaderColor" + if @headerMinHeight == 2 then depth-1 else depth
-    nameCell = new ViewCell(
-      @col.name ? '', 1, 1,
+    fieldNameCell = new ViewCell(
+      @col.fieldName ? '', 1, 1,
       ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderNameAlone' else 'rsHeaderName'), myColorClass])
-    nameCell.columnId = @columnId
-    nameCell.kind = 'below'
+    fieldNameCell.columnId = @columnId
+    fieldNameCell.kind = 'below'
     typeName = (col, s=col?.type) ->
       if !s then ''
       else if col._id == rootColumnId then ''
       else if s == '_token' then '•'
       else if s == '_unit' then 'X'
       else if typeIsPrimitive(s) then s
-      else Columns.findOne(s)?.cellName ? (""+s)[...4]
+      else Columns.findOne(s)?.objectName ? (""+s)[...4]
     typeClass = (s) -> if s in ['_token', '_unit'] then ['centered'] else []
     # XXX: The value in the cell is not consistent with what we allow the user
     # to type in the cell!
@@ -208,7 +208,7 @@ class ViewSection
       (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
     typeCell.columnId = @columnId
     typeCell.kind = 'type'
-    grid = [[nameCell], [typeCell]]
+    grid = [[fieldNameCell], [typeCell]]
 
     if @headerMinHeight == 2
       return grid
@@ -221,7 +221,7 @@ class ViewSection
         classes.push('rsHeaderNonfinal')
       classes.push(myColorClass)
       corner = gridMergedCell(height - 2, grid[0].length,
-                              @col.cellName ? '', classes)
+                              @col.objectName ? '', classes)
       corner[0][0].columnId = @columnId
       corner[0][0].kind = 'top'
       gridVertExtend(corner, grid)
@@ -411,9 +411,9 @@ insertBlankColumn = (parentId, index, view) ->
   Meteor.call('defineColumn', $$,
               parentId,
               index,
-              null,  # name
+              null,  # fieldName
               null,  # type
-              null,  # cellName
+              null,  # objectName
               formula,  # formula
               view?.id,
               standardServerCallback)
@@ -494,7 +494,7 @@ class ClientView
       rowHeights:
         # Specify all the row heights (23 pixels is the Handsontable default),
         # otherwise the fixed clone of the left column sometimes reduced the
-        # cellName row to zero height because it wasn't constrained by the
+        # objectName row to zero height because it wasn't constrained by the
         # content of the real table.  We can look out for any similar glitches.
         if headerExpanded.get()
           for i in [0...@grid.length]
@@ -513,7 +513,7 @@ class ClientView
           renderer: if col == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
           # Only column header "top" and "below" cells can be edited,
-          # for the purpose of changing the cellName and name respectively.
+          # for the purpose of changing the objectName and fieldName respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
                       cell.qCellId? && StateEdit.canEdit(cell.qCellId.columnId) ||
                       cell.qFamilyId? && StateEdit.canEdit(cell.qFamilyId.columnId))
@@ -541,11 +541,11 @@ class ClientView
           # One of these cases should apply...
           if cell.kind == 'top'
             name = if newVal == '' then null else newVal
-            Meteor.call 'changeColumnCellName', $$, cell.columnId, name,
+            Meteor.call 'changeColumnObjectName', $$, cell.columnId, name,
                         standardServerCallback
           if cell.kind == 'below'
             name = if newVal == '' then null else newVal
-            Meteor.call 'changeColumnName', $$, cell.columnId, name,
+            Meteor.call 'changeColumnFieldName', $$, cell.columnId, name,
                         standardServerCallback
           if cell.kind == 'type'
             parsed = false
@@ -576,20 +576,20 @@ class ClientView
           # Future: Would be nice to move selection appropriately on column
           # insert/delete, but this is a less common case.
 
-          setCellName: {
-            # For use only when the cell-name cell is not already visible.
+          setObjectName: {
+            # For use only when the object-name cell is not already visible.
             name: 'Set object name'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
-                !(col = getColumn(ci)).cellName? &&
+                !(col = getColumn(ci)).objectName? &&
                 !col.children.length)
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              cellName = prompt('Object name:')
-              if cellName
-                Meteor.call 'changeColumnCellName', $$, ci, cellName,
+              objectName = prompt('Object name:')
+              if objectName
+                Meteor.call 'changeColumnObjectName', $$, ci, objectName,
                             standardServerCallback
           }
           # addSiblingLeft is redundant but nice for users.
@@ -850,16 +850,6 @@ Template.Spreadsheet.rendered = ->
   Meteor.call 'open', $$
   Tracker.autorun(guarded -> rebuildView viewId)
 
-
-Meteor.methods({
-  # Implement these two methods to reduce display jankiness, since they're easy.
-  # Hm, doesn't help much, I suspect the bottleneck is rerendering the table,
-  # not the server call.
-  changeColumnName: (cc, columnId, name) ->
-    Columns.update(columnId, {$set: {name: name}})
-  changeColumnCellName: (cc, columnId, cellName) ->
-    Columns.update(columnId, {$set: {cellName: cellName}})
-})
 
 $ ->
   exported {View, rebuildView}

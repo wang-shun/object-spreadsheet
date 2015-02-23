@@ -4,19 +4,19 @@
   sampleSchema = [
     {
     type: '_token'
-    cellName: 'Person'
+    objectName: 'Person'
     children: [
       {
-      name: 'name'
+      fieldName: 'name'
       type: '_string'
       # TODO: Required, singleton; probably unique but maybe not in schema
       }
       {
       type: '_unit'
-      cellName: 'Student'
+      objectName: 'Student'
       # No need to constrain singleton.
       children: [
-        name: 'parent'
+        fieldName: 'parent'
         type: 'Person'
         # There can be more than one parent, but there can be only one meeting per
         # enrollment, which we imagine several of the parents may attend if they
@@ -27,18 +27,18 @@
       # the parent of some student.
       {
       type: '_unit'
-      cellName: 'Teacher'
+      objectName: 'Teacher'
       children: [
         {
         type: '_token'
-        cellName: 'Slot'
+        objectName: 'Slot'
         children: [
           {
           # We don't normally expect the time of an existing slot to change, but
           # I'm now thinking it's wiser not to try to enforce that by making the
           # time a direct child of Teacher when it has no direct meaning in the
           # context of the Teacher.  Such decisions won't always be clear. ~ Matt
-          name: 'time'
+          fieldName: 'time'
           # TODO: Change to _datetime once supported.  As long as we are using
           # strings as placeholder values, set this to _string so editing
           # behaves sensibly.
@@ -52,24 +52,24 @@
     }
     {
     type: '_token'
-    cellName: 'Class'
+    objectName: 'Class'
     children: [
       {
-      name: 'code'
+      fieldName: 'code'
       type: '_string'
       # TODO: Required, singleton, unique
       }
       {
-      name: 'name'
+      fieldName: 'name'
       type: '_string'
       # TODO: Required, singleton, unique (assuming department is sane)
       }
       {
       type: '_token'
-      cellName: 'Section'
+      objectName: 'Section'
       children: [
         {
-        name: 'teacher'
+        fieldName: 'teacher'
         type: 'Person:Teacher'
         # TODO: Required, singleton
         }
@@ -78,10 +78,10 @@
         # of as belonging to the section.  We might want to associate other data
         # (e.g., grades) with it that is as important to the student as it is to
         # the section.  But for now, this is useful as an example of having both
-        # a name and a cellName. ~ Matt
-        name: 'student'
+        # a fieldName and an objectName. ~ Matt
+        fieldName: 'student'
         type: 'Person:Student'
-        cellName: 'Enrollment'
+        objectName: 'Enrollment'
         }
       ]
       }
@@ -89,15 +89,15 @@
     }
     {
     type: '_token'
-    cellName: 'Meeting'
+    objectName: 'Meeting'
     children: [
       {
-      name: 'enrollment'
+      fieldName: 'enrollment'
       type: 'Class:Section:Enrollment'
       # TODO: Required, singleton, unique
       }
       {
-      name: 'slot'
+      fieldName: 'slot'
       type: 'Person:Teacher:Slot'
       # TODO: Required, singleton, unique
       }
@@ -240,12 +240,12 @@
     for columnDef, i in schema.children
       thisId = model.defineColumn(
         parentId, i,
-        columnDef.name,
+        columnDef.fieldName,
         # This only works because all of the types in our sample dataset refer to
         # columns that come earlier in preorder.  We can probably live with this
         # until we implement full validation of acyclic type usage.
         parseTypeStr(columnDef.type),
-        columnDef.cellName,
+        columnDef.objectName,
         null  # formula
       )
       scanColumns(thisId, columnDef)
@@ -263,14 +263,14 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  defineParsedFormulaColumn = (parentRef, order, name, cellName, specifiedType, formulaStr, attrs) ->
+  defineParsedFormulaColumn = (parentRef, order, fieldName, objectName, specifiedType, formulaStr, attrs) ->
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()
     parentId = parseColumnRef(parentRef)
 
     model.defineColumn(parentId,
-                       order, name, cellName, specifiedType,
+                       order, fieldName, objectName, specifiedType,
                        parseFormula(parentId, formulaStr), attrs)
   defineParsedFormulaColumn("Person:Student:parent",
                             0, "parentName", null, null,

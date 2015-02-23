@@ -9,7 +9,7 @@ if Meteor.isClient
         else
           col = Columns.findOne({_id: type})
           if col?
-            col.cellName ? col.name
+            col.objectName ? col.fieldName
           else
             "#{type[...4]}..."
       else
