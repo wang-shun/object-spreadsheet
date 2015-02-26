@@ -32,13 +32,18 @@ class Model
 
     # Special case: create root column if missing.
     unless @getColumn(rootColumnId)?
-      @isEmpty = true
+      @wasEmpty = true
       # None of the other properties should be used.
       col = {
         _id: rootColumnId
-        # Close enough to the truth?
-        specifiedType: '_token'
         children: []
+        fieldName: null
+        specifiedType: '_token'  # Close enough to the truth?
+        type: null
+        typecheckError: null
+        isObject: true  # Allow children.
+        objectName: null
+        formula: null
       }
       Columns.insert(col)
 
@@ -56,15 +61,25 @@ class Model
     col = @getColumn columnId
     [[columnId, col]].concat (@getAllColumns c for c in col.children)...
 
-  defineColumn: (parentId, index, fieldName, specifiedType, objectName, formula, attrs) ->
+  defineColumn: (parentId, index, fieldName, specifiedType, isObject, objectName, formula, attrs) ->
     # Future: validate everything
-    # Future: validate no name for type = _unit or _token
+    # Future: validate no fieldName for type _token.  For _unit, there could be borderline use cases.
+    # XXX: Do not allow non-object columns to have type _token?  Currently it
+    # won't hurt anything, and it doesn't make sense to tighten this until we
+    # finalize the flow for specifying types of newly created columns.
     parentCol = @getColumn(parentId)
+    unless parentCol?
+      throw new Meteor.Error('defineColumn-no-parent', 'The specified parent column does not exist.')
+    unless parentCol.isObject
+      throw new Meteor.Error('defineColumn-parent-not-isObject', 'The parent column must be an object to have children.')
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
     if ((fieldName? && childByName(parentCol, fieldName)?) ||
         (objectName? && childByName(parentCol, objectName)?))
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
+    if !isObject && objectName?
+      throw new Meteor.Error('defineColumn-objectName-not-isObject',
+                             'A column with isObject = false cannot have an objectName.')
     if !formula?
       if parentCol.formula?
         throw new Meteor.Error('defineColumn-state-under-formula',
@@ -88,10 +103,10 @@ class Model
       specifiedType: specifiedType
       type: null
       typecheckError: null
+      isObject: isObject
       objectName: objectName
       formula: formula
       children: []
-      cells: {}
     }
     for k,v of attrs
       col[k] = v
@@ -114,6 +129,31 @@ class Model
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     Columns.update(columnId, {$set: {fieldName: fieldName}})
 
+  changeColumnIsObject: (columnId, isObject) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
+    col = @getColumn(columnId)
+    if isObject == col.isObject
+      return
+    # The way you get a (state) token column is to "add object type" to a state
+    # column that still has the default type of _any.  Conversely, removing the
+    # object type changes the type back to _any.  Future: better flow!
+    if isObject
+      if !col.formula? && col.specifiedType == '_any'
+        @invalidateCache()
+        Columns.update(columnId, {$set: {specifiedType: '_token'}})
+    else
+      if col.children?.length
+        throw new Meteor.Error('delete-column-has-children',  # XXX this is not deleteColumn
+                               'Please delete all child columns first.')
+      if col.objectName?
+        Columns.update(columnId, {$set: {objectName: null}})
+      if col.specifiedType == '_token'
+        @invalidateCache()
+        Columns.update(columnId, {$set: {specifiedType: '_any'}})
+    Columns.update(columnId, {$set: {isObject: isObject}})
+
   changeColumnObjectName: (columnId, objectName) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
@@ -121,6 +161,9 @@ class Model
     col = @getColumn(columnId)
     if objectName == col.objectName
       return
+    if !col.isObject && objectName?
+      throw new Meteor.Error('defineColumn-objectName-not-isObject',
+                             'A column with isObject = false cannot have an objectName.')      
     parentCol = @getColumn(col.parent)
     if objectName? && childByName(parentCol, objectName)?
       throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
@@ -153,6 +196,11 @@ class Model
     #                         'Can only changeFormula on a formula column!')
     validateFormula(formula)
     @invalidateCache()
+    col = @getColumn(columnId)
+    # Hack: When a state column is converted to a formula column,
+    # automatically remove the default type of '_any'.
+    if !col.formula? && col.specifiedType == '_any'
+      Columns.update(columnId, {$set: {specifiedType: null}})
     Columns.update(columnId, {$set: {formula: formula}})
 
   deleteColumn: (columnId) ->
@@ -286,7 +334,7 @@ Meteor.startup () ->
   Tablespace.onCreate ->
     @do ->
       @model = new Model
-      if /^(.*\.)?ptc$/.test(@id) && @model.isEmpty
+      if /^(.*\.)?ptc$/.test(@id) && @model.wasEmpty
         loadSampleData(@model)
       @model.evaluateAll()
 
@@ -301,14 +349,19 @@ Meteor.methods({
   # to request this via another method (it would require a callback).
   # Future: validation!
   open: (cc) -> cc.run()
-  defineColumn: (cc, parentId, index, fieldName, specifiedType, objectName, formula, viewId) ->
+  defineColumn: (cc, parentId, index, fieldName, specifiedType, isObject, objectName, formula, viewId) ->
     cc.run ->
       attrs = if viewId? then {view: viewId} else {}
-      id = @model.defineColumn(parentId, index, fieldName, specifiedType, objectName, formula, attrs)
+      id = @model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula, attrs)
       if viewId? then new View(viewId).addColumn(id)
       @model.evaluateAll()
   changeColumnFieldName: (cc, columnId, fieldName) ->
     cc.run -> @model.changeColumnFieldName(columnId, fieldName)
+  changeColumnIsObject: (cc, columnId, isObject) ->
+    cc.run ->
+      @model.changeColumnIsObject(columnId, isObject)
+      # For the case where specifiedType is automatically changed between _token and _any.
+      @model.evaluateAll()
   changeColumnObjectName: (cc, columnId, objectName) ->
     cc.run -> @model.changeColumnObjectName(columnId, objectName)
   changeColumnSpecifiedType: (cc, columnId, specifiedType) ->

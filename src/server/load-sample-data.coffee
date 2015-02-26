@@ -21,6 +21,7 @@
         # There can be more than one parent, but there can be only one meeting per
         # enrollment, which we imagine several of the parents may attend if they
         # believe it is necessary.
+        isObject: true
       ]
       }
       # We don't flag parents explicitly.  A person is a parent by virtue of being
@@ -121,8 +122,6 @@
     for x in arguments
       if typeof x == 'number' then x.toString() else x
 
-  # _mark is used only to refer to a cell within this input format.  IDs will be
-  # assigned by the loading code.
   sampleData = {
     Person: T([
       {
@@ -245,6 +244,7 @@
         # columns that come earlier in preorder.  We can probably live with this
         # until we implement full validation of acyclic type usage.
         parseTypeStr(columnDef.type),
+        columnDef.objectName? || columnDef.isObject,
         columnDef.objectName,
         null  # formula
       )
@@ -263,35 +263,35 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  defineParsedFormulaColumn = (parentRef, order, fieldName, objectName, specifiedType, formulaStr, attrs) ->
+  defineParsedFormulaColumn = (parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, attrs) ->
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()
     parentId = parseColumnRef(parentRef)
 
     model.defineColumn(parentId,
-                       order, fieldName, objectName, specifiedType,
+                       order, fieldName, specifiedType, isObject, objectName,
                        parseFormula(parentId, formulaStr), attrs)
   defineParsedFormulaColumn("Person:Student:parent",
-                            0, "parentName", null, null,
+                            0, "parentName", null, false, null,
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
-                            1, "scheduledMeeting", null, null,
+                            1, "scheduledMeeting", null, true, null,
                             '{all m in ::Meeting | m.slot = Slot}')
 
   defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting",
-                            0, "discussed", null, null,
+                            0, "discussed", null, true, null,
                             'scheduledMeeting.enrollment.student')
   defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting:discussed",
-                            0, "studentName", null, null,
+                            0, "studentName", null, false, null,
                             'discussed.Person.name')
 
   defineParsedFormulaColumn("Person",
-                            1, "children", null, null,
+                            1, "children", null, true, null,
                             '{all c in ::Person | Person in c.Student.parent}',
                             {view: '1'})
   defineParsedFormulaColumn("Person:children",
-                            0, "childName", null, null,
+                            0, "childName", null, false, null,
                             'children.name',
                             {view: '1'})
 

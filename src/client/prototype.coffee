@@ -32,6 +32,9 @@ class ViewCell
     @qFamilyId = null
     @qCellId = null
     @columnId = null
+    # Use in combination with columnId or qCellId to distinguish key and object
+    # (bullet/chevron) columns in the UI.
+    @isObject = false
     @kind = null
     @fullText = null
 
@@ -82,15 +85,17 @@ class ViewSection
       throw new NotReadyError()
     # Future: Set this when we know it.
     @relationSingular = false
-    # Might be undefined (root cell or no cells), fail gently.
-    @type = @col.type
-    @width = 1
+    # Future: Consider rendering _unit with isObject = true specially to save
+    # space, e.g., a single column of hollow bullets.  We'd need to figure out
+    # how to make this not confusing.
+    @width = (@col.type != '_token') + @col.isObject
     @leftEdgeSingular = true
     @rightEdgeSingular = true
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
     @subsections = []
-    @headerMinHeight = @col.objectName? + 2  # fieldName, type
+    # @headerMinHeight refers to the expanded header.
+    @headerMinHeight = @col.isObject + 2  # fieldName, type
     for sublayout in @layoutTree.subtrees
       subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
@@ -127,20 +132,18 @@ class ViewSection
     minHeight = 1
     # TODO: More type-specific rendering?
     displayValue =
-      if @type == '_token' && @col._id != rootColumnId then '•'
       # Show _unit values for now so we can see if they aren't 'X'.
-      #if @type == '_unit' then 'X'
-      else if !typeIsPrimitive(@type) then new CellReference({columnId: @type, cellId: value})
+      #if @col.type == '_unit' then 'X'
+      if !typeIsPrimitive(@col.type) then new CellReference({columnId: @col.type, cellId: value})
       # Should be OK if the user knows which columns are string-typed.
       else if typeof value == 'string' then value
       # Make sure IDs (especially) are unambiguous.
       else JSON.stringify(value)
-    displayClass = if @type in ['_token', '_unit'] then ['centered'] else []
     vlists =
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
     minHeight = Math.max(1, (vlist.minHeight for vlist in vlists)...)
-    new ViewHlist(cellId, minHeight, displayValue, vlists, displayClass)
+    new ViewHlist(cellId, minHeight, displayValue, vlists, @markDisplayClasses())
 
   renderVlist: (vlist, height) ->
     qFamilyId = {columnId: @columnId, cellId: vlist.parentCellId}
@@ -159,15 +162,37 @@ class ViewSection
       grid[0][0].qFamilyId = qFamilyId
     grid
 
+  markDisplayClasses: ->
+    if @col.type == '_unit' then ['centered'] else []
+
+  # Only applicable if @col.isObject.
+  objectSymbol: ->
+    if @col._id == rootColumnId then ''
+    else if @col.type == '_token' then '•' else '»'
+
   renderHlist: (hlist, height) ->
-    # Value
-    value = hlist.value
-    grid = gridMergedCell(height, 1, value, hlist.cssClasses)
-    grid[0][0].qCellId = {columnId: @columnId, cellId: hlist.cellId}
+    grid = ([] for i in [0...height])
+    qCellId = {columnId: @columnId, cellId: hlist.cellId}
     # This logic could be in a ViewCell accessor instead, but for now it isn't
     # duplicated so there's no need.
-    if @columnId != rootColumnId
-      grid[0][0].qFamilyId = {columnId: @columnId, cellId: cellIdParent(hlist.cellId)}
+    qFamilyId =
+      if @columnId == rootColumnId
+        null
+      else
+        {columnId: @columnId, cellId: cellIdParent(hlist.cellId)}
+    if @col.type != '_token'
+      # Value
+      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses)
+      gridValue[0][0].qCellId = qCellId
+      gridValue[0][0].qFamilyId = qFamilyId
+      gridHorizExtend(grid, gridValue)
+    if @col.isObject
+      # Object
+      gridObject = gridMergedCell(height, 1, @objectSymbol(), ['centered'])
+      gridObject[0][0].qCellId = qCellId
+      gridObject[0][0].qFamilyId = qFamilyId
+      gridObject[0][0].isObject = true
+      gridHorizExtend(grid, gridObject)
     # Subsections
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
@@ -181,34 +206,44 @@ class ViewSection
   renderHeader: (expanded, depth) ->
     # Part that is always the same.
     myColorClass = "rsHeaderColor" + if @headerMinHeight == 2 then depth-1 else depth
-    fieldNameCell = new ViewCell(
-      @col.fieldName ? '', 1, 1,
-      ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderNameAlone' else 'rsHeaderName'), myColorClass])
-    fieldNameCell.columnId = @columnId
-    fieldNameCell.kind = 'below'
-    typeName = (col, s=col?.type) ->
-      if !s then ''
-      else if col._id == rootColumnId then ''
-      else if s == '_token' then '•'
-      else if s == '_unit' then 'X'
-      else if typeIsPrimitive(s) then s
-      else Columns.findOne(s)?.objectName ? (""+s)[...4]
-    typeClass = (s) -> if s in ['_token', '_unit'] then ['centered'] else []
-    # XXX: The value in the cell is not consistent with what we allow the user
-    # to type in the cell!
-    typeCell = new ViewCell(
-      (if @col.formula? then '=' else '') +
-      (if @col.specifiedType? then typeName(@col) else "(#{typeName(@col)})") +
-      (if @col.typecheckError? then '!' else ''),
-      1, 1, ['rsHeaderBelow', myColorClass].concat(typeClass(@col.type)))
-    typeCell.fullText = (
-      'Column ID ' + @columnId + ': ' +
-      'type ' + (@type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
-      (if @col.formula? then ' (formula)' else '') +
-      (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
-    typeCell.columnId = @columnId
-    typeCell.kind = 'type'
-    grid = [[fieldNameCell], [typeCell]]
+    grid = [[], []]  # c.f. renderHlist
+    if @col.type != '_token'
+      fieldNameCell = new ViewCell(
+        @col.fieldName ? '', 1, 1,
+        ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderFieldNameLeaf' else 'rsHeaderFieldNameKey'), myColorClass])
+      fieldNameCell.columnId = @columnId
+      fieldNameCell.kind = 'below'
+      typeName =
+        if @col.type == '_unit' then 'X'
+        else if typeIsPrimitive(@col.type) then @col.type
+        else Columns.findOne(@col.type)?.objectName ? (""+@col.type)[...4]
+      # XXX: The value in the cell is not consistent with what we allow the user
+      # to type in the cell!
+      typeCell = new ViewCell(
+        (if @col.formula? then '=' else '') +
+        (if @col.specifiedType? then typeName else "(#{typeName})") +
+        (if @col.typecheckError? then '!' else ''),
+        1, 1, ['rsHeaderBelow', myColorClass].concat(@markDisplayClasses()))
+      typeCell.fullText = (
+        'Column ID ' + @columnId + ': ' +
+        'type ' + (@col.type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
+        (if @col.formula? then ' (formula)' else '') +
+        (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
+      typeCell.columnId = @columnId
+      typeCell.kind = 'type'
+      gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
+    if @col.isObject
+      fieldNameCell = new ViewCell('', 1, 1, ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
+      fieldNameCell.columnId = @columnId
+      fieldNameCell.isObject = true
+      typeCell = new ViewCell(@objectSymbol(), 1, 1, ['rsHeaderBelow', 'centered', myColorClass])
+      # For a token column, make the ID available via the object UI-column.  For
+      # all other columns, this information is available on the value UI-column.
+      if @col.type == '_token'
+        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
+      typeCell.columnId = @columnId
+      typeCell.isObject = true
+      gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
 
     if @headerMinHeight == 2
       return grid
@@ -223,6 +258,7 @@ class ViewSection
       corner = gridMergedCell(height - 2, grid[0].length,
                               @col.objectName ? '', classes)
       corner[0][0].columnId = @columnId
+      corner[0][0].isObject = true
       corner[0][0].kind = 'top'
       gridVertExtend(corner, grid)
       grid = corner
@@ -230,9 +266,7 @@ class ViewSection
 
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
-        gridSeparator = gridMergedCell(
-          currentHeight, 1, '',
-          [(if currentHeight == height then ['rsFullHeightSeparator'] else [])..., myColorClass])
+        gridSeparator = gridMergedCell(currentHeight, 1, '', [myColorClass])
         gridHorizExtend(grid, gridSeparator)
       if currentHeight == 2 && subsection.headerMinHeight > 2
         makeCorner(false)
@@ -242,7 +276,6 @@ class ViewSection
           currentHeight - subsectionGrid.length, subsection.width,
           '',
           [
-            'rsHeaderPadding',
             (if i < @subsections.length - 1 then ['rsHeaderNonfinal'] else [])...,
             myColorClass
           ])
@@ -393,10 +426,6 @@ Template.changeFormula.events({
     # Default formula to get the new column created ASAP.
 	# Then the user can edit it as desired.
     formula = DUMMY_FORMULA
-    # XXXXXX: Hack around a hack...
-    if getColumn(@columnId).specifiedType == '_any'
-      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, null,
-                  standardServerCallback
     Meteor.call 'changeColumnFormula', $$, @columnId, formula,
                 standardServerCallback
     # TODO warn user if column has data!!
@@ -451,7 +480,7 @@ class ClientView
     @qCellIdToGridCoords = new EJSONKeyedMap()
     for rowCells, i in gridData
       for cell, j in rowCells
-        if cell.qCellId?
+        if cell.qCellId? && cell.isObject
           # dataRow is user-facing row number, one-based.
           # row/col: Account for header rows and caption column.  We could
           # compute these later but this is easier for now.
@@ -507,7 +536,7 @@ class ClientView
         adjcol = col+cell.colspan
         classes = if col in @separatorColumns then ['separator'] else
                   if adjcol in @separatorColumns then ['incomparable'] else []
-        if cell.qCellId? && (refc = @refId(cell.qCellId))?
+        if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
         {
           renderer: if col == 0 then 'html' else 'text'
@@ -571,27 +600,38 @@ class ClientView
         return false
 
       contextMenu: {
-        # TODO: Implement commands.
         items: {
           # Future: Would be nice to move selection appropriately on column
           # insert/delete, but this is a less common case.
 
-          setObjectName: {
-            # For use only when the object-name cell is not already visible.
-            name: 'Set object name'
+          addObjectType: {
+            name: 'Add object type'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
-                !(col = getColumn(ci)).objectName? &&
+                !(col = getColumn(ci)).isObject)
+            callback: () =>
+              c = @getSingleSelectedCell()
+              ci = c.columnId
+              Meteor.call('changeColumnIsObject', $$, ci, true,
+                          standardServerCallback)
+          }
+          removeObjectType: {
+            name: 'Remove object type'
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !((ci = c?.columnId)? && ci != rootColumnId &&
+                (col = getColumn(ci)).isObject &&
                 !col.children.length)
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              objectName = prompt('Object name:')
-              if objectName
-                Meteor.call 'changeColumnObjectName', $$, ci, objectName,
-                            standardServerCallback
+              Meteor.call('changeColumnIsObject', $$, ci, false,
+                          standardServerCallback)
           }
+          # TODO: Reconsider what each of these commands should do depending on
+          # the selected cell in light of the addition of object UI-columns.
+
           # addSiblingLeft is redundant but nice for users.
           addSiblingLeft: {
             name: 'Insert left sibling column'
@@ -627,7 +667,8 @@ class ClientView
             name: 'Insert first child column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !(c?.columnId)?
+              !((ci = c?.columnId)? &&
+                (col = getColumn(ci)).isObject)
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId

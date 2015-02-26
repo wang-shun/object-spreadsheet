@@ -14,15 +14,12 @@ body { margin: 0; }
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
 }
 
-.incomparable.rsHeader {
-  border-right: none !important;
-}
-.incomparable:not(.rsHeader) {
+.handsontable div.htContainer td.incomparable:not(.rsHeader) {
   /*
   Work around https://bugzilla.mozilla.org/show_bug.cgi?id=332740 in Firefox.
   Unfortunately, this takes a one-pixel bite out of some of the other borders.
   */
-  border-right: 1px solid transparent !important;
+  border-right: 1px solid transparent;
 }
 
 .handsontable td.referent {
@@ -52,39 +49,48 @@ will always match, just to get higher priority.
   /*background-color: #EEE;*/
 }
 
-.handsontable td.rsHeaderNonfinal {
-  border-right: none;
-}
+/*
+Deviations in the header from the Handsontable standard of each cell having a
+right and a bottom border:
+
+- rsHeaderCorner has no bottom border.  Instead, all child leaves draw a top
+  border.  For child leaves which are under padding cells rather than the
+  corner, this is redundant with the padding cell's bottom border.
+*/
 
 .handsontable td.rsHeader.rsHeaderCorner {
-  border-left: 1px solid #CCC;
-  border-top: 1px solid #CCC;
   border-bottom: none;
 }
 
-.handsontable td.rsHeaderPadding {
+.handsontable td.rsHeaderFieldNameLeaf {
   border-top: 1px solid #CCC;
+}
+
+.handsontable td.rsHeaderFieldNameKey {
+  border-top: 1px dashed #CCC;
+}
+
+/* Connect through to the symbol in the type row. */
+
+.handsontable td.rsHeaderFieldNameObject {
   border-bottom: none;
 }
 
+/*
+- For a given object, all cells that span the object-name row except the last
+  ("nonfinal" cells) are either separator or rsHeaderNonfinal and have no right
+  border.  Instead, all the cells that can come after a separator (i.e., corner
+  and below) draw a left border.
+*/
+
+.handsontable td.rsHeaderNonfinal,
 .handsontable td.rsHeader.separator {
   border-right: none;
 }
 
-.handsontable td.rsHeader.rsFullHeightSeparator {
-  border-top: 1px solid #CCC;
-}
-
+.handsontable td.rsHeader.rsHeaderCorner,
 .handsontable td.rsHeaderBelow {
   border-left: 1px solid #CCC;
-}
-
-.handsontable td.rsHeaderNameAlone {
-  border-top: 1px solid #CCC;
-}
-
-.handsontable td.rsHeaderName {
-  border-top: 1px dashed #CCC;
 }
 
 .handsontable td.rsHeaderColor0:not(.area) {

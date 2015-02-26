@@ -8667,68 +8667,97 @@ Handsontable.PluginHooks = Handsontable.hooks; //in future move this line to leg
       tmp.container.className = instance.rootElement.className + ' htAutoColumnSize';
       tmp.table.className = instance.table.className;
 
+      /*
+       * Current simple behavior for merged cells (differs from browser
+       * behavior): each merged cell constrains the width of the last column
+       * that it spans.
+       * XXX: The widths of the <col> elements appear to include borders, which
+       * means they are simply additive, but I couldn't find documentation
+       * confirming that this is the expected behavior.
+       * ~ Matt 2015-02-25
+       */
+
       var rows = instance.countRows();
       var samples = {};
       var maxLen = 0;
       for (var r = 0; r < rows; r++) {
-        // ~ Matt 2015-02-10
+        var spanFromCol = col;
         var mergeInfo = instance.mergeCells.mergedCellInfoCollection.getInfo(r, col);
-        if (mergeInfo && mergeInfo.colspan > 1) {
-          continue;
+        if (mergeInfo) {
+          if (mergeInfo.col + mergeInfo.colspan - 1 != col)
+            continue;
+          spanFromCol = mergeInfo.col;
         }
-        ////////
-        var value = Handsontable.helper.stringify(instance.getDataAtCell(r, col));
+        var value = Handsontable.helper.stringify(instance.getDataAtCell(r, spanFromCol));
         var len = value.length;
         if (len > maxLen) {
           maxLen = len;
         }
-        if (!samples[len]) {
-          samples[len] = {
+        if (!samples[spanFromCol]) {
+          samples[spanFromCol] = {};
+        }
+        if (!samples[spanFromCol][len]) {
+          samples[spanFromCol][len] = {
             needed: sampleCount,
             strings: []
           };
         }
-        if (samples[len].needed) {
-          samples[len].strings.push({value: value, row: r});
-          samples[len].needed--;
+        if (samples[spanFromCol][len].needed) {
+          samples[spanFromCol][len].strings.push({value: value, row: r});
+          samples[spanFromCol][len].needed--;
         }
       }
 
-      var settings = instance.getSettings();
-      if (settings.colHeaders) {
-        instance.view.appendColHeader(col, tmp.theadTh); //TH innerHTML
-      }
+      var neededWidth = 0;
 
-      Handsontable.Dom.empty(tmp.tbody);
-
-      for (var i in samples) {
-        if (samples.hasOwnProperty(i)) {
-          for (var j = 0, jlen = samples[i].strings.length; j < jlen; j++) {
-            var row = samples[i].strings[j].row;
-
-            var cellProperties = instance.getCellMeta(row, col);
-            cellProperties.col = col;
-            cellProperties.row = row;
-
-            var renderer = instance.getCellRenderer(cellProperties);
-
-            var tr = document.createElement('tr');
-            var td = document.createElement('td');
-
-            renderer(instance, td, row, col, instance.colToProp(col), samples[i].strings[j].value, cellProperties);
-            r++;
-            tr.appendChild(td);
-            tmp.tbody.appendChild(tr);
+      for (var spanFromColStr in samples) {
+        if (samples.hasOwnProperty(spanFromColStr)) {
+          var spanFromCol = Number.parseInt(spanFromColStr);
+          var sameSpanSamples = samples[spanFromCol];
+          var settings = instance.getSettings();
+          if (settings.colHeaders) {
+            instance.view.appendColHeader(col, tmp.theadTh); //TH innerHTML
           }
+
+          Handsontable.Dom.empty(tmp.tbody);
+
+          for (var i in sameSpanSamples) {
+            if (sameSpanSamples.hasOwnProperty(i)) {
+              for (var j = 0, jlen = sameSpanSamples[i].strings.length; j < jlen; j++) {
+                var row = sameSpanSamples[i].strings[j].row;
+
+                var cellProperties = instance.getCellMeta(row, spanFromCol);
+                cellProperties.col = spanFromCol;
+                cellProperties.row = row;
+
+                var renderer = instance.getCellRenderer(cellProperties);
+
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+
+                renderer(instance, td, row, spanFromCol, instance.colToProp(spanFromCol), sameSpanSamples[i].strings[j].value, cellProperties);
+                r++;
+                tr.appendChild(td);
+                tmp.tbody.appendChild(tr);
+              }
+            }
+          }
+
+          var parent = instance.rootElement.parentNode;
+          parent.appendChild(tmp.container);
+          var width = Handsontable.Dom.outerWidth(tmp.table);
+          parent.removeChild(tmp.container);
+
+          for (var prevCol = spanFromCol; prevCol < col; prevCol++) {
+            // Relies on determineColumnsWidth saving each width before it
+            // computes the next.
+            width -= instance.getColWidth(prevCol);
+          }
+          neededWidth = Math.max(neededWidth, width);
         }
       }
 
-      var parent = instance.rootElement.parentNode;
-      parent.appendChild(tmp.container);
-      var width = Handsontable.Dom.outerWidth(tmp.table);
-      parent.removeChild(tmp.container);
-
-      return width;
+      return neededWidth;
     };
 
     this.determineColumnsWidth = function () {

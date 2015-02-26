@@ -32,11 +32,12 @@ SemanticError = Meteor.makeErrorType('SemanticError',
 #@_id
 #@parent: column ID
 #@children: array of column IDs, now in the user's desired order
-#@childByName: EJSONKeyedMap<name, column ID>
 #@fieldName: string or null
 #@specifiedType: type specified by user (required for state columns)
 #@type: checked type (always set during evaluation)
 #@typecheckError: string or null, formula type checking error message
+#@isObject: boolean
+#  (We could alternatively encode this by making @children nullable.)
 #@objectName: string or null
 #@formula: some JSON data structure, or null for a state column
 
