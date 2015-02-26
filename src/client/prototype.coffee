@@ -544,8 +544,8 @@ class ClientView
           # Only column header "top" and "below" cells can be edited,
           # for the purpose of changing the objectName and fieldName respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
-                      cell.qCellId? && StateEdit.canEdit(cell.qCellId.columnId) ||
-                      cell.qFamilyId? && StateEdit.canEdit(cell.qFamilyId.columnId))
+                      cell.qCellId? && !cell.isObject && StateEdit.canEdit(cell.qCellId.columnId) ||
+                      cell.qFamilyId? && !cell.isObject && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -586,12 +586,12 @@ class ClientView
             if parsed
               Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
                           standardServerCallback
-          if cell.qCellId?
+          if cell.qCellId? && !cell.isObject
             if newVal
               StateEdit.modifyCell cell.qCellId, newVal
             else
               StateEdit.removeCell cell.qCellId
-          else if cell.qFamilyId?
+          else if cell.qFamilyId? && !cell.isObject
             if newVal
               StateEdit.addCell cell.qFamilyId, newVal
         # Don't apply the changes directly; let them come though the Meteor
@@ -739,6 +739,8 @@ class ClientView
           deleteStateCell: {
             name: 'Delete cell'
             disabled: () =>
+              # XXX: For keyed objects, one could argue it's more consistent to
+              # allow this only on the key.
               c = @getSingleSelectedCell()
               !(c? && c.qCellId? &&
                 columnIsState(getColumn(c.qCellId.columnId)))
@@ -805,11 +807,15 @@ class ClientView
         [{
           _id: EJSON.stringify(qf)
           qFamilyId: qf
-          canAddValue: col.type not in ['_token', '_unit']
+          canAddValue: col.type not in ['_token', '_unit'] && !selectedCell.isObject
+          # A token column has only the object UI-column, though we don't set
+          # isObject on family padding cells.  So don't check it.
           canAddToken: col.type == '_token'
           # Adding a duplicate value has no effect, but disallow it as a
-          # hint to the user.
-          canAddUnit: (col.type == '_unit' &&
+          # hint to the user.  !selectedCell.isObject is in principle a
+          # requirement, though it ends up being redundant because the only way
+          # to select an object cell is to already have a unit value present.
+          canAddUnit: (col.type == '_unit' && !selectedCell.isObject &&
                        !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
         }]
       else
@@ -858,7 +864,8 @@ rebuildView = (viewId) ->
   # Try to select a cell similar to the one previously selected.
   if selectedCell?
     ((selectedCell.qCellId? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId))) ||
+      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId) &&
+                                     selectedCell.isObject == c.isObject)) ||
      (selectedCell.qFamilyId? &&
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
      (selectedCell.qFamilyId? &&
