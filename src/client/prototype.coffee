@@ -168,7 +168,7 @@ class ViewSection
   # Only applicable if @col.isObject.
   objectSymbol: ->
     if @col._id == rootColumnId then ''
-    else if @col.type == '_token' then '•' else '»'
+    else if @col.type == '_token' then '•' else '◦'
 
   renderHlist: (hlist, height) ->
     grid = ([] for i in [0...height])
@@ -180,19 +180,21 @@ class ViewSection
         null
       else
         {columnId: @columnId, cellId: cellIdParent(hlist.cellId)}
-    if @col.type != '_token'
-      # Value
-      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses)
-      gridValue[0][0].qCellId = qCellId
-      gridValue[0][0].qFamilyId = qFamilyId
-      gridHorizExtend(grid, gridValue)
     if @col.isObject
       # Object
       gridObject = gridMergedCell(height, 1, @objectSymbol(), ['centered'])
       gridObject[0][0].qCellId = qCellId
       gridObject[0][0].qFamilyId = qFamilyId
       gridObject[0][0].isObject = true
+      if @col.type != '_token'
+        gridObject[0][0].cssClasses.push('rsKeyedObject')
       gridHorizExtend(grid, gridObject)
+    if @col.type != '_token'
+      # Value
+      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses)
+      gridValue[0][0].qCellId = qCellId
+      gridValue[0][0].qFamilyId = qFamilyId
+      gridHorizExtend(grid, gridValue)
     # Subsections
     for subsection, i in @subsections
       if @haveSeparatorColBefore[i]
@@ -207,6 +209,18 @@ class ViewSection
     # Part that is always the same.
     myColorClass = "rsHeaderColor" + if @headerMinHeight == 2 then depth-1 else depth
     grid = [[], []]  # c.f. renderHlist
+    if @col.isObject
+      fieldNameCell = new ViewCell('', 1, 1, ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
+      fieldNameCell.columnId = @columnId
+      fieldNameCell.isObject = true
+      typeCell = new ViewCell(@objectSymbol(), 1, 1, ['rsHeaderBelow', 'rsHeaderTypeObject', 'centered', myColorClass])
+      # For a token column, make the ID available via the object UI-column.  For
+      # all other columns, this information is available on the value UI-column.
+      if @col.type == '_token'
+        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
+      typeCell.columnId = @columnId
+      typeCell.isObject = true
+      gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
     if @col.type != '_token'
       fieldNameCell = new ViewCell(
         @col.fieldName ? '', 1, 1,
@@ -223,7 +237,7 @@ class ViewSection
         (if @col.formula? then '=' else '') +
         (if @col.specifiedType? then typeName else "(#{typeName})") +
         (if @col.typecheckError? then '!' else ''),
-        1, 1, ['rsHeaderBelow', myColorClass].concat(@markDisplayClasses()))
+        1, 1, ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderTypeLeaf' else 'rsHeaderTypeKey'), myColorClass].concat(@markDisplayClasses()))
       typeCell.fullText = (
         'Column ID ' + @columnId + ': ' +
         'type ' + (@col.type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
@@ -231,18 +245,6 @@ class ViewSection
         (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
       typeCell.columnId = @columnId
       typeCell.kind = 'type'
-      gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
-    if @col.isObject
-      fieldNameCell = new ViewCell('', 1, 1, ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
-      fieldNameCell.columnId = @columnId
-      fieldNameCell.isObject = true
-      typeCell = new ViewCell(@objectSymbol(), 1, 1, ['rsHeaderBelow', 'centered', myColorClass])
-      # For a token column, make the ID available via the object UI-column.  For
-      # all other columns, this information is available on the value UI-column.
-      if @col.type == '_token'
-        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
-      typeCell.columnId = @columnId
-      typeCell.isObject = true
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
 
     if @headerMinHeight == 2

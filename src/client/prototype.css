@@ -45,10 +45,6 @@ will always match, just to get higher priority.
   border-collapse: collapse;
 }
 
-.handsontable td.rsHeader {
-  /*background-color: #EEE;*/
-}
-
 /*
 Deviations in the header from the Handsontable standard of each cell having a
 right and a bottom border:
@@ -67,7 +63,8 @@ right and a bottom border:
 }
 
 .handsontable td.rsHeaderFieldNameKey {
-  border-top: 1px dashed #CCC;
+  /*border-top: 1px dashed #CCC;*/
+  border-top: 1px solid #CCC;
 }
 
 /* Connect through to the symbol in the type row. */
@@ -79,8 +76,9 @@ right and a bottom border:
 /*
 - For a given object, all cells that span the object-name row except the last
   ("nonfinal" cells) are either separator or rsHeaderNonfinal and have no right
-  border.  Instead, all the cells that can come after a separator (i.e., corner
-  and below) draw a left border.
+  border.  For convenience, separators that don't span the object-name row also
+  have no right border.  Instead, all the cells that can come after a separator
+  (i.e., corner, leaf, and object) draw a left border.
 */
 
 .handsontable td.rsHeaderNonfinal,
@@ -89,8 +87,24 @@ right and a bottom border:
 }
 
 .handsontable td.rsHeader.rsHeaderCorner,
-.handsontable td.rsHeaderBelow {
+.handsontable td.rsHeaderFieldNameLeaf,
+.handsontable td.rsHeaderFieldNameObject,
+.handsontable td.rsHeaderTypeLeaf,
+.handsontable td.rsHeaderTypeObject {
   border-left: 1px solid #CCC;
+}
+
+/* Dotted border between object and key columns in header.  Control from the object side. */
+
+.handsontable td.rsHeaderFieldNameObject,
+.handsontable td.rsHeaderTypeObject {
+  border-right: 1px dashed #CCC;
+}
+
+/* Dotted border between object and key cells in body. */
+
+.handsontable td.rsKeyedObject {
+  border-right: 1px dashed #CCC;
 }
 
 .handsontable td.rsHeaderColor0:not(.area) {
