@@ -107,22 +107,28 @@ right and a bottom border:
   border-right: 1px dashed #CCC;
 }
 
-.handsontable td.rsHeaderColor0:not(.area) {
+.handsontable td.rsHeaderColor0:not(.area),
+.rsColor0 {
   background-color: #FAA;
 }
-.handsontable td.rsHeaderColor1:not(.area) {
+.handsontable td.rsHeaderColor1:not(.area),
+.rsColor1 {
   background-color: #FFA;
 }
-.handsontable td.rsHeaderColor2:not(.area) {
+.handsontable td.rsHeaderColor2:not(.area),
+.rsColor2 {
   background-color: #AFA;
 }
-.handsontable td.rsHeaderColor3:not(.area) {
+.handsontable td.rsHeaderColor3:not(.area),
+.rsColor3 {
   background-color: #AFF;
 }
-.handsontable td.rsHeaderColor4:not(.area) {
+.handsontable td.rsHeaderColor4:not(.area),
+.rsColor4 {
   background-color: #AAF;
 }
-.handsontable td.rsHeaderColor5:not(.area) {
+.handsontable td.rsHeaderColor5:not(.area),
+.rsColor5 {
   background-color: #FAF;
 }
 

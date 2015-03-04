@@ -207,13 +207,17 @@ class ViewSection
   # based on depth.
   renderHeader: (expanded, depth) ->
     # Part that is always the same.
-    myColorClass = "rsHeaderColor" + if @headerMinHeight == 2 then depth-1 else depth
+    myColorClass = 'rsHeaderColor' + colorIndexForDepth(if @headerMinHeight == 2 then depth-1 else depth)
     grid = [[], []]  # c.f. renderHlist
     if @col.isObject
-      fieldNameCell = new ViewCell('', 1, 1, ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
+      fieldNameCell = new ViewCell(
+        '', 1, 1,
+        ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.isObject = true
-      typeCell = new ViewCell(@objectSymbol(), 1, 1, ['rsHeaderBelow', 'rsHeaderTypeObject', 'centered', myColorClass])
+      typeCell = new ViewCell(
+        @objectSymbol(), 1, 1,
+        ['rsHeaderBelow', 'rsHeaderTypeObject', 'centered', myColorClass])
       # For a token column, make the ID available via the object UI-column.  For
       # all other columns, this information is available on the value UI-column.
       if @col.type == '_token'
@@ -223,8 +227,10 @@ class ViewSection
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
     if @col.type != '_token'
       fieldNameCell = new ViewCell(
-        @col.fieldName ? '', 1, 1,
-        ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderFieldNameLeaf' else 'rsHeaderFieldNameKey'), myColorClass])
+        @col.fieldName ? '', 1, 1, [
+          'rsHeaderBelow',
+          (if @headerMinHeight == 2 then 'rsHeaderFieldNameLeaf' else 'rsHeaderFieldNameKey'),
+          myColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
       typeName =
@@ -237,7 +243,10 @@ class ViewSection
         (if @col.formula? then '=' else '') +
         (if @col.specifiedType? then typeName else "(#{typeName})") +
         (if @col.typecheckError? then '!' else ''),
-        1, 1, ['rsHeaderBelow', (if @headerMinHeight == 2 then 'rsHeaderTypeLeaf' else 'rsHeaderTypeKey'), myColorClass].concat(@markDisplayClasses()))
+        1, 1, [
+          'rsHeaderBelow',
+          (if @headerMinHeight == 2 then 'rsHeaderTypeLeaf' else 'rsHeaderTypeKey'),
+          myColorClass].concat(@markDisplayClasses()))
       typeCell.fullText = (
         'Column ID ' + @columnId + ': ' +
         'type ' + (@col.type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
@@ -396,6 +405,16 @@ Template.changeFormula.helpers
       'formulaModified'
     else
       ''
+  contextText: ->
+    col = getColumn(@columnId)
+    if col.isObject
+      objectNameWithFallback(getColumn(col.parent)) ? '<unnamed>'
+    else null
+  contextColorIndex: ->
+    col = getColumn(@columnId)
+    if col.isObject
+      colorIndexForDepth(columnDepth(col.parent))
+    else null
 
 Template.changeFormula.events({
   'input .formula': (event, template) ->
@@ -500,7 +519,8 @@ class ClientView
       # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
       cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
                 "#{if headerExpanded.get() then '-' else '+'}</button> ON")
-      gridVertExtend(gridCaption, gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
+      gridVertExtend(gridCaption,
+                     gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
     gridCaption.push(
       [new ViewCell('FN', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
@@ -824,9 +844,6 @@ class ClientView
         []
     )
     changeFormulaArgs.set(
-      # This intentionally shows only for the 'below' cell, because the 'below'
-      # cell represents the values (which is what a formula generates) while the
-      # 'top' cell represents the cells.
       if selectedCell? && selectedCell.kind == 'below' &&
          (ci = selectedCell.columnId) != rootColumnId
         [{_id: ci, columnId: ci}]

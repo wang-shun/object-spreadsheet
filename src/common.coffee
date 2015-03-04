@@ -43,6 +43,13 @@ SemanticError = Meteor.makeErrorType('SemanticError',
 
 @columnIsState = (col) -> col._id != rootColumnId && !col.formula?
 
+@objectNameWithFallback = (col) ->
+  col.objectName ? (if col.fieldName? then "[#{col.fieldName}]" else null)
+
+@columnDepth = (columnId) ->
+  if columnId == rootColumnId then 0
+  else 1 + columnDepth(getColumn(columnId).parent)
+
 # Requires that an appropriate global getColumn function be defined.
 @parseTypeStr = (s) ->
   if typeIsPrimitive(s)

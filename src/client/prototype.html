@@ -63,7 +63,7 @@
     <!-- hack to extend formula bar to fill the window and leave room -->
     <!-- for the buttons -->
     <table style="width: 100%"><tr><td>
-      <label for="changeFormula-formula">Formula (see src/formulas.coffee):</label>
+      <label for="changeFormula-formula">Formula ({{#if contextText}}in context of <span class="rsColor{{contextColorIndex}}">{{contextText}}</span>; {{/if}}see src/formulas.coffee):</label>
       <br/>
       <input id="changeFormula-formula" type="text" name="formula"
              style="width: 100%" class="formula {{formulaClass}}"/>
