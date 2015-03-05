@@ -147,19 +147,19 @@
       {
       name: V('Matt McCutchen')
       Student: U({
-        parent: V(I(5))
+        '[parent]': V(I(5))
       })
       }
       {
       name: V('Michael McCutchen')
       Student: U({
-        parent: V(I(5))
+        '[parent]': V(I(5))
       })
       }
       {
       name: V('Shachar Itzhaky')
       Student: U({
-        parent: V(I(6))
+        '[parent]': V(I(6))
       })
       }
       {
@@ -176,7 +176,7 @@
       Section: T([
         {
         teacher: V(I(0, 'X'))
-        student: V(I(2, 'X'), I(3, 'X'))
+        Enrollment: V(I(2, 'X'), I(3, 'X'))
         }
       ])
       }
@@ -186,7 +186,7 @@
       Section: T([
         {
         teacher: V(I(0, 'X'))
-        student: V(I(2, 'X'), I(4, 'X'))
+        Enrollment: V(I(2, 'X'), I(4, 'X'))
         }
       ])
       }
@@ -196,7 +196,7 @@
       Section: T([
         {
         teacher: V(I(1, 'X'))
-        student: V(I(2, 'X'))
+        Enrollment: V(I(2, 'X'))
         }
       ])
       }
@@ -225,7 +225,7 @@
     ])
   }
 
-  # Add a super dict representing _unit, though it doesn't get an ID or anything.
+  # Add a super dict representing _root, though it doesn't get an ID or anything.
   superSchema = {children: sampleSchema}
 
   # Delete all existing columns!!
@@ -254,7 +254,9 @@
   # Insert cells into columns.
   insertCells = (columnId, cellId, cellData) ->
     for childColumnName, childCells of cellData ? {}
-      childColumnId = childByName(model.getColumn(columnId), childColumnName)
+      # The sample data set uses the internal model with key and leaf columns
+      # treated the same, so we don't care about the isValues part of the result.
+      childColumnId = columnLogicalChildrenByName(columnId, childColumnName)[0][0]
       childColumn = new ColumnBinRel(childColumnId)
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
@@ -267,30 +269,30 @@
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()
-    parentId = parseColumnRef(parentRef)
+    parentId = parseObjectTypeRef(parentRef)
 
     model.defineColumn(parentId,
                        order, fieldName, specifiedType, isObject, objectName,
                        parseFormula(parentId, formulaStr), attrs)
-  defineParsedFormulaColumn("Person:Student:parent",
+  defineParsedFormulaColumn("Person:Student:[parent]",
                             0, "parentName", null, false, null,
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
                             1, "scheduledMeeting", null, true, null,
                             '{all m in ::Meeting | m.slot = Slot}')
 
-  defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting",
+  defineParsedFormulaColumn("Person:Teacher:Slot:[scheduledMeeting]",
                             0, "discussed", null, true, null,
                             'scheduledMeeting.enrollment.student')
-  defineParsedFormulaColumn("Person:Teacher:Slot:scheduledMeeting:discussed",
+  defineParsedFormulaColumn("Person:Teacher:Slot:[scheduledMeeting]:[discussed]",
                             0, "studentName", null, false, null,
                             'discussed.Person.name')
 
   defineParsedFormulaColumn("Person",
                             1, "children", null, true, null,
-                            '{all c in ::Person | Person in c.Student.parent}',
+                            '{all c in ::Person | Person in c.Student.[parent].parent}',
                             {view: '1'})
-  defineParsedFormulaColumn("Person:children",
+  defineParsedFormulaColumn("Person:[children]",
                             0, "childName", null, false, null,
                             'children.name',
                             {view: '1'})
@@ -302,9 +304,9 @@
 
   view1 =
     _id: '1'
-    layout: T('_root', [T('Person', [T('Person:name'),
-              T('Person:children', [T("Person:children:childName")])])])
-            .map parseColumnRef
+    layout: T('', [T('Person', [T('Person:name'),
+              T('Person:[children]', [T("Person:[children]:childName")])])])
+            .map((s) -> if s then parseColumnRef(s)[0] else rootColumnId)
 
   Views.upsert(view1._id, view1)
 

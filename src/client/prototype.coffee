@@ -389,7 +389,7 @@ changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 # We mainly care that this doesn't crash.
 origFormulaStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.formula
-  if formula? then stringifyFormula(formula) else ''
+  if formula? then stringifyFormula(getColumn(columnId).parent, formula) else ''
 newFormulaStr = new ReactiveVar(null)
 Template.changeFormula.rendered = () ->
   orig = origFormulaStrForColumnId(Template.currentData().columnId)
@@ -430,7 +430,7 @@ Template.changeFormula.events({
       return false
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
-    formulaStr = stringifyFormula(formula)
+    formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
     template.find('input[name=formula]').value = formulaStr
     newFormulaStr.set(formulaStr)
     Meteor.call('changeColumnFormula', $$,
@@ -462,7 +462,8 @@ insertBlankColumn = (parentId, index, view) ->
               parentId,
               index,
               null,  # fieldName
-              null,  # type
+              null,  # specifiedType
+              false, # isObject
               null,  # objectName
               formula,  # formula
               view?.id,

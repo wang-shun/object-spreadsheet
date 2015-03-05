@@ -22,6 +22,8 @@ Careful: earlier entries take priority, so longer operators should go earlier.
 */
 "(" return '('
 ")" return ')'
+"[" return '['
+"]" return ']'
 "{" return '{'
 "}" return '}'
 "," return ','
@@ -90,11 +92,11 @@ expression
         { $$ = ['union', $2]; }
     | atomicLiteral
         { $$ = $1; }
-    | IDENT  /* could be bound variable or implicit this */
+    | navigationStep  /* could be bound variable or implicit this */
         { $$ = yy.navigate(null, $1); }
-    | ROOT IDENT
+    | ROOT navigationStep
         { $$ = yy.navigate(['lit', '_root', [[]]], $2); }
-    | expression '.' IDENT
+    | expression '.' navigationStep
         { $$ = yy.navigate($1, $3); }
     | '-' expression %prec NEG
         { $$ = ['neg', $2]; }
@@ -127,6 +129,14 @@ expression
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
     | 'IF' '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
+    ;
+
+navigationStep
+    : IDENT
+        { $$ = $1; }
+    | '[' IDENT ']'
+        /* This is easy enough to recognize; no need for a data structure. */
+        { $$ = '[' + $2 + ']'; }
     ;
 
 /* Could use a mid-rule action if supported.

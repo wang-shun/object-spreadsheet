@@ -63,8 +63,8 @@ EagerSubformula = {
     typecheckFormula(model, vars, arg)
   evaluate: (model, vars, arg) ->
     evaluateFormula(model, vars, arg)
-  stringify: (arg) ->
-    stringifySubformula(arg)
+  stringify: (model, vars, arg) ->
+    stringifySubformula(model, vars, arg)
 }
 EagerSubformulaCells = {
   validate: EagerSubformula.validate
@@ -92,8 +92,8 @@ HomogeneousEagerSubformulaList = {
     typeSoFar
   evaluate: (model, vars, termFmlas) ->
     (evaluateFormula(model, vars, fmla) for fmla in termFmlas)
-  stringify: (termFmlas) ->
-    (stringifySubformula(fmla) for fmla in termFmlas)
+  stringify: (model, vars, termFmlas) ->
+    (stringifySubformula(model, vars, fmla) for fmla in termFmlas)
 }
 LazySubformula = {
   validate: EagerSubformula.validate
@@ -127,8 +127,11 @@ Lambda = {
       newVars = vars.shallowClone()
       newVars.set(varName, arg)
       evaluateFormula(model, newVars, body)
-  stringify: ([varName, body]) ->
-    [varName, stringifySubformula(body)]
+  stringify: (model, vars, [varName, body]) ->
+    (argType) ->
+      newVars = vars.shallowClone()
+      newVars.set(varName, argType)
+      [varName, stringifySubformula(model, newVars, body)]
 }
 ColumnId = {
   validate: (vars, arg) ->
@@ -156,13 +159,18 @@ getValues = (model, vars, cells) ->
 typecheckUp = (model, vars, startCellsType, targetColId, wantValues) ->
   [upPath, downPath] = findCommonAncestorPaths(startCellsType, targetColId)
   valAssert(downPath.length == 1,
-             'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not up')
+            'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not up')
+  # Enforce the same rule as parsing.  Otherwise, if the startCellsType changes
+  # as a result of a change to another formula, users will be surprised when a
+  # formula that we didn't allow them to enter evaluates successfully.
+  valAssert(!wantValues || upPath.length == 1,
+            'Direct navigation up to a key of a parent object is not allowed.')
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 typecheckDown = (model, vars, startCellsType, targetColId, wantValues) ->
   targetCol = model.getColumn(targetColId)
   valAssert(targetCol.parent == startCellsType,
-             'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not down')
+            'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not down')
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
@@ -191,16 +199,53 @@ goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
 
   if wantValues then getValues(model, vars, targetCellsTset) else targetCellsTset
 
-stringifyNavigation = (startCellsSinfo, targetColumnId, wantValues) ->
-  # XXX: What if the name is ambiguous in this context?
-  # To detect, we would need to know the type; too much work.
-  column = getColumn(targetColumnId) ? {fieldName: '<deleted>', objectName: '<deleted>'}
+annotateNavigationTarget = (model, vars, startCellsFmla, targetName, expectedFmla) ->
+  if !targetName?
+    '(unnamed)'
+  else
+    # Future: Distinguish between "the original interpretation is no longer
+    # valid" (in which case the formula should fail to typecheck) and "there are
+    # multiple possible interpretations including the original" (in which case
+    # the formula should still work).
+    try
+      valAssert(EJSON.equals(resolveNavigation(model, vars, startCellsFmla, targetName), expectedFmla),
+                'Interpreting the concrete formula did not reproduce the existing abstract formula.')
+      targetName
+    catch e
+      targetName + '(problem)'
+
+stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, wantValues) ->
+  column = getColumn(targetColumnId)
+  targetName =
+    if !column? then '(deleted)'
+    else
+      # Reconstruct the current subformula.  XXX: Get it a better way?
+      wantFormula = [direction, startCellsSinfo.formula, targetColumnId, wantValues]
+      if !wantValues
+        annotateNavigationTarget(model, vars, startCellsSinfo.formula,
+                                 objectNameWithFallback(column), wantFormula)
+      else if direction == 'down' && column.isObject
+        # Special case: when an object type Bar is added to a leaf column foo, we
+        # want down navigations "(...).foo" to start displaying as "(...).Bar.foo"
+        # without having to rewrite the abstract syntax of affected formulas.
+        # Even if the first navigation in the concrete syntax is ambiguous, we
+        # know what we meant and should annotate the second navigation
+        # accordingly.
+        intermediateFormula = ['down', startCellsSinfo.formula, targetColumnId, false]
+        (
+          annotateNavigationTarget(model, vars, startCellsSinfo.formula,
+                                   objectNameWithFallback(column), intermediateFormula) + '.' +
+          annotateNavigationTarget(model, vars, intermediateFormula,
+                                   column.fieldName, wantFormula)
+        )
+      else
+        annotateNavigationTarget(model, vars, startCellsSinfo.formula,
+                                 column.fieldName, wantFormula)
   {
     str:
       (if startCellsSinfo.strFor(6) == '::' then '::'
       else if startCellsSinfo.strFor(6) == 'this' then ''
-      else startCellsSinfo.strFor(6) + '.') +
-      (if wantValues then column.fieldName else column.objectName)
+      else startCellsSinfo.strFor(6) + '.') + targetName
     outerPrecedence: 6
   }
 
@@ -208,11 +253,12 @@ ASSOCIATIVITY_LEFT = 'left'
 ASSOCIATIVITY_RIGHT = 'right'
 ASSOCIATIVITY_NONE = null
 
-binaryOperationStringify = (symbol, precedence, associativity) -> (lhsSinfo, rhsSinfo) ->
-  str: (lhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_LEFT)) +
-        ' ' + symbol + ' ' +
-        rhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_RIGHT)))
-  outerPrecedence: precedence
+binaryOperationStringify = (symbol, precedence, associativity) ->
+  (model, vars, lhsSinfo, rhsSinfo) ->
+    str: (lhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_LEFT)) +
+          ' ' + symbol + ' ' +
+          rhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_RIGHT)))
+    outerPrecedence: precedence
 
 numberInfixOperator = (symbol, precedence, associativity, resultType, evaluateFn) ->
   argAdapters: [EagerSubformula, EagerSubformula]
@@ -253,7 +299,7 @@ dispatch = {
     evaluate: (model, vars, type, list) ->
       # XXXXXXX: Validate members of the type.
       new TypedSet(type, new EJSONKeyedSet(list))
-    stringify: (type, list) ->
+    stringify: (model, vars, type, list) ->
       str:
         # Obviously, if someone manually creates a literal that requires a
         # leading minus or set notation, those constructs will be re-parsed as
@@ -287,8 +333,15 @@ dispatch = {
       vars.get(varName)
     evaluate: (model, vars, varName) ->
       vars.get(varName)
-    stringify: (varName) ->
-      str: varName
+    stringify: (model, vars, varName) ->
+      str:
+        if varName == 'this'
+          # A 'this' reference can only occur implicitly in concrete syntax, as
+          # the left operand of a navigation.  The following is just a sentinel
+          # for stringifyNavigation.
+          'this'
+        else
+          annotateNavigationTarget(model, vars, null, varName, ['var', varName])
       outerPrecedence: 6
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
@@ -299,7 +352,7 @@ dispatch = {
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
     typecheck: typecheckUp
     evaluate: goUp
-    stringify: stringifyNavigation
+    stringify: _.partial(stringifyNavigation, 'up')
 
   # ["down", startCells, targetColumnId, wantValues (bool)]
   # Currently allows only one step, matching the concrete syntax.  This makes
@@ -315,7 +368,7 @@ dispatch = {
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
     typecheck: typecheckDown
     evaluate: goDown
-    stringify: stringifyNavigation
+    stringify: _.partial(stringifyNavigation, 'down')
 
   # ["if", condition, thenFmla, elseFmla]
   # Concrete syntax: if(condition, thenFmla, elseFmla)
@@ -330,7 +383,7 @@ dispatch = {
     evaluate: (model, vars, conditionTset, thenFmla, elseFmla) ->
       evaluateFormula(model, vars,
                       if evalAsSingleton(conditionTset.set) then thenFmla else elseFmla)
-    stringify: (conditionSinfo, thenSinfo, elseSinfo) ->
+    stringify: (model, vars, conditionSinfo, thenSinfo, elseSinfo) ->
       str: "if(#{conditionSinfo.strFor(1)}, #{thenSinfo.strFor(1)}, #{elseSinfo.strFor(1)})"
       outerPrecedence: 6
 
@@ -358,10 +411,21 @@ dispatch = {
             tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
             evalAsSingleton(predicateLambda(tset).set)
           )))
-    stringify: (domainSinfo, predicateSinfo) ->
-      str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(2)} " +
-           "| #{predicateSinfo[1].strFor(1)}}"
-      outerPrecedence: 6
+    stringify: (model, vars, domainSinfo, predicateLambda) ->
+      # XXX Wasteful
+      predicateSinfo = predicateLambda(
+        try
+          typecheckFormula(model, vars, domainSinfo.formula)
+        catch e
+          # If we try to stringify a formula that doesn't typecheck, we want to
+          # get something half-useful rather than crash.  Any dependent
+          # navigations will most likely be marked "problem".
+          TYPE_ANY)
+      {
+        str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(2)} " +
+             "| #{predicateSinfo[1].strFor(1)}}"
+        outerPrecedence: 6
+      }
 
   # Predicates on two sets of the same type.
   '=': sameTypeSetsInfixPredicate('=', 1, ASSOCIATIVITY_NONE, EJSON.equals)
@@ -376,7 +440,7 @@ dispatch = {
       '_number'
     evaluate: (model, vars, arg) ->
       new TypedSet('_number', set([-evalAsSingleton(arg.set)]))
-    stringify: (lhsSinfo, rhsSinfo) ->
+    stringify: (model, vars, lhsSinfo, rhsSinfo) ->
       str: "-#{lhsSinfo.strFor(4)}"
       outerPrecedence: 4
 
@@ -400,7 +464,7 @@ dispatch = {
       for term in terms
         res.addAll(term)
       res
-    stringify: (termSinfos) ->
+    stringify: (model, vars, termSinfos) ->
       str: '{' + (termSinfo.strFor(1) for termSinfo in termSinfos).join(', ') + '}'
       outerPrecedence: 0
 
@@ -482,28 +546,39 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   # XXX: This is a lot of duplicate work reprocessing subtrees.
   startCellsType = validateAndTypecheckFormula(model, vars, startCellsFmla)
   valAssert(!typeIsPrimitive(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
-  columnsInScope = new EJSONKeyedMap()  # column id -> up/down
 
+  # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or
   # object name.
-  [upPath, downPath] = findCommonAncestorPaths(startCellsType, rootColumnId)
+  [upPath, dummyDownPath] = findCommonAncestorPaths(startCellsType, rootColumnId)
   for upColumnId in upPath
-    columnsInScope.set(upColumnId, 'up')
-  for downColumnId in model.getColumn(startCellsType).children
-    columnsInScope.set(downColumnId, 'down')
+    if objectNameWithFallback(getColumn(upColumnId)) == targetName
+      interpretations.push(['up', startCellsFmla, upColumnId, false])
 
-  for [columnId, direction] in columnsInScope.entries()
-    col = model.getColumn(columnId)
-    if col.fieldName == targetName
-      interpretations.push([direction, startCellsFmla, columnId, true])
-    if col.objectName == targetName
-      interpretations.push([direction, startCellsFmla, columnId, false])
+  # Check logical children.
+  for [columnId, isValues, direction] in columnLogicalChildrenByName(startCellsType, targetName)
+    interpretations.push([direction, startCellsFmla, columnId, isValues])
 
   # Future: Enforce uniqueness of interpretations in any scope?
   valAssert(interpretations.length == 1,
             "#{interpretations.length} possible interpretations for " +
             "<type #{startCellsType}>.#{targetName}, wanted one.")
+  formula = interpretations[0]
+
+  # If Bar is an object type with key foo, "(...).Bar.foo" parses as
+  # ['up', ['down', ..., fooID, false], fooID, true].  Convert to
+  # ['down', ..., fooID, true] so it displays as "(...).foo" if the object type
+  # is removed.  (Converse of the case in stringifyNavigation.)
+  if formula[0] == 'up' && formula[3] && formula[1][0] == 'down' && formula[2] == formula[1][2]
+    formula = ['down', formula[1][1], formula[2], true]
+
   return interpretations[0]
+
+liteModel = {
+  # Eta-expand to avoid load-order dependency.
+  getColumn: (columnId) -> getColumn(columnId)
+  typecheckColumn: (columnId) -> getColumn(columnId).type
+}
 
 @parseFormula = (thisType, fmlaString) ->
   # XXX: If we are changing a formula so as to introduce a new cyclic type
@@ -512,12 +587,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   # columns in the cycle will change to TYPE_ERROR and the navigations we just
   # interpreted will become invalid.  This behavior is weird but not worth
   # fixing now.
-  liteModel = {
-    getColumn: getColumn
-    typecheckColumn: (columnId) -> getColumn(columnId).type
-  }
-  vars = new EJSONKeyedMap()
-  vars.set('this', thisType)
+  vars = new EJSONKeyedMap([['this', thisType]])
 
   parser = new Jison.Parsers.formula.Parser()
   parser.yy.bindVar = (varName, domainFmla) ->
@@ -537,9 +607,11 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
     else
       throw e
 
-stringifySubformula = (formula) ->
-  res = dispatchFormula('stringify', formula)
+stringifySubformula = (model, vars, formula) ->
+  res = dispatchFormula('stringify', formula, model, vars)
   {
+    # Save original: used by stringifyNavigation.  (Might not be the best design.)
+    formula: formula
     strFor: (lowestSafePrecedence) ->
       if res.outerPrecedence >= lowestSafePrecedence
         res.str
@@ -547,5 +619,8 @@ stringifySubformula = (formula) ->
         "(#{res.str})"
   }
 
-@stringifyFormula = (formula) ->
-  stringifySubformula(formula).strFor(0)
+@stringifyFormula = (thisType, formula) ->
+  # Stringify should only happen after type checking, so it can use liteModel on
+  # either client or server.
+  stringifySubformula(
+    liteModel, new EJSONKeyedMap([['this', thisType]]), formula).strFor(0)

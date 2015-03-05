@@ -74,9 +74,6 @@ class Model
       throw new Meteor.Error('defineColumn-parent-not-isObject', 'The parent column must be an object to have children.')
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
-    if ((fieldName? && childByName(parentCol, fieldName)?) ||
-        (objectName? && childByName(parentCol, objectName)?))
-      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     if !isObject && objectName?
       throw new Meteor.Error('defineColumn-objectName-not-isObject',
                              'A column with isObject = false cannot have an objectName.')
@@ -125,8 +122,6 @@ class Model
     if fieldName == col.fieldName
       return
     parentCol = @getColumn(col.parent)
-    if fieldName? && childByName(parentCol, fieldName)?
-      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     Columns.update(columnId, {$set: {fieldName: fieldName}})
 
   changeColumnIsObject: (columnId, isObject) ->
@@ -165,8 +160,6 @@ class Model
       throw new Meteor.Error('defineColumn-objectName-not-isObject',
                              'A column with isObject = false cannot have an objectName.')      
     parentCol = @getColumn(col.parent)
-    if objectName? && childByName(parentCol, objectName)?
-      throw new Meteor.Error('column-name-taken', 'The name is taken by a sibling column.')
     Columns.update(columnId, {$set: {objectName: objectName}})
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
