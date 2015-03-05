@@ -96,8 +96,8 @@ right and a bottom border:
 
 /* Dotted border between object and key columns in header.  Control from the object side. */
 
-.handsontable td.rsHeaderFieldNameObject,
-.handsontable td.rsHeaderTypeObject {
+.handsontable td.rsHeaderFieldNameKeyedObject,
+.handsontable td.rsHeaderTypeKeyedObject {
   border-right: 1px dashed #CCC;
 }
 

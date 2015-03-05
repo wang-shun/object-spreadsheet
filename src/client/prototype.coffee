@@ -212,12 +212,16 @@ class ViewSection
     if @col.isObject
       fieldNameCell = new ViewCell(
         '', 1, 1,
-        ['rsHeaderBelow', 'rsHeaderFieldNameObject', myColorClass])
+        ['rsHeaderFieldNameObject',
+         (if @col.type != '_token' then ['rsHeaderFieldNameKeyedObject'] else [])...,
+         myColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.isObject = true
       typeCell = new ViewCell(
         @objectSymbol(), 1, 1,
-        ['rsHeaderBelow', 'rsHeaderTypeObject', 'centered', myColorClass])
+        ['rsHeaderTypeObject',
+         (if @col.type != '_token' then ['rsHeaderTypeKeyedObject'] else [])...,
+         'centered', myColorClass])
       # For a token column, make the ID available via the object UI-column.  For
       # all other columns, this information is available on the value UI-column.
       if @col.type == '_token'
@@ -228,7 +232,6 @@ class ViewSection
     if @col.type != '_token'
       fieldNameCell = new ViewCell(
         @col.fieldName ? '', 1, 1, [
-          'rsHeaderBelow',
           (if @headerMinHeight == 2 then 'rsHeaderFieldNameLeaf' else 'rsHeaderFieldNameKey'),
           myColorClass])
       fieldNameCell.columnId = @columnId
@@ -244,7 +247,6 @@ class ViewSection
         (if @col.specifiedType? then typeName else "(#{typeName})") +
         (if @col.typecheckError? then '!' else ''),
         1, 1, [
-          'rsHeaderBelow',
           (if @headerMinHeight == 2 then 'rsHeaderTypeLeaf' else 'rsHeaderTypeKey'),
           myColorClass].concat(@markDisplayClasses()))
       typeCell.fullText = (
