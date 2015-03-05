@@ -51,15 +51,15 @@ gridVertExtend = (orig, extension) ->
 
 # Mutate "orig" by adding "extension" at the right.
 gridHorizExtend = (orig, extension) ->
-  for i in [0..orig.length-1] by 1
+  for i in [0...orig.length]
     orig[i].push(extension[i]...)
 
 # Return a grid consisting of one "height x width" merged cell and enough dummy
 # 1x1 cells.  You can mutate the upper-left cell as desired.
 gridMergedCell = (height, width, value = '', cssClasses = []) ->
   grid =
-    for i in [0..height-1] by 1
-      for j in [0..width-1] by 1
+    for i in [0...height]
+      for j in [0...width]
         new ViewCell()
   grid[0][0].rowspan = height
   grid[0][0].colspan = width
@@ -207,7 +207,7 @@ class ViewSection
   # based on depth.
   renderHeader: (expanded, depth) ->
     # Part that is always the same.
-    myColorClass = 'rsHeaderColor' + colorIndexForDepth(if @headerMinHeight == 2 then depth-1 else depth)
+    myColorClass = 'rsHeaderColor' + colorIndexForDepth(if @col.isObject then depth else depth-1)
     grid = [[], []]  # c.f. renderHlist
     if @col.isObject
       fieldNameCell = new ViewCell(
@@ -222,17 +222,22 @@ class ViewSection
         ['rsHeaderTypeObject',
          (if @col.type != '_token' then ['rsHeaderTypeKeyedObject'] else [])...,
          'centered', myColorClass])
-      # For a token column, make the ID available via the object UI-column.  For
-      # all other columns, this information is available on the value UI-column.
-      if @col.type == '_token'
-        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
       typeCell.columnId = @columnId
       typeCell.isObject = true
+      if @col.type == '_token'
+        # There is no value UI-column, so certain functionality that would
+        # normally be on the value UI-column is on the object UI-column instead.
+        fieldNameCell.kind = 'tokenObject-below'
+        typeCell.kind = 'tokenObject-type'
+        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
+      else
+        fieldNameCell.kind = 'keyedObject-below'
+        typeCell.kind = 'keyedObject-type'
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
     if @col.type != '_token'
       fieldNameCell = new ViewCell(
         @col.fieldName ? '', 1, 1, [
-          (if @headerMinHeight == 2 then 'rsHeaderFieldNameLeaf' else 'rsHeaderFieldNameKey'),
+          (if @col.isObject then 'rsHeaderFieldNameKey' else 'rsHeaderFieldNameLeaf'),
           myColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
@@ -247,7 +252,7 @@ class ViewSection
         (if @col.specifiedType? then typeName else "(#{typeName})") +
         (if @col.typecheckError? then '!' else ''),
         1, 1, [
-          (if @headerMinHeight == 2 then 'rsHeaderTypeLeaf' else 'rsHeaderTypeKey'),
+          (if @col.isObject then 'rsHeaderTypeKey' else 'rsHeaderTypeLeaf'),
           myColorClass].concat(@markDisplayClasses()))
       typeCell.fullText = (
         'Column ID ' + @columnId + ': ' +
@@ -258,7 +263,7 @@ class ViewSection
       typeCell.kind = 'type'
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
 
-    if @headerMinHeight == 2
+    unless @col.isObject
       return grid
 
     height = if expanded then @headerMinHeight else 3
@@ -528,7 +533,7 @@ class ClientView
       [new ViewCell('FN', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
     gridVertExtend(gridCaption,
-                   ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0..gridData.length-1]))
+                   ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0...gridData.length]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
     @grid = grid
@@ -543,7 +548,7 @@ class ClientView
       # need it.  We may also want to fix the header for large data sets.
       fixedColumnsLeft: 1
       # Separator columns are 8 pixels wide.  Others use default width.
-      colWidths: (for i in [0..@mainSection.width]
+      colWidths: (for i in [0...@grid[0].length]  # no way grid can be empty
                     if i in separatorColumns then 10 else undefined)
       rowHeights:
         # Specify all the row heights (23 pixels is the Handsontable default),
@@ -654,15 +659,12 @@ class ClientView
               Meteor.call('changeColumnIsObject', $$, ci, false,
                           standardServerCallback)
           }
-          # TODO: Reconsider what each of these commands should do depending on
-          # the selected cell in light of the addition of object UI-columns.
-
-          # addSiblingLeft is redundant but nice for users.
           addSiblingLeft: {
             name: 'Insert left sibling column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId)
+              !((ci = c?.columnId)? && ci != rootColumnId &&
+                (!(col = getColumn(ci)).isObject || c.kind == 'top'))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
@@ -673,18 +675,31 @@ class ClientView
               @hot.deselectCell()
               insertBlankColumn parentId, index, @view
           }
+          # Note: "Sibling" here refers to the user-facing conceptual model, as
+          # in columnLogicalChildrenByName.  If we were to call this command
+          # simply "Insert column right", we'd risk surprising the user when
+          # he/she runs it on a corner cell that has sub-objects, since the cell
+          # doesn't span all the way to where the new column is inserted.
           addSiblingRight: {
             name: 'Insert right sibling column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId)
+              !((ci = c?.columnId)? &&
+                (c.kind == 'top' && ci != rootColumnId ||
+                 /^(tokenObject-)?(below|type)$/.test(c.kind)))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              col = getColumn(ci)
-              parentId = col.parent
-              parentCol = getColumn(parentId)
-              index = parentCol.children.indexOf(ci) + 1
+              if c.kind == 'top'
+                # Like addColumnLeft except + 1
+                col = getColumn(ci)
+                parentId = col.parent
+                parentCol = getColumn(parentId)
+                index = parentCol.children.indexOf(ci) + 1
+              else
+                # Child of the selected column
+                parentId = ci
+                index = 0
               @hot.deselectCell()
               insertBlankColumn parentId, index, @view
           }
@@ -693,7 +708,7 @@ class ClientView
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? &&
-                (col = getColumn(ci)).isObject)
+                (col = getColumn(ci)).isObject && col.type == '_token')
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
@@ -706,14 +721,12 @@ class ClientView
             name: 'Delete column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              ci = c && (c.columnId ? c.qFamilyId?.columnId)
               # Future: Support recursive delete.
-              # CLEANUP: This is a mess; find a way to share the code or publish from the server.
-              !(ci? && ci != rootColumnId &&
+              !((ci = c?.columnId)? && ci != rootColumnId &&
                 !((col = getColumn(ci))?.children?.length))
             callback: () =>
               c = @getSingleSelectedCell()
-              ci = c && (c.columnId ? c.qFamilyId?.columnId)
+              ci = c.columnId
               @hot.deselectCell() # <- Otherwise changeFormula form gets hosed.
               Meteor.call('deleteColumn', $$, ci,
                           standardServerCallback)
@@ -859,8 +872,8 @@ class ClientView
     @hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
 
   selectMatchingCell: (predicate) ->
-    for i in [0..@grid.length-1] by 1
-      for j in [0..@mainSection.width-1] by 1
+    for i in [0...@grid.length]
+      for j in [0...@grid[i].length]
         if predicate(@grid[i][j])
           @selectSingleCell(i, j)
           return true
@@ -891,11 +904,11 @@ rebuildView = (viewId) ->
      (selectedCell.qFamilyId? &&
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
      (selectedCell.qFamilyId? &&
-      view.selectMatchingCell((c) -> c.kind == 'below' &&
+      view.selectMatchingCell((c) -> c.kind in ['below', 'tokenObject-below'] &&
                                      EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) ||
      (selectedCell.kind? &&
       view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
-                                     EJSON.equals(selectedCell.columnId, c.columnId))) ||
+                                     selectedCell.columnId == c.columnId)) ||
      false)
   # Make sure various things are consistent with change in table data or
   # selection (view.selectMatchingCell doesn't seem to trigger this).

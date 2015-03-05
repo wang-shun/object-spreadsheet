@@ -8,7 +8,7 @@
 # Multisets unsupported for now: twindex removed.
 
 @rootCellId = []
-@cellIdParent = (cellId) -> cellId[0..-2]
+@cellIdParent = (cellId) -> cellId[0...-1]
 @cellIdChild = (cellId, value) -> cellId.concat([value])
 @cellIdLastStep = (cellId) -> cellId[cellId.length - 1]
 
