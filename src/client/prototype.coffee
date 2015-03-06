@@ -664,7 +664,7 @@ class ClientView
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
-                (!(col = getColumn(ci)).isObject || c.kind == 'top'))
+                (c.kind == 'top' || !(col = getColumn(ci)).isObject))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
@@ -707,7 +707,7 @@ class ClientView
             name: 'Insert first child column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? &&
+              !((ci = c?.columnId)? && c.kind == 'top' &&
                 (col = getColumn(ci)).isObject && col.type == '_token')
             callback: () =>
               c = @getSingleSelectedCell()
@@ -723,7 +723,13 @@ class ClientView
               c = @getSingleSelectedCell()
               # Future: Support recursive delete.
               !((ci = c?.columnId)? && ci != rootColumnId &&
-                !((col = getColumn(ci))?.children?.length))
+                (col = getColumn(ci)).children.length == 0 &&
+                # A keyed object with no (non-key) children spans two UI
+                # columns.  It might be surprising if "Delete column" on a
+                # header cell in one of the two UI columns deleted the entire
+                # thing.  But "Delete column" on the top cell (which spans both
+                # columns) is OK.
+                (!col.isObject || col.type == '_token' || c.kind == 'top'))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
