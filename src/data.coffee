@@ -105,6 +105,72 @@ class PairsBinRel
     new PairsBinRel(sriap, @rangeType, @domainType)
 
 
+#
+# Provides transaction-like behaviour by taking a snapshot of the
+# Cells collection in memory, manipulating it and then storing the
+# changes back to the Mongo collection.
+#
+class Transaction
+  
+  class @Cells
+    
+    constructor: (@dbCells) ->
+      @mem = new Mongo.Collection(null)
+      
+    prefetch: ->
+      @mem.insert(doc) for doc in @dbCells.find().fetch()
+        
+    insert: (doc) ->
+      doc = _.clone(doc)
+      doc.dirty = true
+      @mem.insert(doc)
+      
+    update: (query, values, upsert=false) ->
+      if _.size(values) != 1
+        throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+      if values.$set?
+        values = _.clone(values)
+        values.$set.dirty = true
+      else if values.$pull? || values.$addToSet?
+        values = _.clone(values)
+        values.$set = {dirty: true}
+      else
+        throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+      if upsert
+        @mem.upsert(query, values)
+      else
+        @mem.update(query, values)
+        
+    upsert: (query, values) ->
+      @update(query, values, true)
+      
+    remove:  (query={})  ->  @mem.remove(query) # nothing fancy here...
+    find:    (query={})  ->  @mem.find(query)
+    findOne: (query={})  ->  @mem.findOne(query)
+    
+    commit: ->
+      @dbCells.find().forEach (doc) =>
+        if ! @mem.findOne(doc._id)
+          @dbCells.remove(doc._id)
+      @mem.find({dirty: true}).forEach (doc) =>
+        @dbCells.upsert(doc._id, doc)
+    
+  constructor: (dbCells) ->
+    @Cells = new Transaction.Cells(dbCells ? Cells)
+    
+  begin: ->
+    @Cells.prefetch()
+    $$.Cells = @Cells
+    
+  rollback: ->
+    $$.Cells = @Cells.dbCells
+    
+  commit: ->
+    @Cells.commit()
+    $$.Cells = @Cells.dbCells
+
+        
+      
 if Meteor.isServer
   Meteor.methods
     ColumnBinRel_add: (cc, columnId, key, value) ->
@@ -115,4 +181,4 @@ if Meteor.isServer
       cc.run -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
 
-exported {Tablespace, ColumnBinRel, PairsBinRel}
+exported {Tablespace, ColumnBinRel, PairsBinRel, Transaction}
