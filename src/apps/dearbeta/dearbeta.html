@@ -1,0 +1,26 @@
+<template name="DearBeta">
+  <ul>
+  {{#each files}}
+    <li>{{name}}
+    <ul>
+      {{#each Node}}
+        <li>{{id}}
+          <ul>
+            {{#each Time}}
+            <li>{{ns}} ({{Request.length}})  
+              <button class="up">+</button> <button class="down">-</button>
+              <ul>
+              {{#each Hint}}
+                <li>{{body}}  ({{Vote.length}})</li>
+              {{/each}}
+              </ul>
+            </li>
+            {{/each}}
+          </ul>
+        </li>
+      {{/each}}
+    </ul>
+    </li>
+  {{/each}}
+  </ul>
+</template>

@@ -138,6 +138,10 @@ right and a bottom border:
   vertical-align: top;
 }
 
+.handsontable td.rsRowNum {
+  text-align: center;
+}
+
 .handsontable td.centered {
   text-align: center;
   vertical-align: middle;
@@ -188,3 +192,22 @@ right and a bottom border:
   vertical-align: bottom;
   padding-left: 1em;
 }
+
+/*-------------------*/
+/* Presentation Mode */
+/*-------------------*/
+
+.present form label {
+  font-size: 125%;
+}
+
+.present .formula {
+  font-size: 150%;
+  padding: 5px;
+}
+
+.present .handsontable td {
+  /* padding-top: 5px; interferes with scrolling? */
+}
+
+

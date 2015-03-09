@@ -38,7 +38,7 @@ class ColumnBinRel
 
   cells: ->
     families = Cells.find({column: @columnId}).fetch()
-    famcells = (family) -> ([family.key, v] for v in family.values)
+    famcells = (family) -> ([family.key, v] for v in family.values || [])
     [].concat((famcells x for x in families)...)
 
   cellset: ->

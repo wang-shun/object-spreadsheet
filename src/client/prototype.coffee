@@ -533,7 +533,7 @@ class ClientView
       [new ViewCell('FN', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
     gridVertExtend(gridCaption,
-                   ([new ViewCell(i+1, 1, 1, ['rsCaption'])] for i in [0...gridData.length]))
+                   ([new ViewCell(i+1, 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
     @grid = grid
@@ -935,10 +935,12 @@ guarded = (op) ->
 Template.Spreadsheet.rendered = ->
   sheet = @data?.sheet || ''
   viewId = @data?.viewId
+  # $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
+  if sheet then document.title = sheet
   Tablespace.default = Tablespace.get sheet
   Meteor.call 'open', $$
   Tracker.autorun(guarded -> rebuildView viewId)
 
 
 $ ->
-  exported {View, rebuildView}
+  exported {View, rebuildView, StateEdit}
