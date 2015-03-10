@@ -373,19 +373,16 @@ class StateEdit
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
     key = cellIdParent(qCellId.cellId)
-    oldValue = cellIdLastStep(qCellId.cellId)
     if (newValue = @parseValueUi(
         {columnId: qCellId.columnId, cellId: key}, enteredValue))?
       # TODO check if cell has children!
       new ColumnBinRel(qCellId.columnId)
-        .removeAdd key, oldValue, newValue, callback
+        .removeAdd qCellId.cellId, null, newValue, callback
 
   @removeCell: (qCellId, callback=->) ->
-    key = cellIdParent(qCellId.cellId)
-    oldValue = cellIdLastStep(qCellId.cellId)
     # TODO check if cell has children!
     new ColumnBinRel(qCellId.columnId)
-      .remove key, oldValue, callback
+      .remove qCellId.cellId, null, callback
 
   @canEdit: (columnId) ->
     col = getColumn(columnId)

@@ -7,12 +7,22 @@
         <li>{{id}}
           <ul>
             {{#each Time}}
-            <li>{{ns}} ({{Request.length}})  
-              <button class="up">+</button> <button class="down">-</button>
+            <li>{{ns}}   
+              <span class="Request">
+                <button class="up">+</button>{{Request.length}}<button class="down">-</button>
+              </span>
               <ul>
-              {{#each Hint}}
-                <li>{{body}}  ({{Vote.length}})</li>
-              {{/each}}
+                {{#each Hint}}
+                <li>
+                  <span class="Hint">
+                    <button class="del">X</button>
+                    {{body}}  
+                    <button class="up">+</button>{{Vote.length}}<button class="down">-</button>
+                  </span>
+                </li>
+                {{/each}}
+                <li><form><input name="text" type="text">
+                  <button type="submit">Add hint</button></form></li>
               </ul>
             </li>
             {{/each}}

@@ -24,6 +24,18 @@ class Tablespace extends ControlContext
     if Meteor.isServer then Meteor.publish collection._name, -> collection.find()
     if Meteor.isClient then Meteor.subscribe collection._name
 
+  runTransaction: (op) ->
+    @run ->
+      t = new Transaction
+      t.begin()
+      try
+        ret = op()
+        t.commit()
+        ret
+      catch e
+        t.rollback()
+        throw e
+    
   typeName: -> 'Tablespace'
   toJSONValue: -> {@id}
   @fromJSONValue: (json) => @get json.id
@@ -54,6 +66,10 @@ class ColumnBinRel
       $$.call 'ColumnBinRel_add', @columnId, key, value, callback
 
   remove: (key, value, callback=->) ->
+    if !value?
+      cellId = key
+      key = cellIdParent(cellId)
+      value = cellIdLastStep(cellId)
     if Meteor.isServer
       Cells.update {column: @columnId, key}, {$pull: {values: value}}
       $$.model.invalidateCache()
@@ -63,6 +79,10 @@ class ColumnBinRel
 
   ## remove(key, oldValue) + add(key, newValue) in a single operation
   removeAdd: (key, oldValue, newValue, callback=->) ->
+    if !oldValue?
+      cellId = key
+      key = cellIdParent(cellId)
+      oldValue = cellIdLastStep(cellId)
     if ! EJSON.equals(oldValue, newValue)
       if Meteor.isServer
         # This WOULD have been nice, but is not supported (Mongo ticket SERVER-1050)
@@ -164,10 +184,12 @@ class Transaction
     
   rollback: ->
     $$.Cells = @Cells.dbCells
+    undefined
     
   commit: ->
     @Cells.commit()
     $$.Cells = @Cells.dbCells
+    undefined
 
         
       
