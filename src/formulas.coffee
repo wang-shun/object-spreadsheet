@@ -449,10 +449,10 @@ dispatch = {
   '*' : numberInfixOperator('*' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x *  y)
   '/' : numberInfixOperator('/' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x /  y)
   '^' : numberInfixOperator('^' , 5, ASSOCIATIVITY_RIGHT,'_number', Math.pow)
-  '<' : numberInfixOperator('<' , 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x <  y)
-  '<=': numberInfixOperator('<=', 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x <= y)
-  '>' : numberInfixOperator('>' , 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x >  y)
-  '>=': numberInfixOperator('>=', 1, ASSOCIATIVITY_NONE, '_number', (x, y) -> x >= y)
+  '<' : numberInfixOperator('<' , 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x <  y)
+  '<=': numberInfixOperator('<=', 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x <= y)
+  '>' : numberInfixOperator('>' , 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x >  y)
+  '>=': numberInfixOperator('>=', 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x >= y)
 
   # ["union", list of subformulas]
   # Union of a fixed number of sets.
@@ -590,6 +590,7 @@ liteModel = {
   vars = new EJSONKeyedMap([['this', thisType]])
 
   parser = new Jison.Parsers.formula.Parser()
+  parser.yy.startToken = 'FORMULA'
   parser.yy.bindVar = (varName, domainFmla) ->
     valAssert(!vars.get(varName)?, 'Lambda shadows variable ' + varName)
     vars.set(varName, validateAndTypecheckFormula(liteModel, vars, domainFmla))
