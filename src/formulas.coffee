@@ -372,7 +372,7 @@ dispatch = {
           # for stringifyNavigation.
           'this'
         else
-          annotateNavigationTarget(model, vars, null, varName, ['var', varName], null)
+          annotateNavigationTarget(model, vars, null, varName, null, ['var', varName])
       outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
@@ -428,6 +428,17 @@ dispatch = {
     stringify: (model, vars, domainSinfo) ->
       # TODO: Factor out helper for function syntax.
       str: "count(#{domainSinfo.strFor(PRECEDENCE_LOWEST)})"
+      outerPrecedence: PRECEDENCE_ATOMIC
+
+  oneOf:
+    argAdapters: [EagerSubformula]
+    typecheck: (model, vars, domainType) -> domainType
+    evaluate: (model, vars, domainTset) ->
+      evalAssert(domainTset.elements().length > 0,
+                 'oneOf on empty set.')
+      new TypedSet(domainTset.type, set([domainTset.elements()[0]]))
+    stringify: (model, vars, domainSinfo) ->
+      str: "oneOf(#{domainSinfo.strFor(PRECEDENCE_LOWEST)})"
       outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["filter", domain (subformula), [varName, predicate (subformula)]]:
@@ -614,7 +625,6 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or
   # object name.
-  console.log startCellsType
   [upPath, dummyDownPath] = findCommonAncestorPaths(startCellsType, rootColumnId)
   for upColumnId in upPath
     if objectNameWithFallback(getColumn(upColumnId)) == targetName
