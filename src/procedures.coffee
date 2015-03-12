@@ -62,8 +62,7 @@ mergeTypeMaps = (vars1, vars2) ->
     newVars = mergeTypeMaps(this.varsPreviousBranch, this.vars)
     this.popVars()
     this.vars = newVars
-  parser.yy.convertFamilyReference = (fmla, wantObject) ->
-    console.log('convertFamilyReference', fmla, getColumn(fmla[2]), wantObject)
+  parser.yy.convertFamilyReference = (fmla, wantObject, wantKeys) ->
     valAssert(fmla[0] == 'down', 'Family reference must be a down navigation.')
     valAssert(
       # A single down navigation in concrete syntax will always have
@@ -71,12 +70,17 @@ mergeTypeMaps = (vars1, vars2) ->
       # generates down navigations to object columns with wantValues = true, and
       # more generally either mismatch can arise from adding/removing object
       # types.
-      getColumn(fmla[2]).isObject == wantObject && fmla[3] == !wantObject,
+      getColumn(fmla[2]).isObject == wantObject && fmla[4] == !wantObject,
       if wantObject
         'new/create only work on object families.'
       else
         'set/add/remove only work on leaf families.')
-    return fmla[1..2]  # TODO: keys
+    valAssert(fmla[3]? == wantKeys,
+              if wantKeys
+                'create requires a subscript expression.'
+              else
+                'A subscript expression is not allowed.')
+    return fmla[1..3]
 
   try
     return parser.parse(procString)

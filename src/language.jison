@@ -147,11 +147,11 @@ statement
         { yy.bindVar($2, $4, true);
           $$ = ['let', $2, $4]; }
     | familyReference ':=' expression NL
-        { $$ = ['set', yy.convertFamilyReference($1, false), $3]; }
+        { $$ = ['set', yy.convertFamilyReference($1, false, false), $3]; }
     | TO SET familyReference ADD expression NL
-        { $$ = ['add', yy.convertFamilyReference($3, false), $5]; }
+        { $$ = ['add', yy.convertFamilyReference($3, false, false), $5]; }
     | FROM SET familyReference REMOVE expression NL
-        { $$ = ['remove', yy.convertFamilyReference($3, false), $5]; }
+        { $$ = ['remove', yy.convertFamilyReference($3, false, false), $5]; }
     | ifHeader '{' NL statements '}' NL optElse
         { yy.commitVars();
           $$ = ['if', $1, $4, $7]; }
@@ -162,13 +162,10 @@ statement
         { $$ = ['delete', $2]; }
     | optLet NEW familyReference NL  /* Rarely useful without a let... */
         { if ($1) yy.bindVar($1, $3, true);
-          $$ = ['new', $1, yy.convertFamilyReference($3, true)]; }
-/*
-Enable once implemented in resolveNavigation.
+          $$ = ['new', $1, yy.convertFamilyReference($3, true, false)]; }
     | optLet CREATE familySliceReference NL
         { if ($1) yy.bindVar($1, $3, true);
-          $$ = ['create', $1, yy.convertFamilyReference($3, true)]; }
-*/
+          $$ = ['create', $1, yy.convertFamilyReference($3, true, true)]; }
     /* Future: Error messages. */
     | CHECK expression NL
         { $$ = ['check', $2]; }
@@ -241,11 +238,8 @@ expression
         { $$ = $1; }
     | familyReference
         { $$ = $1; }
-/*
-Enable once implemented in resolveNavigation.
     | familySliceReference
         { $$ = $1; }
-*/
     | '-' expression %prec NEG
         { $$ = ['neg', $2]; }
     | expression '+' expression

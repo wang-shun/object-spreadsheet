@@ -66,6 +66,16 @@ EagerSubformula = {
   stringify: (model, vars, arg) ->
     stringifySubformula(model, vars, arg)
 }
+OptionalEagerSubformula = {
+  validate: (vars, arg) ->
+    if arg? then validateSubformula(vars, arg)
+  typecheck: (model, vars, arg) ->
+    if arg? then typecheckFormula(model, vars, arg) else null
+  evaluate: (model, vars, arg) ->
+    if arg? then evaluateFormula(model, vars, arg) else null
+  stringify: (model, vars, arg) ->
+    if arg? then stringifySubformula(model, vars, arg) else null
+}
 EagerSubformulaCells = {
   validate: EagerSubformula.validate
   typecheck: (model, vars, arg) ->
@@ -153,7 +163,7 @@ Type = {
 
 getValues = (model, vars, cells) ->
   # XXX: Fail on token columns
-  type = model.getColumn(cells.type).type
+  type = model.typecheckColumn(cells.type)
   new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
 
 typecheckUp = (model, vars, startCellsType, targetColId, wantValues) ->
@@ -167,10 +177,15 @@ typecheckUp = (model, vars, startCellsType, targetColId, wantValues) ->
             'Direct navigation up to a key of a parent object is not allowed.')
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
-typecheckDown = (model, vars, startCellsType, targetColId, wantValues) ->
+typecheckDown = (model, vars, startCellsType, targetColId, keysType, wantValues) ->
   targetCol = model.getColumn(targetColId)
   valAssert(targetCol.parent == startCellsType,
             'Navigation from ' + startCellsType + ' to ' + targetColId + ' is not down')
+  valAssert(wantValues || targetCol.isObject,
+            'Target column has no object type to navigate to.')
+  if keysType?
+    valAssert(!wantValues, 'Can only specify keys when navigating to objects.')
+    valExpectType('Key set', keysType, model.typecheckColumn(targetCol))
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
@@ -187,19 +202,20 @@ goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
 
   if wantValues then getValues(model, vars, result) else result
 
-goDown = (model, vars, startCellsTset, targetColId, wantValues) ->
+goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
   # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
 
   # Go down.
   targetCellsSet = new EJSONKeyedSet()
   for cellId in startCellsTset.elements()
     for value in readFamilyForFormula(model, {columnId: targetColId, cellId: cellId}).elements()
-      targetCellsSet.add(cellIdChild(cellId, value))
+      if !keysTset? || keysTset.set.has(value)
+        targetCellsSet.add(cellIdChild(cellId, value))
   targetCellsTset = new TypedSet(targetColId, targetCellsSet)
 
   if wantValues then getValues(model, vars, targetCellsTset) else targetCellsTset
 
-annotateNavigationTarget = (model, vars, startCellsFmla, targetName, expectedFmla) ->
+annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, expectedFmla) ->
   if !targetName?
     '(unnamed)'
   else
@@ -208,44 +224,49 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, expectedFml
     # multiple possible interpretations including the original" (in which case
     # the formula should still work).
     try
-      valAssert(EJSON.equals(resolveNavigation(model, vars, startCellsFmla, targetName), expectedFmla),
+      valAssert(EJSON.equals(resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla), expectedFmla),
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
       targetName
     catch e
       targetName + '(problem)'
 
-stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, wantValues) ->
+stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
   column = getColumn(targetColumnId)
   targetName =
     if !column? then '(deleted)'
     else
       # Reconstruct the current subformula.  XXX: Get it a better way?
       wantFormula = [direction, startCellsSinfo.formula, targetColumnId, wantValues]
+      if direction == 'down'
+        wantFormula.splice(3, 0, keysSinfo?.formula)
       if !wantValues
         annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                 objectNameWithFallback(column), wantFormula)
+                                 objectNameWithFallback(column), keysSinfo?.formula, wantFormula)
       else if direction == 'down' && column.isObject
         # Special case: when an object type Bar is added to a leaf column foo, we
         # want down navigations "(...).foo" to start displaying as "(...).Bar.foo"
         # without having to rewrite the abstract syntax of affected formulas.
         # Even if the first navigation in the concrete syntax is ambiguous, we
         # know what we meant and should annotate the second navigation
-        # accordingly.
-        intermediateFormula = ['down', startCellsSinfo.formula, targetColumnId, false]
+        # accordingly.  We shouldn't have keys here but if we do, they go to the
+        # first navigation.
+        intermediateFormula = ['down', startCellsSinfo.formula, targetColumnId, null, false]
         (
           annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                   objectNameWithFallback(column), intermediateFormula) + '.' +
+                                   objectNameWithFallback(column), keysSinfo?.formula,
+                                   intermediateFormula) + '.' +
           annotateNavigationTarget(model, vars, intermediateFormula,
-                                   column.fieldName, wantFormula)
+                                   column.fieldName, null, wantFormula)
         )
       else
         annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                 column.fieldName, wantFormula)
+                                 column.fieldName, keysSinfo?.formula, wantFormula)
   {
     str:
       (if startCellsSinfo.strFor(PRECEDENCE_NAV) == '::' then '::'
       else if startCellsSinfo.strFor(PRECEDENCE_NAV) == 'this' then ''
-      else startCellsSinfo.strFor(PRECEDENCE_NAV) + '.') + targetName
+      else startCellsSinfo.strFor(PRECEDENCE_NAV) + '.') + targetName +
+      (if keysSinfo? then "[#{keysSinfo.strFor(PRECEDENCE_LOWEST)}]" else '')
     outerPrecedence: PRECEDENCE_NAV
   }
 
@@ -351,7 +372,7 @@ dispatch = {
           # for stringifyNavigation.
           'this'
         else
-          annotateNavigationTarget(model, vars, null, varName, ['var', varName])
+          annotateNavigationTarget(model, vars, null, varName, ['var', varName], null)
       outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
@@ -362,7 +383,8 @@ dispatch = {
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
     typecheck: typecheckUp
     evaluate: goUp
-    stringify: _.partial(stringifyNavigation, 'up')
+    stringify: (model, vars, startCellsSinfo, targetColumnId, wantValues) ->
+      stringifyNavigation('up', model, vars, startCellsSinfo, targetColumnId, null, wantValues)
 
   # ["down", startCells, targetColumnId, wantValues (bool)]
   # Currently allows only one step, matching the concrete syntax.  This makes
@@ -373,12 +395,13 @@ dispatch = {
   # because it is reading from another column whose formula changed.
   # Concrete syntax: foo, FooCell, (expression).foo, ::Bar, etc.
   down:
-    argAdapters: [EagerSubformulaCells, ColumnId, {}]
-    validate: (vars, startCellsFmla, targetColumnId, wantValues) ->
+    argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}]
+    validate: (vars, startCellsFmla, targetColumnId, keysFmla, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
     typecheck: typecheckDown
     evaluate: goDown
-    stringify: _.partial(stringifyNavigation, 'down')
+    stringify: (model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
+      stringifyNavigation('down', model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues)
 
   # ["if", condition, thenFmla, elseFmla]
   # Concrete syntax: if(condition, thenFmla, elseFmla)
@@ -606,12 +629,21 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
             "<type #{startCellsType}>.#{targetName}, wanted one.")
   formula = interpretations[0]
 
+  if formula[0] == 'down'
+    # typecheckDown checks the rest of the requirements for subscripting.
+    formula.splice(3, 0, keysFmla)
+  else
+    # We have to check this here so we don't silently ignore the subscript.
+    valAssert(!keysFmla?, 'Only down navigations can be subscripted with keys.')
+
   # If Bar is an object type with key foo, "(...).Bar.foo" parses as
-  # ['up', ['down', ..., fooID, false], fooID, true].  Convert to
+  # ['up', ['down', ..., fooID, null, false], fooID, true].  Convert to
   # ['down', ..., fooID, true] so it displays as "(...).foo" if the object type
   # is removed.  (Converse of the case in stringifyNavigation.)
-  if formula[0] == 'up' && formula[3] && formula[1][0] == 'down' && formula[2] == formula[1][2]
-    formula = ['down', formula[1][1], formula[2], true]
+  if (formula[0] == 'up' && formula[3] &&
+      formula[1][0] == 'down' && formula[1][2] == formula[2] &&
+      !formula[1][3]? && !formula[1][4])
+    formula = ['down', formula[1][1], formula[2], null, true]
 
   return formula
 

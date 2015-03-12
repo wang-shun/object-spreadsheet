@@ -288,6 +288,11 @@
                             0, "studentName", null, false, null,
                             'discussed.Person.name')
 
+  # Example of a subscript expression; not currently needed for the PTC application.
+  defineParsedFormulaColumn("Person:Student",
+                            1, "enrollments", null, false, null,
+                            '::Class.Section.Enrollment[Student]')
+
   defineParsedFormulaColumn("Class:Section:Enrollment",
                             0, "scheduledMeeting", null, false, null,
                             '{all m in ::Meeting | m.enrollment = Enrollment}')
@@ -333,7 +338,7 @@
 ###
 Testing from the server shell:
 p = Tablespace.get('ptc').run(function() {
- return convertSampleProcedure(sampleProcedures.parentCreateMeeting) })
+  return convertSampleProcedure(sampleProcedures.parentCreateMeeting) })
 ###
 
 # Future: Add special support for "check ::valid"?  But we might want similar
@@ -373,6 +378,15 @@ check ::valid
 check clientUser in meeting.enrollment.student.[parent].parent
 delete meeting
 check ::valid
+'''
+
+  # This is just a test of a create statement, not something that actually
+  # belongs in the PTC application.
+  enroll:
+    params: [['student', 'Person:Student'],
+             ['section', 'Class:Section']]
+    body: '''
+create section.Enrollment[student]
 '''
 }
 
