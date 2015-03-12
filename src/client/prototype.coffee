@@ -694,7 +694,8 @@ class ClientView
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              if c.kind == 'top' || !(col = getColumn(ci)).isObject
+              col = getColumn(ci)
+              if c.kind == 'top' || !col.isObject
                 # Like addSiblingLeft except + 1
                 parentId = col.parent
                 parentCol = getColumn(parentId)
