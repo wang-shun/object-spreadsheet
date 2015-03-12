@@ -335,19 +335,15 @@
 
   model
 
-###
-Testing from the server shell:
-p = Tablespace.get('ptc').run(function() {
-  return convertSampleProcedure(sampleProcedures.parentCreateMeeting) })
-###
 
 # Future: Add special support for "check $valid"?  But we might want similar
 # functionality for other checks, if the Derailer study is any evidence.
 # Cleanup: Introduce a formula to reduce duplication in enrollment authorization
 # checks?
-@sampleProcedures = {
+sampleProcedures = {
   teacherCreateSlot:
-    params: [['time', '_string']]
+    params: [['clientUser', 'Person'],
+             ['time', '_string']]
     body: '''
 let t = clientUser.Teacher
 check t != {}
@@ -356,14 +352,16 @@ s.time := time
 check $valid
 '''
   teacherDeleteSlot:
-    params: [['slot', 'Person:Teacher:Slot']]
+    params: [['clientUser', 'Person'],
+             ['slot', 'Person:Teacher:Slot']]
     body: '''
 check slot.Person = clientUser
 delete slot
 check $valid
 '''
   parentCreateMeeting:
-    params: [['enr', 'Class:Section:Enrollment'],
+    params: [['clientUser', 'Person'],
+             ['enr', 'Class:Section:Enrollment'],
              ['slot', 'Person:Teacher:Slot']]
     body: '''
 check clientUser in enr.student.[parent].parent
@@ -373,7 +371,8 @@ m.slot := slot
 check $valid
 '''
   parentCancelMeeting:
-    params: [['meeting', 'Meeting']]
+    params: [['clientUser', 'Person'],
+             ['meeting', 'Meeting']]
     body: '''
 check clientUser in meeting.enrollment.student.[parent].parent
 delete meeting
@@ -390,17 +389,22 @@ make section.Enrollment[student]
 '''
 }
 
-@convertSampleProcedure = (obj) ->
-  params = new EJSONKeyedMap()
-  # Imagined to be system-set and count 1.
-  params.set('clientUser', parseTypeStr('Person'))
-  count1Checks = ''
-  for [paramName, paramType] in obj.params
-    if /\*$/.test(paramType)
-      paramType = paramType[0...-1]
-    else
-      count1Checks += "check count(#{paramName}) = 1\n"
-    paramType = parseTypeStr(paramType)
-    params.set(paramName, paramType)
-  body = parseProcedure(params, count1Checks + obj.body + '\n')
-  return {params: params, body: body}
+@defineSampleProcedures = (model) ->
+  # Needed to parse procedures; server-startup evaluateAll hasn't run yet.
+  model.typecheckAll()
+  for name, proc of sampleProcedures
+    try
+      model.cannedTransactions.set(
+        name, parseCannedTransaction(proc.params, proc.body))
+    catch e
+      # Incompatible schema change?
+      console.log("Failed to define PTC sample procedure #{name}:", e.stack)
+
+###
+Example of calling a transaction from the browser console:
+
+Meteor.call('executeCannedTransaction', $$, 'teacherCreateSlot', {clientUser: [["1"]], time: ['2014-12-16 15:00']})
+
+Object IDs can be copied from the full text of the bullet cell.  Remember to
+promote all arguments to lists.
+###

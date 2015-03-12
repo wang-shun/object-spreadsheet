@@ -65,9 +65,14 @@ if Meteor.isServer
   Meteor.methods
     defineDearbetaProcedures: (cc) ->
       cc.run ->
-        for name, proc of procedures
-          @model.cannedTransactions.set(
-            name, parseCannedTransaction(proc.params, proc.body))
+        # This may run multiple times; it should overwrite and not cause any problems.
+        try
+          for name, proc of procedures
+            @model.cannedTransactions.set(
+              name, parseCannedTransaction(proc.params, proc.body))
+        catch e
+          # Incompatible schema change?
+          console.log("Failed to define dearbeta sample procedure #{name}:", e.stack)
     requestUp: (cc, qFamilyId) -> cc.runTransaction ->
       new ColumnBinRel(qFamilyId.columnId).add(qFamilyId.cellId, Random.id())
     requestDown: (cc, qCellId) -> cc.runTransaction ->

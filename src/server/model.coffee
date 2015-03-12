@@ -359,8 +359,10 @@ Meteor.startup () ->
   Tablespace.onCreate ->
     @do ->
       @model = new Model
-      if /^(.*\.)?ptc$/.test(@id) && @model.wasEmpty
-        loadSampleData(@model)
+      if /^(.*\.)?ptc$/.test(@id)
+        if @model.wasEmpty
+          loadSampleData(@model)
+        defineSampleProcedures(@model)
       @model.evaluateAll()
 
   Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell

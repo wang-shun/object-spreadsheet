@@ -186,6 +186,8 @@ class ViewSection
       gridObject[0][0].qCellId = qCellId
       gridObject[0][0].qFamilyId = qFamilyId
       gridObject[0][0].isObject = true
+      # For debugging and calling canned transactions from the console.
+      gridObject[0][0].fullText = 'Object ID: ' + JSON.stringify(hlist.cellId)
       if @col.type != '_token'
         gridObject[0][0].cssClasses.push('rsKeyedObject')
       gridHorizExtend(grid, gridObject)
