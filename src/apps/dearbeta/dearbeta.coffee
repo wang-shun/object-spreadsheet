@@ -49,6 +49,32 @@ if Meteor.isServer
     hintDel: (cc, qCellId) -> cc.runTransaction ->
       new ColumnBinRel(qCellId.columnId).remove(qCellId.cellId)
         
+  procedures =
+    requestUp:
+      params: [['at', 'File:Node:Time']]
+      body: '''new at.Request
+'''
+    requestDown:
+      params: [['at', 'File:Node:Time']]
+      body: '''delete oneOf(at.Request)'''
+    hintUp:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''new at.Vote'''
+    hintDown:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''delete oneOf(at.Vote)'''
+    hintAdd:
+      params: [['at', 'File:Node:Time'], ['text', '_string']]
+      body: '''let h = create at.Hint
+               h.body = text'''
+    hintDel:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''delete at'''
+  
+  @gogogo = ->
+    for name of procedures
+      proc = procedures[name]
+      parseProcedure(proc.params, proc.body)
   
 readObj = (t, rootCellId, keyField=undefined) ->
   obj = {qCellId: {columnId: t.root, cellId: rootCellId}}

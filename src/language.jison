@@ -54,6 +54,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 "all" return 'ALL'
 "check" return 'CHECK'
 "count" return 'COUNT'
+"oneOf" return 'ONEOF'
 "create" return 'CREATE'
 "delete" return 'DELETE'
 "else" return 'ELSE'
@@ -271,6 +272,8 @@ expression
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
     | COUNT '(' expression ')'
         { $$ = ['count', $3]; }
+    | ONEOF '(' expression ')'
+        { $$ = ['oneOf', $3]; }
     | IF '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
     | '!' expression

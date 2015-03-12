@@ -614,6 +614,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or
   # object name.
+  console.log startCellsType
   [upPath, dummyDownPath] = findCommonAncestorPaths(startCellsType, rootColumnId)
   for upColumnId in upPath
     if objectNameWithFallback(getColumn(upColumnId)) == targetName
@@ -655,6 +656,11 @@ liteModel = {
 
 # Reused by parseProcedure. :/
 @setupParserCommon = (startToken, vars) ->
+  if _.isArray(vars)
+    a = vars
+    vars = new EJSONKeyedMap()
+    for [k,v] in a
+      vars.set(k, parseTypeStr(v))
   parser = new Jison.Parsers.language.Parser()
   parser.yy.vars = vars.shallowClone()
   parser.yy.startToken = startToken
