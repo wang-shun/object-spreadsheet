@@ -41,7 +41,7 @@ readColumnTypeForFormula = (model, columnId) ->
                                      "Fix its formula or manually specify the type if needed to break a cycle.")
 
 valExpectType = (what, actualType, expectedType) ->
-  valAssert(mergeTypes(actualType, expectedType) != TYPE_ERROR,
+  valAssert(mergeTypes(actualType, expectedType) == expectedType,
             "#{what} has type #{actualType}, wanted #{expectedType}")
 
 evalAsSingleton = (set) ->
@@ -243,11 +243,20 @@ stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, 
                                  column.fieldName, wantFormula)
   {
     str:
-      (if startCellsSinfo.strFor(6) == '::' then '::'
-      else if startCellsSinfo.strFor(6) == 'this' then ''
-      else startCellsSinfo.strFor(6) + '.') + targetName
-    outerPrecedence: 6
+      (if startCellsSinfo.strFor(PRECEDENCE_NAV) == '::' then '::'
+      else if startCellsSinfo.strFor(PRECEDENCE_NAV) == 'this' then ''
+      else startCellsSinfo.strFor(PRECEDENCE_NAV) + '.') + targetName
+    outerPrecedence: PRECEDENCE_NAV
   }
+
+PRECEDENCE_LOWEST = PRECEDENCE_OR = 1
+PRECEDENCE_AND = 2
+PRECEDENCE_COMPARE = 3
+PRECEDENCE_PLUS = 4
+PRECEDENCE_TIMES = 5
+PRECEDENCE_NEG = 6
+PRECEDENCE_POW = 7
+PRECEDENCE_ATOMIC = PRECEDENCE_NAV = 8
 
 ASSOCIATIVITY_LEFT = 'left'
 ASSOCIATIVITY_RIGHT = 'right'
@@ -260,14 +269,15 @@ binaryOperationStringify = (symbol, precedence, associativity) ->
           rhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_RIGHT)))
     outerPrecedence: precedence
 
-numberInfixOperator = (symbol, precedence, associativity, resultType, evaluateFn) ->
+singletonInfixOperator = (symbol, precedence, associativity,
+                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn) ->
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
-    valExpectType("Left operand of '#{symbol}'", lhsType, '_number')
-    valExpectType("Right operand of '#{symbol}'", rhsType, '_number')
+    valExpectType("Left operand of '#{symbol}'", lhsType, lhsExpectedType)
+    valExpectType("Right operand of '#{symbol}'", rhsType, rhsExpectedType)
     resultType
   evaluate: (model, vars, lhs, rhs) ->
-    new TypedSet('_number', set([evaluateFn(evalAsSingleton(lhs.set), evalAsSingleton(rhs.set))]))
+    new TypedSet(resultType, set([evaluateFn(evalAsSingleton(lhs.set), evalAsSingleton(rhs.set))]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
@@ -315,9 +325,9 @@ dispatch = {
       outerPrecedence:
         if type == '_number' and list.length == 1 and list[0] < 0
           # Should never be reached by parsing concrete syntax.
-          4
+          PRECEDENCE_NEG
         else
-          6
+          PRECEDENCE_ATOMIC
 
   # ["var", varName (string)]:
   # Gets the value of a bound variable.
@@ -342,7 +352,7 @@ dispatch = {
           'this'
         else
           annotateNavigationTarget(model, vars, null, varName, ['var', varName])
-      outerPrecedence: 6
+      outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
   # Concrete syntax: foo, FooCell, (expression).foo, etc.
@@ -384,8 +394,18 @@ dispatch = {
       evaluateFormula(model, vars,
                       if evalAsSingleton(conditionTset.set) then thenFmla else elseFmla)
     stringify: (model, vars, conditionSinfo, thenSinfo, elseSinfo) ->
-      str: "if(#{conditionSinfo.strFor(1)}, #{thenSinfo.strFor(1)}, #{elseSinfo.strFor(1)})"
-      outerPrecedence: 6
+      str: "if(#{conditionSinfo.strFor(PRECEDENCE_LOWEST)}, #{thenSinfo.strFor(PRECEDENCE_LOWEST)}, #{elseSinfo.strFor(PRECEDENCE_LOWEST)})"
+      outerPrecedence: PRECEDENCE_ATOMIC
+
+  count:
+    argAdapters: [EagerSubformula]
+    typecheck: (model, vars, domainType) -> '_number'
+    evaluate: (model, vars, domainTset) ->
+      new TypedSet('_number', set([domainTset.elements().length]))
+    stringify: (model, vars, domainSinfo) ->
+      # TODO: Factor out helper for function syntax.
+      str: "count(#{domainSinfo.strFor(PRECEDENCE_LOWEST)})"
+      outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["filter", domain (subformula), [varName, predicate (subformula)]]:
   # For each cell in the domain, evaluates the predicate with varName bound to
@@ -422,15 +442,15 @@ dispatch = {
           # navigations will most likely be marked "problem".
           TYPE_ANY)
       {
-        str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(2)} " +
-             "| #{predicateSinfo[1].strFor(1)}}"
-        outerPrecedence: 6
+        str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(PRECEDENCE_COMPARE+1)} " +
+             "| #{predicateSinfo[1].strFor(PRECEDENCE_LOWEST)}}"
+        outerPrecedence: PRECEDENCE_ATOMIC
       }
 
   # Predicates on two sets of the same type.
-  '=': sameTypeSetsInfixPredicate('=', 1, ASSOCIATIVITY_NONE, EJSON.equals)
-  '!=': sameTypeSetsInfixPredicate('!=', 1, ASSOCIATIVITY_NONE, (x, y) -> !EJSON.equals(x, y))
-  'in': sameTypeSetsInfixPredicate('in', 1, ASSOCIATIVITY_NONE, (x, y) -> y.hasAll(x))
+  '=' : sameTypeSetsInfixPredicate('=' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, EJSON.equals)
+  '!=': sameTypeSetsInfixPredicate('!=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> !EJSON.equals(x, y))
+  'in': sameTypeSetsInfixPredicate('in', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> y.hasAll(x))
 
   # Unary minus.
   'neg':
@@ -440,19 +460,33 @@ dispatch = {
       '_number'
     evaluate: (model, vars, arg) ->
       new TypedSet('_number', set([-evalAsSingleton(arg.set)]))
-    stringify: (model, vars, lhsSinfo, rhsSinfo) ->
-      str: "-#{lhsSinfo.strFor(4)}"
-      outerPrecedence: 4
+    stringify: (model, vars, argSinfo) ->
+      str: "-#{argSinfo.strFor(PRECEDENCE_NEG)}"
+      outerPrecedence: PRECEDENCE_NEG
 
-  '+' : numberInfixOperator('+' , 2, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x +  y)
-  '-' : numberInfixOperator('-' , 2, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x -  y)
-  '*' : numberInfixOperator('*' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x *  y)
-  '/' : numberInfixOperator('/' , 3, ASSOCIATIVITY_LEFT, '_number', (x, y) -> x /  y)
-  '^' : numberInfixOperator('^' , 5, ASSOCIATIVITY_RIGHT,'_number', Math.pow)
-  '<' : numberInfixOperator('<' , 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x <  y)
-  '<=': numberInfixOperator('<=', 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x <= y)
-  '>' : numberInfixOperator('>' , 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x >  y)
-  '>=': numberInfixOperator('>=', 1, ASSOCIATIVITY_NONE, '_bool', (x, y) -> x >= y)
+  '+' : singletonInfixOperator('+' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x +  y)
+  '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x -  y)
+  '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x *  y)
+  '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x /  y)
+  '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'_number', '_number', '_number', Math.pow)
+  '<' : singletonInfixOperator('<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x <  y)
+  '<=': singletonInfixOperator('<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x <= y)
+  '>' : singletonInfixOperator('>' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x >  y)
+  '>=': singletonInfixOperator('>=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x >= y)
+
+  # TODO: Short circuit?
+  '&&': singletonInfixOperator('&&', PRECEDENCE_AND, ASSOCIATIVITY_LEFT, '_bool', '_bool', '_bool', (x, y) -> x && y)
+  '||': singletonInfixOperator('||', PRECEDENCE_OR, ASSOCIATIVITY_LEFT, '_bool', '_bool', '_bool', (x, y) -> x || y)
+  '!':
+    argAdapters: [EagerSubformula]
+    typecheck: (model, vars, argType) ->
+      valExpectType("Operand of '!'", argType, '_bool')
+      '_bool'
+    evaluate: (model, vars, arg) ->
+      new TypedSet('_bool', set([!evalAsSingleton(arg.set)]))
+    stringify: (model, vars, argSinfo) ->
+      str: "!#{argSinfo.strFor(PRECEDENCE_NEG)}"
+      outerPrecedence: PRECEDENCE_NEG
 
   # ["union", list of subformulas]
   # Union of a fixed number of sets.
@@ -465,8 +499,8 @@ dispatch = {
         res.addAll(term)
       res
     stringify: (model, vars, termSinfos) ->
-      str: '{' + (termSinfo.strFor(1) for termSinfo in termSinfos).join(', ') + '}'
-      outerPrecedence: 0
+      str: '{' + (termSinfo.strFor(PRECEDENCE_LOWEST) for termSinfo in termSinfos).join(', ') + '}'
+      outerPrecedence: PRECEDENCE_ATOMIC
 
 }
 
@@ -533,15 +567,22 @@ validateAndTypecheckFormula = (model, vars, formula) ->
 # vars: EJSONKeyedMap<string, type (string)>
 # Returns the new formula with the call to "up" or "down" added around
 # startCellsFmla.
-resolveNavigation = (model, vars, startCellsFmla, targetName) ->
+resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
+  # TODO: Implement keysFmla.  For now, the grammar doesn't accept it.
   interpretations = []
   unless startCellsFmla?
     valAssert(targetName != 'this',
               'Explicit "this" is not allowed in concrete syntax.  ' +
               'Please use the object name for clarity.')
-    if vars.get(targetName)?
-      interpretations.push(['var', targetName])
-    startCellsFmla = ['var', 'this']
+    if vars.get('this')?
+      if vars.get(targetName)?
+        interpretations.push(['var', targetName])
+      startCellsFmla = ['var', 'this']
+      # Fall through to navigation interpretations.
+    else  # i.e., in procedures
+      # Easier than trying to generalize the error message below.
+      valAssert(vars.get(targetName)?, "Undefined variable #{targetName}")
+      return ['var', targetName]
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.
   startCellsType = validateAndTypecheckFormula(model, vars, startCellsFmla)
@@ -572,13 +613,28 @@ resolveNavigation = (model, vars, startCellsFmla, targetName) ->
   if formula[0] == 'up' && formula[3] && formula[1][0] == 'down' && formula[2] == formula[1][2]
     formula = ['down', formula[1][1], formula[2], true]
 
-  return interpretations[0]
+  return formula
 
 liteModel = {
   # Eta-expand to avoid load-order dependency.
   getColumn: (columnId) -> getColumn(columnId)
   typecheckColumn: (columnId) -> getColumn(columnId).type
 }
+
+# Reused by parseProcedure. :/
+@setupParserCommon = (startToken, vars) ->
+  parser = new Jison.Parsers.language.Parser()
+  parser.yy.vars = vars.shallowClone()
+  parser.yy.startToken = startToken
+  parser.yy.bindVar = (varName, formula, allowOverwrite) ->
+    unless allowOverwrite
+      valAssert(!this.vars.get(varName)?, 'Shadowing variable ' + varName)
+    this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula))
+  parser.yy.unbindVar = (varName) ->
+    this.vars.delete(varName)
+  parser.yy.navigate = (startCellsFmla, targetName, keysFmla) ->
+    resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla)
+  return parser
 
 @parseFormula = (thisType, fmlaString) ->
   # XXX: If we are changing a formula so as to introduce a new cyclic type
@@ -587,17 +643,8 @@ liteModel = {
   # columns in the cycle will change to TYPE_ERROR and the navigations we just
   # interpreted will become invalid.  This behavior is weird but not worth
   # fixing now.
-  vars = new EJSONKeyedMap([['this', thisType]])
 
-  parser = new Jison.Parsers.formula.Parser()
-  parser.yy.startToken = 'FORMULA'
-  parser.yy.bindVar = (varName, domainFmla) ->
-    valAssert(!vars.get(varName)?, 'Lambda shadows variable ' + varName)
-    vars.set(varName, validateAndTypecheckFormula(liteModel, vars, domainFmla))
-  parser.yy.unbindVar = (varName) ->
-    vars.delete(varName)
-  parser.yy.navigate = (startCellsFmla, targetName) ->
-    resolveNavigation(liteModel, vars, startCellsFmla, targetName)
+  parser = setupParserCommon('FORMULA', new EJSONKeyedMap([['this', thisType]]))
 
   try
     return parser.parse(fmlaString)
@@ -624,4 +671,4 @@ stringifySubformula = (model, vars, formula) ->
   # Stringify should only happen after type checking, so it can use liteModel on
   # either client or server.
   stringifySubformula(
-    liteModel, new EJSONKeyedMap([['this', thisType]]), formula).strFor(0)
+    liteModel, new EJSONKeyedMap([['this', thisType]]), formula).strFor(PRECEDENCE_LOWEST)

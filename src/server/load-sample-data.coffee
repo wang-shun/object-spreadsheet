@@ -244,7 +244,7 @@
         # columns that come earlier in preorder.  We can probably live with this
         # until we implement full validation of acyclic type usage.
         parseTypeStr(columnDef.type),
-        columnDef.objectName? || columnDef.isObject,
+        columnDef.objectName? || (columnDef.isObject ? false),
         columnDef.objectName,
         null  # formula
       )
@@ -269,7 +269,7 @@
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()
-    parentId = parseObjectTypeRef(parentRef)
+    parentId = if parentRef then parseObjectTypeRef(parentRef) else rootColumnId
 
     model.defineColumn(parentId,
                        order, fieldName, specifiedType, isObject, objectName,
@@ -288,6 +288,15 @@
                             0, "studentName", null, false, null,
                             'discussed.Person.name')
 
+  defineParsedFormulaColumn("Class:Section:Enrollment",
+                            0, "scheduledMeeting", null, false, null,
+                            '{all m in ::Meeting | m.enrollment = Enrollment}')
+
+  # Future: Add special support for referential integrity?
+  defineParsedFormulaColumn("Meeting",
+                            2, "valid", null, false, null,
+                            'slot in ::Person.Teacher.Slot && enrollment.Section.teacher = slot.Teacher')
+
   defineParsedFormulaColumn("Person",
                             1, "children", null, true, null,
                             '{all c in ::Person | Person in c.Student.[parent].parent}',
@@ -296,6 +305,15 @@
                             0, "childName", null, false, null,
                             'children.name',
                             {view: '1'})
+
+  # Note, this only covers the constraints that can be broken by the
+  # transactions we support.
+  defineParsedFormulaColumn(
+    "", 3, "valid", null, false, null,
+    # XXX Change to universal quantification when available.
+    '{all e in ::Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&
+     {all s in ::Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&
+     {all m in ::Meeting | !m.valid} = {}')
 
   model.evaluateAll()  # prepare dependencies
 
@@ -311,3 +329,64 @@
   Views.upsert(view1._id, view1)
 
   model
+
+###
+Testing from the server shell:
+p = Tablespace.get('ptc').run(function() {
+ return convertSampleProcedure(sampleProcedures.parentCreateMeeting) })
+###
+
+# Future: Add special support for "check ::valid"?  But we might want similar
+# functionality for other checks, if the Derailer study is any evidence.
+# Cleanup: Introduce a formula to reduce duplication in enrollment authorization
+# checks?
+@sampleProcedures = {
+  teacherCreateSlot:
+    params: [['time', '_string']]
+    body: '''
+let t = clientUser.Teacher
+check t != {}
+let s = new t.Slot
+s.time := time
+check ::valid
+'''
+  teacherDeleteSlot:
+    params: [['slot', 'Person:Teacher:Slot']]
+    body: '''
+check slot.Person = clientUser
+delete slot
+check ::valid
+'''
+  parentCreateMeeting:
+    params: [['enr', 'Class:Section:Enrollment'],
+             ['slot', 'Person:Teacher:Slot']]
+    body: '''
+check clientUser in enr.student.[parent].parent
+let m = new ::Meeting
+m.enrollment := enr
+m.slot := slot
+check ::valid
+'''
+  parentCancelMeeting:
+    params: [['meeting', 'Meeting']]
+    body: '''
+check clientUser in meeting.enrollment.student.[parent].parent
+delete meeting
+check ::valid
+'''
+}
+
+@convertSampleProcedure = (obj) ->
+  params = new EJSONKeyedMap()
+  # Imagined to be system-set and count 1.
+  params.set('clientUser', parseTypeStr('Person'))
+  count1Checks = ''
+  for [paramName, paramType] in obj.params
+    if /\*$/.test(paramType)
+      paramType = paramType[0...-1]
+    else
+      count1Checks += "check count(#{paramName}) = 1\n"
+    paramType = parseTypeStr(paramType)
+    params.set(paramName, paramType)
+  body = parseProcedure(params, count1Checks + obj.body + '\n')
+  return {params: params, body: body}

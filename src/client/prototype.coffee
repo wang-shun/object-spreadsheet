@@ -581,6 +581,13 @@ class ClientView
             {row: i, col: j, rowspan: cell.rowspan, colspan: cell.colspan}
         )...)
 
+      # We don't have a principled design for how the selection should move
+      # after pressing Enter, and for now, the default behavior is causing
+      # surprises when it moves the selection to the padding cell at the bottom
+      # of a family, which is mapped by the "select similar cell" code to the
+      # first cell in the family.
+      enterMoves: {row: 0, col: 0}
+
       # Seems more helpful to the user (e.g., when scrolling the browser window).
       # See if we have trouble with the user needing to "escape" from the table.
       outsideClickDeselects: false

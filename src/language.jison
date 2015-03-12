@@ -7,7 +7,7 @@ frac "."[0-9]+
 
 %%
 \ + /* skip whitespace */
-\n return 'NEWLINE'
+\n return 'NL'
 
 /* Primitive literals */
 {int}{frac}?{exp}?\b return 'NUMBER'
@@ -20,7 +20,16 @@ frac "."[0-9]+
 Set literals, operators, etc.
 
 Careful: earlier entries take priority, so longer operators should go earlier.
+I've messed this up enough times that I'm prioritizing obvious correctness over
+keeping similar operators together. ~ Matt 2015-03-11
 */
+"&&" return '&&'
+"||" return '||'
+":=" return ':='
+"::" return 'ROOT'
+"!=" return '!='
+"<=" return '<='
+">=" return '>='
 "(" return '('
 ")" return ')'
 "[" return '['
@@ -28,15 +37,11 @@ Careful: earlier entries take priority, so longer operators should go earlier.
 "{" return '{'
 "}" return '}'
 "," return ','
-":=" return ':='
-"::" return 'ROOT'
 ":" return ':'
 "|" return '|'
+"!" return '!'
 "=" return '='
-"!=" return '!='
-"<=" return '<='
 "<" return '<'
-">=" return '>='
 ">" return '>'
 "+" return '+'
 "-" return '-'
@@ -48,6 +53,7 @@ Careful: earlier entries take priority, so longer operators should go earlier.
 "add" return 'ADD'
 "all" return 'ALL'
 "check" return 'CHECK'
+"count" return 'COUNT'
 "create" return 'CREATE'
 "delete" return 'DELETE'
 "else" return 'ELSE'
@@ -88,18 +94,27 @@ lexer.lex = function() {
 %start entryPointEOF
 
 /*
-Precedence level numbers are as used in stringify functions in
-formulas.coffee.
+Keep in sync with PRECEDENCE_* in formulas.coffee.
 
 Compare to:
 http://www.gnu.org/software/bison/manual/html_node/Infix-Calc.html
+
+WARNING: Jison silently ignores %precedence declarations
+(https://github.com/zaach/ebnf-parser/blob/5412bee3f848ce42b64eb11af6648450050bd7fd/bnf.l#L37)
+and %prec declarations for unknown operators
+(https://github.com/zaach/jison/blob/245f6dd9c0990c2dd05e9c44da0586b166d7f0d3/lib/jison.js#L326),
+making the former easy to miss.  We have to use %nonassoc instead.
 */
-%nonassoc '=' '!=' '<' '<=' '>' '>=' IN  /* 1 */
-%left '+' '-'     /* 2 */
-%left '*' '/'     /* 3 */
-%precedence NEG   /* 4 */
-%right '^'        /* 5 */
-%left '.'         /* 6 */
+%left '||'
+%left '&&'
+%nonassoc '=' '!=' '<' '<=' '>' '>=' IN
+%left '+' '-'
+%left '*' '/'
+/* ! with unary - is taken from C; it's a little weird but I don't have any
+   better idea. ~ Matt 2015-03-11 */
+%nonassoc NEG '!'
+%right '^'
+%left '.'
 
 %%
 
@@ -127,26 +142,61 @@ Putting the NLs here rather than in "statements" seems to be the easiest way to
 avoid a shift-reduce conflict at the optElse in the IF production.  :/
 */
 statement
+    /* TODO: Allow shadowing only in if statements (the only compelling use case)? */
     : LET IDENT '=' expression NL
-        { $$ = ['let', $2, $4]; }
+        { yy.bindVar($2, $4, true);
+          $$ = ['let', $2, $4]; }
     | familyReference ':=' expression NL
-        { $$ = ['set', $1, $3]; }
+        { $$ = ['set', yy.convertFamilyReference($1, false), $3]; }
     | TO SET familyReference ADD expression NL
-        { $$ = ['add', $3, $5]; }
+        { $$ = ['add', yy.convertFamilyReference($3, false), $5]; }
     | FROM SET familyReference REMOVE expression NL
-        { $$ = ['remove', $3, $5]; }
-    | IF expression '{' NL statements '}' NL optElse
-        { $$ = ['if', $2, $5, $7]; }
-    | FOREACH expression '{' NL statements '}' NL
-        { $$ = ['foreach', $2, $5]; }
+        { $$ = ['remove', yy.convertFamilyReference($3, false), $5]; }
+    | ifHeader '{' NL statements '}' NL optElse
+        { yy.commitVars();
+          $$ = ['if', $1, $4, $7]; }
+    | foreachHeader '{' NL statements '}' NL
+        { yy.rollbackVars();
+          $$ = ['foreach', $1.var, $1.domain, $4]; }
     | DELETE expression NL
         { $$ = ['delete', $2]; }
     | optLet NEW familyReference NL  /* Rarely useful without a let... */
-        { $$ = ['new', $1, $3]; }
-    | optLet CREATE familyReference NL '[' expression ']'
-        { $$ = ['create', $1, $3, $5]; }
-    | CHECK expression ':' expression NL
-        { $$ = ['check', $2, $4]; }
+        { if ($1) yy.bindVar($1, $3, true);
+          $$ = ['new', $1, yy.convertFamilyReference($3, true)]; }
+/*
+Enable once implemented in resolveNavigation.
+    | optLet CREATE familySliceReference NL
+        { if ($1) yy.bindVar($1, $3, true);
+          $$ = ['create', $1, yy.convertFamilyReference($3, true)]; }
+*/
+    /* Future: Error messages. */
+    | CHECK expression NL
+        { $$ = ['check', $2]; }
+    ;
+
+ifHeader
+    : IF '(' expression ')'
+        { yy.pushVars();
+          $$ = $3; }
+    ;
+
+optElse
+    :
+        { $$ = []; }
+    | elseHeader '{' NL statements '}' NL
+        { $$ = $4; }
+    ;
+
+elseHeader
+    : ELSE
+        { yy.nextBranch(); }
+    ;
+
+foreachHeader
+    : FOREACH '(' IDENT IN expression ')'
+        { yy.pushVars();
+          yy.bindVar($3, $5, false);
+          $$ = {var: $3, domain: $5}; }
     ;
 
 optLet
@@ -156,25 +206,28 @@ optLet
         { $$ = $2; }
     ;
 
-optElse
-    :
-        { $$ = []; }
-    | ELSE '{' NL statements '}' NL
-        { $$ = $4; }
-    ;
-
 /*
 The various "statement" productions that use this nonterminal require that it
-be a real down-navigation (not to a key column).  The expression production also
-allows up-navigations and variable references.
+be a real down-navigation (not to a key column).  The expression productions
+also allow up-navigations and variable references.
 */
-familyReference
+familyReferenceCommon
     : navigationStep  /* as expression, could be bound variable or implicit this */
         { $$ = [null, $1]; }
     | ROOT navigationStep
         { $$ = [['lit', '_root', [[]]], $2]; }
     | expression '.' navigationStep
         { $$ = [$1, $3]; }
+    ;
+
+familyReference
+    : familyReferenceCommon
+        { $$ = yy.navigate($1[0], $1[1], null); }
+    ;
+
+familySliceReference
+    : familyReferenceCommon '[' expression ']'
+        { $$ = yy.navigate($1[0], $1[1], $3); }
     ;
 
 expression
@@ -187,10 +240,11 @@ expression
     | atomicLiteral
         { $$ = $1; }
     | familyReference
-        { $$ = yy.navigate($1[0], $1[1]); }
+        { $$ = $1; }
 /*
-TODO: Implement for consistency with the create statement.
-    | familyReference '[' expression ']'
+Enable once implemented in resolveNavigation.
+    | familySliceReference
+        { $$ = $1; }
 */
     | '-' expression %prec NEG
         { $$ = ['neg', $2]; }
@@ -221,8 +275,16 @@ TODO: Implement for consistency with the create statement.
     | '{' filterBinding '|' expression '}'
         { yy.unbindVar($2.var);
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
+    | COUNT '(' expression ')'
+        { $$ = ['count', $3]; }
     | IF '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
+    | '!' expression
+        { $$ = ['!', $2]; }
+    | expression '&&' expression
+        { $$ = ['&&', $1, $3]; }
+    | expression '||' expression
+        { $$ = ['||', $1, $3]; }
     ;
 
 navigationStep
@@ -237,7 +299,7 @@ navigationStep
    https://github.com/zaach/jison/issues/69 */
 filterBinding
     : ALL IDENT IN expression
-        { yy.bindVar($2, $4);
+        { yy.bindVar($2, $4, false);
           $$ = {var: $2, domain: $4}; }
     ;
 

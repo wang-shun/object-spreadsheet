@@ -89,6 +89,10 @@
 
 # Returns: [columnId, isValues]
 @parseColumnRef = (s) ->
+  unless s
+    # What we currently want for user-facing usage.  load-sample-data has to
+    # override this behavior. :/
+    throw new SemanticError('We currently do not support references to the root column.')
   colId2 = [rootColumnId, false]
   for n in s.split(':')
     if colId2[1]
