@@ -53,6 +53,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 "add" return 'ADD'
 "check" return 'CHECK'
 "count" return 'COUNT'
+"oneOf" return 'ONEOF'
 "delete" return 'DELETE'
 "else" return 'ELSE'
 "foreach" return 'FOREACH'
@@ -270,6 +271,8 @@ expression
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
     | COUNT '(' expression ')'
         { $$ = ['count', $3]; }
+    | ONEOF '(' expression ')'
+        { $$ = ['oneOf', $3]; }
     | IF '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
     | '!' expression
