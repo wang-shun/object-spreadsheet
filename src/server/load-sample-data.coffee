@@ -279,7 +279,7 @@
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
                             1, "scheduledMeeting", null, true, null,
-                            '{all m in ::Meeting | m.slot = Slot}')
+                            '{m : $Meeting | m.slot = Slot}')
 
   defineParsedFormulaColumn("Person:Teacher:Slot:[scheduledMeeting]",
                             0, "discussed", null, true, null,
@@ -291,20 +291,20 @@
   # Example of a subscript expression; not currently needed for the PTC application.
   defineParsedFormulaColumn("Person:Student",
                             1, "enrollments", null, false, null,
-                            '::Class.Section.Enrollment[Student]')
+                            '$Class.Section.Enrollment[Student]')
 
   defineParsedFormulaColumn("Class:Section:Enrollment",
                             0, "scheduledMeeting", null, false, null,
-                            '{all m in ::Meeting | m.enrollment = Enrollment}')
+                            '{m : $Meeting | m.enrollment = Enrollment}')
 
   # Future: Add special support for referential integrity?
   defineParsedFormulaColumn("Meeting",
                             2, "valid", null, false, null,
-                            'slot in ::Person.Teacher.Slot && enrollment.Section.teacher = slot.Teacher')
+                            'slot in $Person.Teacher.Slot && enrollment.Section.teacher = slot.Teacher')
 
   defineParsedFormulaColumn("Person",
                             1, "children", null, true, null,
-                            '{all c in ::Person | Person in c.Student.[parent].parent}',
+                            '{c : $Person | Person in c.Student.[parent].parent}',
                             {view: '1'})
   defineParsedFormulaColumn("Person:[children]",
                             0, "childName", null, false, null,
@@ -316,9 +316,9 @@
   defineParsedFormulaColumn(
     "", 3, "valid", null, false, null,
     # XXX Change to universal quantification when available.
-    '{all e in ::Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&
-     {all s in ::Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&
-     {all m in ::Meeting | !m.valid} = {}')
+    '{e : $Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&
+     {s : $Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&
+     {m : $Meeting | !m.valid} = {}')
 
   model.evaluateAll()  # prepare dependencies
 
@@ -341,7 +341,7 @@ p = Tablespace.get('ptc').run(function() {
   return convertSampleProcedure(sampleProcedures.parentCreateMeeting) })
 ###
 
-# Future: Add special support for "check ::valid"?  But we might want similar
+# Future: Add special support for "check $valid"?  But we might want similar
 # functionality for other checks, if the Derailer study is any evidence.
 # Cleanup: Introduce a formula to reduce duplication in enrollment authorization
 # checks?
@@ -353,40 +353,40 @@ let t = clientUser.Teacher
 check t != {}
 let s = new t.Slot
 s.time := time
-check ::valid
+check $valid
 '''
   teacherDeleteSlot:
     params: [['slot', 'Person:Teacher:Slot']]
     body: '''
 check slot.Person = clientUser
 delete slot
-check ::valid
+check $valid
 '''
   parentCreateMeeting:
     params: [['enr', 'Class:Section:Enrollment'],
              ['slot', 'Person:Teacher:Slot']]
     body: '''
 check clientUser in enr.student.[parent].parent
-let m = new ::Meeting
+let m = new $Meeting
 m.enrollment := enr
 m.slot := slot
-check ::valid
+check $valid
 '''
   parentCancelMeeting:
     params: [['meeting', 'Meeting']]
     body: '''
 check clientUser in meeting.enrollment.student.[parent].parent
 delete meeting
-check ::valid
+check $valid
 '''
 
-  # This is just a test of a create statement, not something that actually
-  # belongs in the PTC application.
+  # This is just a test of a make statement, not something that actually belongs
+  # in the PTC application.
   enroll:
     params: [['student', 'Person:Student'],
              ['section', 'Class:Section']]
     body: '''
-create section.Enrollment[student]
+make section.Enrollment[student]
 '''
 }
 

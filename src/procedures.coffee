@@ -28,7 +28,7 @@ dispatch = {
     argAdapters: [EagerSubformula]
   new:
     argAdapters: [OptionalVarName, EagerFamilyRef]
-  create:
+  make:
     argAdapters: [OptionalVarName, EagerFamilyRef, EagerSubformula]
   check:
     argAdapters: [EagerSubformula]
@@ -72,12 +72,12 @@ mergeTypeMaps = (vars1, vars2) ->
       # types.
       getColumn(fmla[2]).isObject == wantObject && fmla[4] == !wantObject,
       if wantObject
-        'new/create only work on object families.'
+        'new/make only work on object families.'
       else
         'set/add/remove only work on leaf families.')
     valAssert(fmla[3]? == wantKeys,
               if wantKeys
-                'create requires a subscript expression.'
+                'make requires a subscript expression.'
               else
                 'A subscript expression is not allowed.')
     return fmla[1..3]

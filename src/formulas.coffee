@@ -263,7 +263,7 @@ stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, 
                                  column.fieldName, keysSinfo?.formula, wantFormula)
   {
     str:
-      (if startCellsSinfo.strFor(PRECEDENCE_NAV) == '::' then '::'
+      (if startCellsSinfo.strFor(PRECEDENCE_NAV) == '$' then '$'
       else if startCellsSinfo.strFor(PRECEDENCE_NAV) == 'this' then ''
       else startCellsSinfo.strFor(PRECEDENCE_NAV) + '.') + targetName +
       (if keysSinfo? then "[#{keysSinfo.strFor(PRECEDENCE_LOWEST)}]" else '')
@@ -337,7 +337,7 @@ dispatch = {
         # operators rather than as part of the literal.
         if type == '_root'
           # See stringifyNavigation.  This shouldn't be exposed anywhere else.
-          '::'
+          '$'
         else if list.length == 1
           JSON.stringify(list[0])
         else
@@ -465,7 +465,7 @@ dispatch = {
           # navigations will most likely be marked "problem".
           TYPE_ANY)
       {
-        str: "{all #{predicateSinfo[0]} in #{domainSinfo.strFor(PRECEDENCE_COMPARE+1)} " +
+        str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_COMPARE+1)} " +
              "| #{predicateSinfo[1].strFor(PRECEDENCE_LOWEST)}}"
         outerPrecedence: PRECEDENCE_ATOMIC
       }

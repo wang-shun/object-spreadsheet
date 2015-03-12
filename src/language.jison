@@ -26,10 +26,10 @@ keeping similar operators together. ~ Matt 2015-03-11
 "&&" return '&&'
 "||" return '||'
 ":=" return ':='
-"::" return 'ROOT'
 "!=" return '!='
 "<=" return '<='
 ">=" return '>='
+"$" return '$'
 "(" return '('
 ")" return ')'
 "[" return '['
@@ -51,16 +51,15 @@ keeping similar operators together. ~ Matt 2015-03-11
 "." return '.'
 
 "add" return 'ADD'
-"all" return 'ALL'
 "check" return 'CHECK'
 "count" return 'COUNT'
-"create" return 'CREATE'
 "delete" return 'DELETE'
 "else" return 'ELSE'
 "foreach" return 'FOREACH'
 "if" return 'IF'
 "in" return 'IN'
 "let" return 'LET'
+"make" return 'MAKE'
 "new" return 'NEW'
 "remove" return 'REMOVE'
 "set" return 'SET'
@@ -163,9 +162,9 @@ statement
     | optLet NEW familyReference NL  /* Rarely useful without a let... */
         { if ($1) yy.bindVar($1, $3, true);
           $$ = ['new', $1, yy.convertFamilyReference($3, true, false)]; }
-    | optLet CREATE familySliceReference NL
+    | optLet MAKE familySliceReference NL
         { if ($1) yy.bindVar($1, $3, true);
-          $$ = ['create', $1, yy.convertFamilyReference($3, true, true)]; }
+          $$ = ['make', $1, yy.convertFamilyReference($3, true, true)]; }
     /* Future: Error messages. */
     | CHECK expression NL
         { $$ = ['check', $2]; }
@@ -211,7 +210,7 @@ also allow up-navigations and variable references.
 familyReferenceCommon
     : navigationStep  /* as expression, could be bound variable or implicit this */
         { $$ = [null, $1]; }
-    | ROOT navigationStep
+    | '$' navigationStep
         { $$ = [['lit', '_root', [[]]], $2]; }
     | expression '.' navigationStep
         { $$ = [$1, $3]; }
@@ -292,9 +291,9 @@ navigationStep
 /* Could use a mid-rule action if supported.
    https://github.com/zaach/jison/issues/69 */
 filterBinding
-    : ALL IDENT IN expression
-        { yy.bindVar($2, $4, false);
-          $$ = {var: $2, domain: $4}; }
+    : IDENT ':' expression
+        { yy.bindVar($1, $3, false);
+          $$ = {var: $1, domain: $3}; }
     ;
 
 commaSeparatedExpressions
