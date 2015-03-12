@@ -1,37 +1,110 @@
-VarName = {
-}
-OptionalVarName = {
+# Argument adapters.
+# The first few are for documentation purposes and currently don't do anything.
+VarName = {}
+Statements = {}
+OptionalVarName = {}
+EagerSubformula = {
+  execute: evaluateFormula
 }
 EagerFamilyRef = {
-}
-Statements = {
+  execute: (model, vars, arg) ->
+    parentCellsTset: evaluateFormula(model, vars, arg[0])
+    columnId: arg[1]
+    keysTset: arg[2]
 }
 
-# Dummies, TBD how to implement this.
-EagerSubformula = null
-LazySubformula = null
+recursiveDeleteStateCell = (columnId, cellId) ->
+  col = getColumn(columnId)
+  for childColId in col.children
+    childCol = getColumn(childColId)
+    unless childCol.formula?
+      # Empty families are only inserted during evaluateAll, so they may not yet
+      # exist for objects created in the same transaction.
+      if (ce = Cells.findOne({column: childColId, key: cellId}))?
+        for val in ce.values
+          recursiveDeleteStateCell(childColId, cellIdChild(cellId, val))
+  Cells.update({column: columnId, key: cellIdParent(cellId)},
+               {$pull: {values: cellIdLastStep(cellId)}})
 
 dispatch = {
   let:
     argAdapters: [VarName, EagerSubformula]
+    execute: (model, mutableVars, lhsName, rhsTset) ->
+      mutableVars.set(lhsName, rhsTset)
   set:
     argAdapters: [EagerFamilyRef, EagerSubformula]
+    execute: (model, mutableVars, lhsFref, rhsTset) ->
+      # XXX Validate not modifying a formula column.
+      model.invalidateDataCache()
+      for parentCellId in lhsFref.parentCellsTset.elements()
+        Cells.upsert({column: lhsFref.columnId, key: parentCellId},
+                     {$set: {values: rhsTset.elements()}})
   add:
     argAdapters: [EagerFamilyRef, EagerSubformula]
+    execute: (model, mutableVars, lhsFref, rhsTset) ->
+      # XXX Validate not modifying a formula column.
+      model.invalidateDataCache()
+      for parentCellId in lhsFref.parentCellsTset.elements()
+        Cells.upsert({column: lhsFref.columnId, key: parentCellId},
+                     {$addToSet: {values: {$each: rhsTset.elements()}}})
   remove:
     argAdapters: [EagerFamilyRef, EagerSubformula]
+    execute: (model, mutableVars, lhsFref, rhsTset) ->
+      # XXX Validate not modifying a formula column.
+      model.invalidateDataCache()
+      for parentCellId in lhsFref.parentCellsTset.elements()
+        Cells.update({column: lhsFref.columnId, key: parentCellId},
+                     {$pullAll: {values: rhsTset.elements()}})
   if:
     argAdapters: [EagerSubformula, Statements, Statements]
+    execute: (model, mutableVars, conditionTset, thenBody, elseBody) ->
+      executeStatements1(
+        model, mutableVars,
+        if evalAsSingleton(conditionTset.set) then thenBody else elseBody)
   foreach:
     argAdapters: [VarName, EagerSubformula, Statements]
+    execute: (model, mutableVars, bindVarName, domainTset, body) ->
+      for element in domainTset.elements()
+        newVars = mutableVars.shallowClone()
+        newVars.set(bindVarName, new TypedSet(domainTset.type, set([element])))
+        executeStatements1(model, newVars, body)
   delete:
     argAdapters: [EagerSubformula]
+    execute: (model, mutableVars, objectsTset) ->
+      # XXX: We are relying on objectsTset.type being correct!  This
+      # functionality is poorly tested since we introduced typechecking.
+      model.invalidateDataCache()
+      for objectId in objectsTset.elements()
+        recursiveDeleteStateCell(objectsTset.type, objectId)
   new:
     argAdapters: [OptionalVarName, EagerFamilyRef]
+    execute: (model, mutableVars, bindVarName, fref) ->
+      model.invalidateDataCache()
+      objects = []
+      for parentCellId in fref.parentCellsTset.elements()
+        token = Random.id()
+        Cells.upsert({column: fref.columnId, key: parentCellId},
+                     {$addToSet: {values: token}})
+        objects.push(cellIdChild(parentCellId, token))
+      if bindVarName?
+        mutableVars.set(bindVarName, new TypedSet(fref.columnId, set(objects)))
   make:
-    argAdapters: [OptionalVarName, EagerFamilyRef, EagerSubformula]
+    argAdapters: [OptionalVarName, EagerFamilyRef]
+    execute: (model, mutableVars, bindVarName, fref) ->
+      model.invalidateDataCache()
+      for parentCellId in fref.parentCellsTset.elements()
+        for key in fref.keysTset.elements()
+          # No-op if already exists
+          Cells.upsert({column: fref.columnId, key: parentCellId},
+                       {$addToSet: {values: key}})
+          objects.push(cellIdChild(parentCellId, key))
+      if bindVarName?
+        mutableVars.set(bindVarName, new TypedSet(fref.columnId, set(objects)))
   check:
     argAdapters: [EagerSubformula]
+    execute: (model, mutableVars, conditionTset) ->
+      unless evalAsSingleton(conditionTset.set)
+        throw new EvaluationError('check statement failed')
 }
 
 mergeTypeMaps = (vars1, vars2) ->
@@ -43,7 +116,23 @@ mergeTypeMaps = (vars1, vars2) ->
   else
     vars2
 
-@parseProcedure = (params, procString) ->
+@parseCannedTransaction = (paramsInfo, bodyString) ->
+  params = new EJSONKeyedMap()
+  # Disable automatic addition of built-in parameters for now to avoid the
+  # hassle of setting them manually when they aren't actually needed.
+  ## Imagined to be system-set and count 1.
+  #params.set('clientUser', parseTypeStr('Person'))
+  count1Checks = ''
+  for [paramName, paramType] in paramsInfo
+    if /\*$/.test(paramType)
+      paramType = paramType[0...-1]
+    else
+      count1Checks += "check count(#{paramName}) = 1\n"
+    paramType = parseTypeStr(paramType)
+    params.set(paramName, paramType)
+  bodyString = (count1Checks + bodyString +
+                if /\n$/.test(bodyString) then '' else '\n')
+
   parser = setupParserCommon('PROCEDURE', params)
   # More stuff for scoping and flow sensitivity...
   parser.yy.varsStack = []
@@ -83,7 +172,7 @@ mergeTypeMaps = (vars1, vars2) ->
     return fmla[1..3]
 
   try
-    return parser.parse(procString)
+    return {params, body: parser.parse(bodyString)}
   catch e
     # Yuck.  Any better way to recognize parse errors caused by user input?
     if /^(Lexical|Parse) error/.test(e.message)
@@ -91,5 +180,23 @@ mergeTypeMaps = (vars1, vars2) ->
     else
       throw e
 
+# Copied from formulas.coffee.  More generality than we need right now.
+dispatchStatement = (action, statement, contextArgs...) ->
+  d = dispatch[statement[0]]
+  args = statement[1..]
+  adaptedArgs =
+    for adapter, i in d.argAdapters
+      if adapter[action]? then adapter[action](contextArgs..., args[i]) else args[i]
+  d[action](contextArgs..., adaptedArgs...)
+
+executeStatement = (model, mutableVars, statement) ->
+  dispatchStatement('execute', statement, model, mutableVars)
+
+# mutableVars: The map is intended to be mutated; the value tsets, not.
+executeStatements1 = (model, mutableVars, statements) ->
+  for statement in statements
+    executeStatement(model, mutableVars, statement)
+
+# May throw EvaluationError and leave things in an intermediate state.
 @executeStatements = (model, vars, statements) ->
-  TODO
+  executeStatements1(model, vars.shallowClone(), statements)

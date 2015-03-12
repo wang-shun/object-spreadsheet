@@ -2,11 +2,15 @@
 if Meteor.isClient
   Router.route "/:sheet/apps", -> @render "DearBeta", data: {sheet: @params.sheet}
 
+  # C.f. standardServerCallback, andThen in prototype.coffee.
+  executeCannedTransaction = (name, argsObj, callback) ->
+    $$.call('executeCannedTransaction', name, argsObj,
+            (error, result) -> if error? then alert(error.message) else callback?(result))
 
   Template.DearBeta.created = ->
     sheet = @data?.sheet
     Tablespace.default = Tablespace.get sheet
-    Meteor.call 'open', $$
+    Meteor.call 'defineDearbetaProcedures', $$
 
   Template.DearBeta.helpers
     cells: ->
@@ -17,20 +21,53 @@ if Meteor.isClient
       obj.File
 
   Template.DearBeta.events
-    "click .Request .up": -> $$.call "requestUp", @Request.qFamilyId
-    "click .Request .down": -> $$.call "requestDown", @Request[0]?.qCellId
-    "click .Hint .up": -> $$.call "hintUp", @Vote.qFamilyId
-    "click .Hint .down": -> $$.call "hintDown", @Vote[0]?.qCellId
-    "click .Hint .del": -> $$.call "hintDel", @qCellId
+    "click .Request .up": ->
+      executeCannedTransaction("requestUp", {at: [@Request.qFamilyId.cellId]})
+    "click .Request .down": ->
+      executeCannedTransaction("requestDown", {at: [@qCellId.cellId]})
+    "click .Hint .up": ->
+      executeCannedTransaction("hintUp", {at: [@Vote.qFamilyId.cellId]})
+    "click .Hint .down": ->
+      executeCannedTransaction("hintDown", {at: [@qCellId.cellId]})
+    "click .Hint .del": ->
+      executeCannedTransaction("hintDel", {at: [@qCellId.cellId]})
     "submit form": (event) ->
-      $$.call "hintAdd", @Hint.qFamilyId, event.target.text.value, ->
-        event.target.reset()
+      executeCannedTransaction(
+        "hintAdd",
+        {at: [@Hint.qFamilyId.cellId], text: [event.target.text.value]},
+        () -> event.target.reset())
       false
 
 
 if Meteor.isServer
   
+  procedures =
+    requestUp:
+      params: [['at', 'File:Node:Time']]
+      body: '''new at.Request'''
+    requestDown:
+      params: [['at', 'File:Node:Time']]
+      body: '''delete oneOf(at.Request)'''
+    hintUp:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''new at.Vote'''
+    hintDown:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''delete oneOf(at.Vote)'''
+    hintAdd:
+      params: [['at', 'File:Node:Time'], ['text', '_string']]
+      body: '''let h = new at.Hint
+               h.body := text'''
+    hintDel:
+      params: [['at', 'File:Node:Time:Hint']]
+      body: '''delete at'''
+  
   Meteor.methods
+    defineDearbetaProcedures: (cc) ->
+      cc.run ->
+        for name, proc of procedures
+          @model.cannedTransactions.set(
+            name, parseCannedTransaction(proc.params, proc.body))
     requestUp: (cc, qFamilyId) -> cc.runTransaction ->
       new ColumnBinRel(qFamilyId.columnId).add(qFamilyId.cellId, Random.id())
     requestDown: (cc, qCellId) -> cc.runTransaction ->
@@ -48,34 +85,7 @@ if Meteor.isServer
         .add(cellIdChild(qFamilyId.cellId, tok), text)
     hintDel: (cc, qCellId) -> cc.runTransaction ->
       new ColumnBinRel(qCellId.columnId).remove(qCellId.cellId)
-        
-  procedures =
-    requestUp:
-      params: [['at', 'File:Node:Time']]
-      body: '''new at.Request
-'''
-    requestDown:
-      params: [['at', 'File:Node:Time']]
-      body: '''delete oneOf(at.Request)'''
-    hintUp:
-      params: [['at', 'File:Node:Time:Hint']]
-      body: '''new at.Vote'''
-    hintDown:
-      params: [['at', 'File:Node:Time:Hint']]
-      body: '''delete oneOf(at.Vote)'''
-    hintAdd:
-      params: [['at', 'File:Node:Time'], ['text', '_string']]
-      body: '''let h = create at.Hint
-               h.body = text'''
-    hintDel:
-      params: [['at', 'File:Node:Time:Hint']]
-      body: '''delete at'''
-  
-  @gogogo = ->
-    for name of procedures
-      proc = procedures[name]
-      parseProcedure(proc.params, proc.body)
-  
+
 readObj = (t, rootCellId, keyField=undefined) ->
   obj = {qCellId: {columnId: t.root, cellId: rootCellId}}
   if keyField?

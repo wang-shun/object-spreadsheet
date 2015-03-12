@@ -57,11 +57,13 @@ class ColumnBinRel
     c = Columns.findOne(@columnId)
     new TypedSet([c.parent, c.type], set(@cells()))
 
+  # NOTE: "callback" is supported only on the client.
+
   add: (key, value, callback=->) ->
     if Meteor.isServer
+      $$.model.invalidateDataCache()
       Cells.upsert {column: @columnId, key}, {$addToSet: {values: value}}
-      $$.model.invalidateCache()
-      $$.call 'notifyChange', callback
+      $$.model.evaluateAll()
     else
       $$.call 'ColumnBinRel_add', @columnId, key, value, callback
 
@@ -71,9 +73,9 @@ class ColumnBinRel
       key = cellIdParent(cellId)
       value = cellIdLastStep(cellId)
     if Meteor.isServer
+      $$.model.invalidateDataCache()
       Cells.update {column: @columnId, key}, {$pull: {values: value}}
-      $$.model.invalidateCache()
-      $$.call 'notifyChange', callback
+      $$.model.evaluateAll()
     else
       $$.call 'ColumnBinRel_remove', @columnId, key, value, callback
 
@@ -87,10 +89,10 @@ class ColumnBinRel
       if Meteor.isServer
         # This WOULD have been nice, but is not supported (Mongo ticket SERVER-1050)
         #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}
+        $$.model.invalidateDataCache()
         Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
         Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
-        $$.model.invalidateCache()
-        $$.call 'notifyChange', callback
+        $$.model.evaluateAll()
       else
         $$.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
 
@@ -173,6 +175,7 @@ class Transaction
         if ! @mem.findOne(doc._id)
           @dbCells.remove(doc._id)
       @mem.find({dirty: true}).forEach (doc) =>
+        delete doc.dirty
         @dbCells.upsert(doc._id, doc)
     
   constructor: (dbCells) ->

@@ -44,7 +44,7 @@ valExpectType = (what, actualType, expectedType) ->
   valAssert(mergeTypes(actualType, expectedType) == expectedType,
             "#{what} has type #{actualType}, wanted #{expectedType}")
 
-evalAsSingleton = (set) ->
+@evalAsSingleton = (set) ->
   elements = set.elements()
   evalAssert(elements.length == 1, 'Expected a singleton')
   elements[0]
@@ -666,11 +666,6 @@ liteModel = {
 
 # Reused by parseProcedure. :/
 @setupParserCommon = (startToken, vars) ->
-  if _.isArray(vars)
-    a = vars
-    vars = new EJSONKeyedMap()
-    for [k,v] in a
-      vars.set(k, parseTypeStr(v))
   parser = new Jison.Parsers.language.Parser()
   parser.yy.vars = vars.shallowClone()
   parser.yy.startToken = startToken
