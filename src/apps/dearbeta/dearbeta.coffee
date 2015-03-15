@@ -1,6 +1,6 @@
 
 if Meteor.isClient
-  Router.route "/:sheet/apps", -> @render "DearBeta", data: {sheet: @params.sheet}
+  Router.route "/beta/apps", -> @render "DearBeta", data: {sheet: 'beta'}
 
   # C.f. standardServerCallback, andThen in prototype.coffee.
   executeCannedTransaction = (name, argsObj, callback) ->
@@ -13,8 +13,6 @@ if Meteor.isClient
     Meteor.call 'defineDearbetaProcedures', $$
 
   Template.DearBeta.helpers
-    cells: ->
-      Cells.find()
     files: ->
       t = View.rootLayout()
       obj = readObj(t, [])
@@ -107,3 +105,5 @@ readObj = (t, rootCellId, keyField=undefined) ->
         obj[c.fieldName] = vals
   
   obj
+  
+exported {readObj}

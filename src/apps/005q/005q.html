@@ -1,0 +1,15 @@
+<template name="DoubleOhFiveQueue">
+  <form>
+    Hi! My name is <input name="name"> and I need help with <input name="matter">.
+    I'm at <input name="location">
+    <button type="submit">HELP ME!</button>
+  </form>
+  
+  <div class="the-queue">
+    <ul>
+      {{#each root.Call}}
+      <li>{{name}}</li>
+      {{/each}}
+    </ul>
+  </div>
+</template>
