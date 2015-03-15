@@ -176,8 +176,4 @@ without = (list, item) -> list.filter (x) -> x != item
 set = (x) -> new EJSONKeyedSet(x)
 T = -> new Tree(arguments...)
 
-exported = (d) ->
-  for k,v of d
-    @[k] = v
-
 exported {exported, set, Tree, T, Digraph}

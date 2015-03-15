@@ -34,9 +34,4 @@ class ControlContext extends OnDemand
   call: (method, args...) ->
     Meteor.call method, @, args...
 
-
-exported = (d) ->
-  for k,v of d
-    @[k] = v
-
-exported {exported, Announce, OnDemand, ControlContext}
+exported {Announce, OnDemand, ControlContext}

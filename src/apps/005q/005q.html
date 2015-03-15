@@ -1,15 +1,34 @@
 <template name="DoubleOhFiveQueue">
   <form>
-    Hi! My name is <input name="name"> and I need help with <input name="matter">.
+    Hi! My name is <input name="name" required> and I need help with
+    <input type="text" name="matter" list="skills">.
+    <datalist id="skills">
+      {{#each root.Skill}}
+      <option value="{{name}}"></option>
+      {{/each}}
+    </datalist>
     I'm at <input name="location">
     <button type="submit">HELP ME!</button>
   </form>
   
   <div class="the-queue">
     <ul>
-      {{#each root.Call}}
+      {{#each sortBy root.Call "time"}}
       <li>{{name}}</li>
       {{/each}}
     </ul>
   </div>
+
+  <hr>
+  <h3>Staff login</h3>
+  {{#each root.Staff}}
+  <div>
+    <b>{{name}}</b>, your calls are:
+    <ul>
+      {{#each calls}}
+      <li>{{name}} ({{#each matter}}{{name}}{{/each}})</li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/each}}
 </template>

@@ -2,35 +2,28 @@
 if Meteor.isClient
   Router.route "/beta/apps", -> @render "DearBeta", data: {sheet: 'beta'}
 
-  # C.f. standardServerCallback, andThen in prototype.coffee.
-  executeCannedTransaction = (name, argsObj, callback) ->
-    $$.call('executeCannedTransaction', name, argsObj,
-            (error, result) -> if error? then alert(error.message) else callback?(result))
-
   Template.DearBeta.created = ->
-    sheet = @data?.sheet
-    Tablespace.default = Tablespace.get sheet
-    Meteor.call 'defineDearbetaProcedures', $$
+    Tablespace.default = Tablespace.get @data?.sheet
+    $$.call 'compileProcedures', @data?.sheet
 
   Template.DearBeta.helpers
     files: ->
-      t = View.rootLayout()
-      obj = readObj(t, [])
+      obj = Relsheets.read()
       obj.File
 
   Template.DearBeta.events
     "click .Request .up": ->
-      executeCannedTransaction("requestUp", {at: [@Request.qFamilyId.cellId]})
+      Relsheets.call("requestUp", {at: [@Request.qFamilyId.cellId]})
     "click .Request .down": ->
-      executeCannedTransaction("requestDown", {at: [@qCellId.cellId]})
+      Relsheets.call("requestDown", {at: [@qCellId.cellId]})
     "click .Hint .up": ->
-      executeCannedTransaction("hintUp", {at: [@Vote.qFamilyId.cellId]})
+      Relsheets.call("hintUp", {at: [@Vote.qFamilyId.cellId]})
     "click .Hint .down": ->
-      executeCannedTransaction("hintDown", {at: [@qCellId.cellId]})
+      Relsheets.call("hintDown", {at: [@qCellId.cellId]})
     "click .Hint .del": ->
-      executeCannedTransaction("hintDel", {at: [@qCellId.cellId]})
+      Relsheets.call("hintDel", {at: [@qCellId.cellId]})
     "submit form": (event) ->
-      executeCannedTransaction(
+      Relsheets.call(
         "hintAdd",
         {at: [@Hint.qFamilyId.cellId], text: [event.target.text.value]},
         () -> event.target.reset())
@@ -39,7 +32,7 @@ if Meteor.isClient
 
 if Meteor.isServer
   
-  procedures =
+  Relsheets.procedures "beta",
     requestUp:
       params: [['at', 'File:Node:Time']]
       body: '''new at.Request'''
@@ -59,51 +52,3 @@ if Meteor.isServer
     hintDel:
       params: [['at', 'File:Node:Time:Hint']]
       body: '''delete at'''
-  
-  Meteor.methods
-    defineDearbetaProcedures: (cc) ->
-      cc.run ->
-        # This may run multiple times; it should overwrite and not cause any problems.
-        try
-          for name, proc of procedures
-            @model.cannedTransactions.set(
-              name, parseCannedTransaction(proc.params, proc.body))
-        catch e
-          # Incompatible schema change?
-          console.log("Failed to define dearbeta sample procedure #{name}:", e.stack)
-    requestUp: (cc, qFamilyId) -> cc.runTransaction ->
-      new ColumnBinRel(qFamilyId.columnId).add(qFamilyId.cellId, Random.id())
-    requestDown: (cc, qCellId) -> cc.runTransaction ->
-      if qCellId?
-        new ColumnBinRel(qCellId.columnId).remove(qCellId.cellId)
-    hintUp: (cc, qFamilyId) -> cc.runTransaction ->
-      new ColumnBinRel(qFamilyId.columnId).add(qFamilyId.cellId, Random.id())
-    hintDown: (cc, qCellId) -> cc.runTransaction ->
-      if qCellId?
-        new ColumnBinRel(qCellId.columnId).remove(qCellId.cellId)
-    hintAdd: (cc, qFamilyId, text) -> cc.runTransaction ->
-      tok = Random.id()
-      new ColumnBinRel(qFamilyId.columnId).add(qFamilyId.cellId, tok)
-      new ColumnBinRel(parseColumnRef("File:Node:Time:Hint:body")[0])
-        .add(cellIdChild(qFamilyId.cellId, tok), text)
-    hintDel: (cc, qCellId) -> cc.runTransaction ->
-      new ColumnBinRel(qCellId.columnId).remove(qCellId.cellId)
-
-readObj = (t, rootCellId, keyField=undefined) ->
-  obj = {qCellId: {columnId: t.root, cellId: rootCellId}}
-  if keyField?
-    obj[keyField] = cellIdLastStep(rootCellId)
-  for x in t.subtrees
-    c = Columns.findOne(x.root)
-    if c?
-      vals = new ColumnBinRel(x.root).lookup(set([rootCellId])).set.elements()
-      if c.objectName?
-        fam = (readObj(x, cellIdChild(rootCellId, v), c.fieldName) for v in vals)
-        fam.qFamilyId = {columnId: x.root, cellId: rootCellId}
-        obj[c.objectName] = fam
-      else if c.fieldName?
-        obj[c.fieldName] = vals
-  
-  obj
-  
-exported {readObj}
