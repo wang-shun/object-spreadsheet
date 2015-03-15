@@ -26,7 +26,16 @@
     <b>{{name}}</b>, your calls are:
     <ul>
       {{#each calls}}
-      <li>{{name}} ({{#each matter}}{{name}}{{/each}})</li>
+      <li>{{name}} ({{#each matter}}{{name}}{{/each}})
+        {{#with call=this user=..}}
+        {{#if call.assign.length}}
+        <button class="done">Done</button>
+        <button class="forfeit">Forfeit</button>
+        {{else}}
+        <button class="pick">Pick</button>
+        {{/if}}
+        {{/with}}
+      </li>
       {{/each}}
     </ul>
   </div>

@@ -20,6 +20,12 @@ if Meteor.isClient
         location: [event.target.location.value]
       Relsheets.call("enqueue", formData, -> event.target.reset())
       false
+    "click .pick": ->
+      Relsheets.call("pick", {call: [@call.qCellId.cellId], user: [@user.qCellId.cellId]})
+    "click .forfeit": ->
+      Relsheets.call("forfeit", {call: [@call.qCellId.cellId]})
+    "click .done": ->
+      Relsheets.call("done", {call: [@call.qCellId.cellId]})
 
 
 if Meteor.isServer
@@ -35,6 +41,16 @@ if Meteor.isServer
                q.name := name
                q.location := location
                q.matter := {s : $Skill | s.name = matter}'''
+    pick:
+      params: [['call', 'Call'],
+               ['user', 'Staff']]
+      body: '''call.assign := user'''
+    forfeit:
+      params: [['call', 'Call']]
+      body: '''call.assign := {}'''
+    done:
+      params: [['call', 'Call']]
+      body: '''delete call'''
 
   Meteor.methods
     define005qProcedures: (cc) ->

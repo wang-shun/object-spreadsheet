@@ -25,8 +25,14 @@ if Meteor.isServer
     compileProcedures: (cc, sheet) -> cc.run -> Relsheets.compile(sheet)
 
 
-Relsheets.readObj = (t, rootCellId, keyField=undefined) ->
+Relsheets.readObj = (t, rootCellId, keyField=undefined, visited=undefined) ->
   obj = {qCellId: {columnId: t.root, cellId: rootCellId}}
+  if !visited?
+    visited = new EJSONKeyedMap
+  if (v = visited.get(obj.qCellId))
+    return v
+  visited.set(obj.qCellId, obj)
+    
   if keyField?
     obj[keyField] = cellIdLastStep(rootCellId)
   for x in t.subtrees
@@ -34,13 +40,13 @@ Relsheets.readObj = (t, rootCellId, keyField=undefined) ->
     if c?
       vals = new ColumnBinRel(x.root).lookup(set([rootCellId])).set.elements()
       if c.objectName?
-        fam = (@readObj(x, cellIdChild(rootCellId, v), c.fieldName) for v in vals)
+        fam = (@readObj(x, cellIdChild(rootCellId, v), c.fieldName, visited) for v in vals)
         fam.qFamilyId = {columnId: x.root, cellId: rootCellId}
         obj[c.objectName] = fam
       else if c.fieldName?
         if c.type? && !typeIsPrimitive(c.type)
           ot = View.drillDown(c.type)
-          vals = vals.map((v) => @readObj(ot, v))
+          vals = vals.map((v) => @readObj(ot, v, Columns.findOne(ot.root)?.fieldName, visited))
         obj[c.fieldName] = vals
 
   obj
