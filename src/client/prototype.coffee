@@ -525,11 +525,11 @@ class ClientView
       # This is terrible but it will take ten times as long to do properly...
       # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
       cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-                "#{if headerExpanded.get() then '-' else '+'}</button> ON")
+                "#{if headerExpanded.get() then '-' else '+'}</button> Obj")
       gridVertExtend(gridCaption,
-                     gridMergedCell(headerHeight - 2, 1, cnHtml, ['htMiddle', 'rsCaption']))
+                     gridMergedCell(headerHeight - 2, 1, cnHtml, ['htBottom', 'rsCaption']))
     gridCaption.push(
-      [new ViewCell('FN', 1, 1, ['rsCaption'])],
+      [new ViewCell('Field', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
     gridVertExtend(gridCaption,
                    ([new ViewCell(i+1, 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
