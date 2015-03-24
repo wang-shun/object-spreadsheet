@@ -64,6 +64,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 "oneOf" return 'ONEOF'
 "remove" return 'REMOVE'
 "set" return 'SET'
+"sum" return 'SUM'
 "to" return 'TO'
 
 /* Identifiers */
@@ -266,9 +267,15 @@ expression
         { $$ = ['>=', $1, $3]; }
     | expression IN expression
         { $$ = ['in', $1, $3]; }
-    | '{' filterBinding '|' expression '}'
+    | '{' binding '|' expression '}'
         { yy.unbindVar($2.var);
           $$ = ['filter', $2.domain, [$2.var, $4]]; }
+    /* For demo purposes.  I'm not thrilled with this syntax.  Decoupling
+       typechecking from parsing so that we have the option to put the binding
+       after the expression (if we choose) is on the to-do list. :( ~ Matt */
+    | 'SUM' '[' binding ']' '(' expression ')'
+        { yy.unbindVar($3.var);
+          $$ = ['sum', $3.domain, [$3.var, $6]]; }
     | COUNT '(' expression ')'
         { $$ = ['count', $3]; }
     | ONEOF '(' expression ')'
@@ -293,7 +300,7 @@ navigationStep
 
 /* Could use a mid-rule action if supported.
    https://github.com/zaach/jison/issues/69 */
-filterBinding
+binding
     : IDENT ':' expression
         { yy.bindVar($1, $3, false);
           $$ = {var: $1, domain: $3}; }

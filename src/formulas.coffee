@@ -476,8 +476,33 @@ dispatch = {
           # navigations will most likely be marked "problem".
           TYPE_ANY)
       {
-        str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_COMPARE+1)} " +
+        str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)} " +
              "| #{predicateSinfo[1].strFor(PRECEDENCE_LOWEST)}}"
+        outerPrecedence: PRECEDENCE_ATOMIC
+      }
+
+  sum:
+    argAdapters: [EagerSubformula, Lambda]
+    typecheck: (model, vars, domainType, addendLambda) ->
+      addendLambda(domainType)
+    evaluate: (model, vars, domainTset, addendLambda) ->
+      res = 0
+      for x in domainTset.elements()
+        tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
+        res += evalAsSingleton(addendLambda(tset).set)
+      return new TypedSet('_number', new EJSONKeyedSet([res]))
+    stringify: (model, vars, domainSinfo, addendLambda) ->
+      addendSinfo = addendLambda(
+        try
+          typecheckFormula(model, vars, domainSinfo.formula)
+        catch e
+          # If we try to stringify a formula that doesn't typecheck, we want to
+          # get something half-useful rather than crash.  Any dependent
+          # navigations will most likely be marked "problem".
+          TYPE_ANY)
+      {
+        str: "sum[#{addendSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)}]" +
+             "(#{addendSinfo[1].strFor(PRECEDENCE_LOWEST)})"
         outerPrecedence: PRECEDENCE_ATOMIC
       }
 
