@@ -1,4 +1,4 @@
-@loadSampleData = (model) ->
+@loadPTCData = (model) ->
   # Sample schema and data in a more human-friendly hierarchical format.
 
   sampleSchema = [
@@ -389,7 +389,7 @@ make section.Enrollment[student]
 '''
 }
 
-@defineSampleProcedures = (model) ->
+@definePTCProcedures = (model) ->
   # Needed to parse procedures; server-startup evaluateAll hasn't run yet.
   model.typecheckAll()
   for name, proc of sampleProcedures
@@ -408,3 +408,12 @@ Meteor.call('executeCannedTransaction', $$, 'teacherCreateSlot', {clientUser: [[
 Object IDs can be copied from the full text of the bullet cell.  Remember to
 promote all arguments to lists.
 ###
+
+@loadDump = (appName) ->
+  try
+    for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells']]
+      docs = JSON.parse(Assets.getText("dump/#{appName}:#{collName}.json"))
+      for doc in docs
+        coll.upsert(doc._id, doc)  # upsert needed to overwrite root column
+  catch e
+    console.log("Failed to load dump for #{appName} into sheet '#{$$.id}':", e.stack)

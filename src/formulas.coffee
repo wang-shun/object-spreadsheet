@@ -615,7 +615,7 @@ dispatchFormula = (action, formula, contextArgs...) ->
 @DUMMY_FORMULA = ['union', []]
 
 # BELOW: Concrete syntax support.  However, this is used on the server, by
-# loadSampleData!
+# loadPTCData!
 
 validateAndTypecheckFormula = (model, vars, formula) ->
   validateSubformula(new EJSONKeyedSet(vars.keys()), formula)

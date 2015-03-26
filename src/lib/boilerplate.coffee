@@ -10,19 +10,19 @@ if Meteor.isServer
 
   Relsheets =
     _procedures: {}
-    procedures: (sheet, defs) -> @_procedures[sheet] = defs
-    compile: (sheet) ->
+    procedures: (appName, defs) -> @_procedures[appName] = defs
+    compile: (appName) ->
       # This may run multiple times; it should overwrite and not cause any problems.
       try
-        for name, proc of @_procedures[sheet]
+        for name, proc of @_procedures[appName]
           $$.model.cannedTransactions.set(
             name, parseCannedTransaction(proc.params, proc.body))
       catch e
         # Incompatible schema change?
-        console.log("Failed to define '#{sheet}' sample procedure #{name}:", e.stack)
+        console.log("Failed to define app #{appName} sample procedure #{name} on sheet #{$$.id}:", e.stack)
 
   Meteor.methods
-    compileProcedures: (cc, sheet) -> cc.run -> Relsheets.compile(sheet)
+    compileProcedures: (cc, appName) -> cc.run -> Relsheets.compile(appName)
 
 
 Relsheets.readObj = (t, rootCellId, keyField=undefined, visited=undefined) ->

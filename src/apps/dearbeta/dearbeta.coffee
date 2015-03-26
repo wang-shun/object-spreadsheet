@@ -1,10 +1,11 @@
 
 if Meteor.isClient
-  Router.route "/beta/apps", -> @render "DearBeta", data: {sheet: 'beta'}
+  Router.route "/:sheet/apps/beta", ->
+    @render "DearBeta", data: {sheet: @params.sheet}
 
   Template.DearBeta.created = ->
     Tablespace.default = Tablespace.get @data?.sheet
-    $$.call 'compileProcedures', @data?.sheet
+    $$.call 'compileProcedures', 'beta'
 
   Template.DearBeta.helpers
     files: ->

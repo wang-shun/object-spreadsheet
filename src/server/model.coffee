@@ -359,10 +359,19 @@ Meteor.startup () ->
   Tablespace.onCreate ->
     @do ->
       @model = new Model
-      if /^(.*\.)?ptc$/.test(@id)
+      appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
+      if appName == 'ptc'
         if @model.wasEmpty
-          loadSampleData(@model)
-        defineSampleProcedures(@model)
+          loadPTCData(@model)
+        definePTCProcedures(@model)
+      else if appName in ['005q', 'beta']
+        # TO MAKE A DUMP:
+        # for c in APPNAME:{columns,cells}; do mongoexport --port 3001 --db meteor -c $c --jsonArray >private/dump/$c.json; done
+        if @model.wasEmpty
+          loadDump(appName)
+          # Hack to redo the invalidateSchemaCache since these dumps may contain
+          # computed data.
+          @model = new Model
       @model.evaluateAll()
 
   Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell

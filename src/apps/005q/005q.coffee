@@ -1,10 +1,11 @@
 
 if Meteor.isClient
-  Router.route "/005q/apps", -> @render "DoubleOhFiveQueue", data: {sheet: '005q'}
+  Router.route "/:sheet/apps/005q", ->
+    @render "DoubleOhFiveQueue", data: {sheet: @params.sheet}
 
   Template.DoubleOhFiveQueue.created = ->
     Tablespace.default = Tablespace.get @data?.sheet
-    $$.call 'compileProcedures', @data?.sheet
+    $$.call 'compileProcedures', '005q'
 
   Template.DoubleOhFiveQueue.helpers
     root: -> Relsheets.read()
@@ -51,15 +52,3 @@ if Meteor.isServer
     done:
       params: [['call', 'Call']]
       body: '''delete call'''
-
-  Meteor.methods
-    define005qProcedures: (cc) ->
-      cc.run ->
-        # This may run multiple times; it should overwrite and not cause any problems.
-        try
-          for name, proc of procedures
-            @model.cannedTransactions.set(
-              name, parseCannedTransaction(proc.params, proc.body))
-        catch e
-          # Incompatible schema change?
-          console.log("Failed to define 005q sample procedure #{name}:", e.stack)
