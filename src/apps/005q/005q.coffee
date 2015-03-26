@@ -4,8 +4,7 @@ if Meteor.isClient
     @render "DoubleOhFiveQueue", data: {sheet: @params.sheet}
 
   Template.DoubleOhFiveQueue.created = ->
-    Tablespace.default = Tablespace.get @data?.sheet
-    $$.call 'compileProcedures', '005q'
+    Relsheets.open(@data?.sheet, '005q')
 
   Template.DoubleOhFiveQueue.helpers
     root: -> Relsheets.read()

@@ -943,8 +943,7 @@ Template.Spreadsheet.rendered = ->
   viewId = @data?.viewId
   # $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
   if sheet then document.title = sheet
-  Tablespace.default = Tablespace.get sheet
-  Meteor.call 'open', $$
+  Relsheets.open(sheet)
   Tracker.autorun(guarded -> rebuildView viewId)
 
 

@@ -4,8 +4,7 @@ if Meteor.isClient
     @render "DearBeta", data: {sheet: @params.sheet}
 
   Template.DearBeta.created = ->
-    Tablespace.default = Tablespace.get @data?.sheet
-    $$.call 'compileProcedures', 'beta'
+    Relsheets.open(@data?.sheet, 'beta')
 
   Template.DearBeta.helpers
     files: ->

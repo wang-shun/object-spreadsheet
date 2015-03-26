@@ -1,6 +1,12 @@
 
 if Meteor.isClient
   Relsheets =
+    open: (sheet, proceduresAppName=null) ->
+      Tablespace.default = Tablespace.get(sheet)
+      $$.call('open', () ->
+        if proceduresAppName?
+          $$.call('compileProcedures', proceduresAppName)
+        $$.subscribeAll())
     call: (transaction, argsObj, callback) ->
       $$.call('executeCannedTransaction', transaction, argsObj,
               andThen (result) -> callback?(result))

@@ -260,7 +260,7 @@
       childColumn = new ColumnBinRel(childColumnId)
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
-        childColumn.add(cellId, value)
+        childColumn.add(cellId, value, (->), false)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)
 

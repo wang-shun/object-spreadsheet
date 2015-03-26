@@ -12,17 +12,35 @@ scoped 'Views',   get: -> $$.Views
 
 class Tablespace extends ControlContext
   constructor: (@id) ->
+    super()
+    if Meteor.isServer
+      # The constructor is called during Meteor method EJSON conversion, and
+      # creating Mongo.Collections during that process causes various errors.
+      # Defer until the control context is actually activated as part of the
+      # Meteor method call.
+      @do(@setupCollections)
+    if Meteor.isClient
+      # This is safe, and the client does not activate control contexts.
+      @setupCollections()
+
+  setupCollections: () ->
     console.log "created Tablespace[#{@id}]"
     @Columns = new Mongo.Collection "#{@id}:columns"
     @Cells   = new Mongo.Collection "#{@id}:cells"
     @Views   = new Mongo.Collection "#{@id}:views"
-    for c in [@Columns,@Cells,@Views]
-      @publishSubscribe c
-    super()
+    if Meteor.isServer
+      for collection in [@Columns,@Cells,@Views]
+        @publish collection
 
-  publishSubscribe: (collection) ->
-    if Meteor.isServer then Meteor.publish collection._name, -> collection.find()
-    if Meteor.isClient then Meteor.subscribe collection._name
+  publish: (collection) ->
+    # Do not inline this into the same function as the loop over collections, or
+    # the reference to "collection" from the publish function will see the wrong
+    # value of the variable (insane JavaScript semantics).
+    Meteor.publish collection._name, -> collection.find()
+
+  subscribeAll: () ->
+    for collection in [@Columns,@Cells,@Views]
+      Meteor.subscribe collection._name
 
   runTransaction: (op) ->
     @run ->
@@ -57,17 +75,19 @@ class ColumnBinRel
     c = Columns.findOne(@columnId)
     new TypedSet([c.parent, c.type], set(@cells()))
 
-  # NOTE: "callback" is supported only on the client.
+  # NOTE: "callback" is supported only on the client, and "evaluate" is
+  # supported only on the server (calls from the client always evaluate).
 
-  add: (key, value, callback=->) ->
+  add: (key, value, callback=(->), evaluate=true) ->
     if Meteor.isServer
       $$.model.invalidateDataCache()
       Cells.upsert {column: @columnId, key}, {$addToSet: {values: value}}
-      $$.model.evaluateAll()
+      if evaluate
+        $$.model.evaluateAll()
     else
       $$.call 'ColumnBinRel_add', @columnId, key, value, callback
 
-  remove: (key, value, callback=->) ->
+  remove: (key, value, callback=(->), evaluate=true) ->
     if !value?
       cellId = key
       key = cellIdParent(cellId)
@@ -75,12 +95,13 @@ class ColumnBinRel
     if Meteor.isServer
       $$.model.invalidateDataCache()
       Cells.update {column: @columnId, key}, {$pull: {values: value}}
-      $$.model.evaluateAll()
+      if evaluate
+        $$.model.evaluateAll()
     else
       $$.call 'ColumnBinRel_remove', @columnId, key, value, callback
 
   ## remove(key, oldValue) + add(key, newValue) in a single operation
-  removeAdd: (key, oldValue, newValue, callback=->) ->
+  removeAdd: (key, oldValue, newValue, callback=(->), evaluate=true) ->
     if !oldValue?
       cellId = key
       key = cellIdParent(cellId)
@@ -92,7 +113,8 @@ class ColumnBinRel
         $$.model.invalidateDataCache()
         Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
         Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
-        $$.model.evaluateAll()
+        if evaluate
+          $$.model.evaluateAll()
       else
         $$.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
 
