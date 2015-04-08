@@ -224,7 +224,8 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
     # multiple possible interpretations including the original" (in which case
     # the formula should still work).
     try
-      valAssert(EJSON.equals(resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla), expectedFmla),
+      actualFmla = resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla)
+      valAssert(EJSON.equals(actualFmla, expectedFmla),
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
       targetName
     catch e
@@ -232,35 +233,46 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
   column = getColumn(targetColumnId)
+  # ?. returns undefined whether the LHS is null or undefined, but we want null
+  # to match the familyReference production in language.jison.
+  keysFmla = keysSinfo?.formula ? null
   targetName =
     if !column? then '(deleted)'
     else
       # Reconstruct the current subformula.  XXX: Get it a better way?
       wantFormula = [direction, startCellsSinfo.formula, targetColumnId, wantValues]
       if direction == 'down'
-        wantFormula.splice(3, 0, keysSinfo?.formula)
+        wantFormula.splice(3, 0, keysFmla)
       if !wantValues
         annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                 objectNameWithFallback(column), keysSinfo?.formula, wantFormula)
+                                 objectNameWithFallback(column), keysFmla, wantFormula)
       else if direction == 'down' && column.isObject
         # Special case: when an object type Bar is added to a leaf column foo, we
         # want down navigations "(...).foo" to start displaying as "(...).Bar.foo"
         # without having to rewrite the abstract syntax of affected formulas.
         # Even if the first navigation in the concrete syntax is ambiguous, we
         # know what we meant and should annotate the second navigation
-        # accordingly.  We shouldn't have keys here but if we do, they go to the
-        # first navigation.
-        intermediateFormula = ['down', startCellsSinfo.formula, targetColumnId, null, false]
+        # accordingly.
+        #
+        # The only way we reach here with keysFmla != null is if the user enters
+        # an ill-typed formula like (...).foo[5] and then adds an object type.
+        # (resolveNavigation does not convert (...).Bar[5].foo to a single down
+        # navigation because of the keys, and it rejects (...).Bar.foo[5] with
+        # "Only down navigations can be subscripted with keys".)  In that case,
+        # this code displays (...).Bar.foo(problem)[5], which is reasonable.  It's
+        # unclear if any deeper justification for passing the keysFmla to the
+        # second navigation holds water.
+        intermediateFormula = wantFormula[0..2].concat([null, false])
         (
           annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                   objectNameWithFallback(column), keysSinfo?.formula,
+                                   objectNameWithFallback(column), null,
                                    intermediateFormula) + '.' +
           annotateNavigationTarget(model, vars, intermediateFormula,
-                                   column.fieldName, null, wantFormula)
+                                   column.fieldName, keysFmla, wantFormula)
         )
       else
         annotateNavigationTarget(model, vars, startCellsSinfo.formula,
-                                 column.fieldName, keysSinfo?.formula, wantFormula)
+                                 column.fieldName, keysFmla, wantFormula)
   {
     str:
       (if startCellsSinfo.strFor(PRECEDENCE_NAV) == '$' then '$'
@@ -627,7 +639,6 @@ validateAndTypecheckFormula = (model, vars, formula) ->
 # Returns the new formula with the call to "up" or "down" added around
 # startCellsFmla.
 resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
-  # TODO: Implement keysFmla.  For now, the grammar doesn't accept it.
   interpretations = []
   unless startCellsFmla?
     valAssert(targetName != 'this',
@@ -670,12 +681,14 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
     formula.splice(3, 0, keysFmla)
   else
     # We have to check this here so we don't silently ignore the subscript.
+    # XXX: When navigating to a key column, this error message is inconsistent
+    # with the user-facing model, in which such a navigation is down.
     valAssert(!keysFmla?, 'Only down navigations can be subscripted with keys.')
 
   # If Bar is an object type with key foo, "(...).Bar.foo" parses as
   # ['up', ['down', ..., fooID, null, false], fooID, true].  Convert to
-  # ['down', ..., fooID, true] so it displays as "(...).foo" if the object type
-  # is removed.  (Converse of the case in stringifyNavigation.)
+  # ['down', ..., fooID, null, true] so it displays as "(...).foo" if the object
+  # type is removed.  (Converse of the case in stringifyNavigation.)
   if (formula[0] == 'up' && formula[3] &&
       formula[1][0] == 'down' && formula[1][2] == formula[2] &&
       !formula[1][3]? && !formula[1][4])
