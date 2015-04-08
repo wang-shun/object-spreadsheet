@@ -203,10 +203,6 @@
     ])
     Meeting: T([
       {
-      enrollment: V(I(2, 0, I(2, 'X')))
-      slot: V(I(1, 'X', 0))
-      }
-      {
       enrollment: V(I(0, 0, I(2, 'X')))
       slot: V(I(0, 'X', 1))
       }
@@ -265,15 +261,15 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  defineParsedFormulaColumn = (parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, attrs) ->
+  defineParsedFormulaColumn = (parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view) ->
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()
     parentId = if parentRef then parseObjectTypeRef(parentRef) else rootColumnId
+    Meteor.call('defineColumn', $$,
+                parentId, order, fieldName, specifiedType, isObject, objectName,
+                parseFormula(parentId, formulaStr), view)
 
-    model.defineColumn(parentId,
-                       order, fieldName, specifiedType, isObject, objectName,
-                       parseFormula(parentId, formulaStr), attrs)
   defineParsedFormulaColumn("Person:Student:[parent]",
                             0, "parentName", null, false, null,
                             'parent.name')
@@ -290,7 +286,7 @@
 
   # Example of a subscript expression; not currently needed for the PTC application.
   defineParsedFormulaColumn("Person:Student",
-                            1, "enrollments", null, false, null,
+                            1, "enrollment", null, false, null,
                             '$Class.Section.Enrollment[Student]')
 
   defineParsedFormulaColumn("Class:Section:Enrollment",
@@ -302,15 +298,6 @@
                             2, "valid", null, false, null,
                             'slot in $Person.Teacher.Slot && enrollment.Section.teacher = slot.Teacher')
 
-  defineParsedFormulaColumn("Person",
-                            1, "children", null, true, null,
-                            '{c : $Person | Person in c.Student.[parent].parent}',
-                            {view: '1'})
-  defineParsedFormulaColumn("Person:[children]",
-                            0, "childName", null, false, null,
-                            'children.name',
-                            {view: '1'})
-
   # Note, this only covers the constraints that can be broken by the
   # transactions we support.
   defineParsedFormulaColumn(
@@ -320,18 +307,61 @@
      {s : $Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&
      {m : $Meeting | !m.valid} = {}')
 
-  model.evaluateAll()  # prepare dependencies
-
-  # Create a view
+  # Create a spreadsheet view, which we use to hold data for a web application
+  # view.
   T = -> new Tree arguments...
 
   view1 =
     _id: '1'
-    layout: T('', [T('Person', [T('Person:name'),
-              T('Person:[children]', [T("Person:[children]:childName")])])])
-            .map((s) -> if s then parseColumnRef(s)[0] else rootColumnId)
+    layout: T(rootColumnId)
 
   Views.upsert(view1._id, view1)
+
+  # These columns will be added to the view when they are defined.
+  defineParsedFormulaColumn("",
+                            4, "clientUser", null, true, "ParentView",
+                            '$Person',
+                            '1')
+  defineParsedFormulaColumn("ParentView",
+                            0, "name", null, false, null,
+                            'clientUser.name',
+                            '1')
+  defineParsedFormulaColumn("ParentView",
+                            1, "student", null, true, null,
+                            '{c : $Person.Student | clientUser in c.[parent].parent}',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]",
+                            0, "name", null, false, null,
+                            'student.Person.name',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]",
+                            1, "enrollment", null, true, null,
+                            'student.enrollment',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]",
+                            0, "className", null, false, null,
+                            'enrollment.Class.name',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]",
+                            1, "teacherName", null, false, null,
+                            'enrollment.Section.teacher.Person.name',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]",
+                            2, "meeting", null, false, null,
+                            'enrollment.scheduledMeeting',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]",
+                            3, "meetingTime", null, false, null,
+                            'meeting.slot.time',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]",
+                            4, "availableSlot", null, true, null,
+                            'if(meeting = {}, {s : enrollment.Section.teacher.Slot | s.[scheduledMeeting].scheduledMeeting = {}}, {})',
+                            '1')
+  defineParsedFormulaColumn("ParentView:[student]:[enrollment]:[availableSlot]",
+                            0, "slotTime", null, false, null,
+                            'availableSlot.time',
+                            '1')
 
   model
 

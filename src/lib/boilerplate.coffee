@@ -31,7 +31,7 @@ if Meteor.isServer
     compileProcedures: (cc, appName) -> cc.run -> Relsheets.compile(appName)
 
 
-Relsheets.readObj = (t, rootCellId, keyField=undefined, visited=undefined) ->
+Relsheets.readObj = (t, rootCellId, expandRefs=false, keyField=undefined, visited=undefined) ->
   obj = {qCellId: {columnId: t.root, cellId: rootCellId}}
   if !visited?
     visited = new EJSONKeyedMap
@@ -45,22 +45,43 @@ Relsheets.readObj = (t, rootCellId, keyField=undefined, visited=undefined) ->
     c = Columns.findOne(x.root)
     if c?
       vals = new ColumnBinRel(x.root).lookup(set([rootCellId])).set.elements()
-      if c.objectName?
-        fam = (@readObj(x, cellIdChild(rootCellId, v), c.fieldName, visited) for v in vals)
+      if c.isObject
+        fam = (@readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited) for v in vals)
         fam.qFamilyId = {columnId: x.root, cellId: rootCellId}
-        obj[c.objectName] = fam
+        # We could use objectNameWithFallback, but this gives easier syntax for readers.
+        objectName = c.objectName ? c.fieldName
+        obj[objectName] = fam
       else if c.fieldName?
-        if c.type? && !typeIsPrimitive(c.type)
+        # TODO: Sending the full content of all referenced objects to the client
+        # is a security problem.  Remove this feature and update all affected
+        # applications.  (Doesn't really matter until we have authentication.)
+        if expandRefs && c.type? && !typeIsPrimitive(c.type)
           ot = View.drillDown(c.type)
-          vals = vals.map((v) => @readObj(ot, v, Columns.findOne(ot.root)?.fieldName, visited))
+          vals = vals.map((v) => @readObj(ot, v, expandRefs, Columns.findOne(ot.root)?.fieldName, visited))
         obj[c.fieldName] = vals
 
   obj
 
-
+# Future: Deprecate this in favor of something like readSubtree?
 Relsheets.read = ->
-  @readObj(View.rootLayout(), [])
+  @readObj(View.rootLayout(), [], true)
 
+Relsheets.readSubtree = (columnStr, rootCellId) ->
+  try
+    columnTree = View.drillDown(parseObjectTypeRef(columnStr))
+  catch e
+    # Apparently the above can be attempted before the client has received the
+    # entire Columns publication.  XXX: Avoid catching real errors.
+    return {}
+  # Alternatively, we could take viewId and depth parameters and do the
+  # following, which will let the developer send only a subset of the
+  # descendants of the starting column to the client (once we restrict
+  # publishing), but we generally expect the developer to create a dedicated
+  # schema subtree for each web application view anyway.
+  #columnTree = new View(viewId).def().layout
+  #for i in [0...depth]
+  #  columnTree = columnTree.subtrees[0]
+  Relsheets.readObj(columnTree, rootCellId)
 
 exported = (d) ->
   for k,v of d

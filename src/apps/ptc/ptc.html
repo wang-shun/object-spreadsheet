@@ -1,0 +1,29 @@
+<template name="PTC_Parent">
+  <h1>Parent view for {{viewData.name}}</h1>
+  <ul>
+  {{#each viewData.student}}
+    <li>{{name}}
+    <ul>
+      {{#each enrollment}}
+        {{>PTC_Parent_enrollment}}
+      {{/each}}
+    </ul>
+    </li>
+  {{/each}}
+  </ul>
+</template>
+
+<template name="PTC_Parent_enrollment">
+<li>{{className}} with {{teacherName}}:
+  {{#if meeting}}
+  meeting at {{meetingTime}} <button class="cancel">Cancel</button>
+  {{else}}
+  available times:
+  <ul>
+    {{#each availableSlot}}
+    <li>{{slotTime}} <button class="schedule">Schedule</button></li>
+    {{/each}}
+  </ul>
+  {{/if}}
+</li>
+</template>
