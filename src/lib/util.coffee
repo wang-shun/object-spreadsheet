@@ -48,6 +48,28 @@ class @EJSONKeyedSet
     s
 EJSON.addType('EJSONKeyedSet', EJSONKeyedSet.fromJSONValue)
 
+class @EJSONSmallSet
+  constructor: (els = [], _trustMeDistinct=false) ->
+    if _trustMeDistinct
+      @els = els[..]
+    else
+      @els = []
+      for x in els
+        @add(x)
+  has: (x) -> exists @els, (y) -> EJSON.equals(x,y)
+  hasAll: (s) -> forall @els, (x) => @has x
+  add: (x) -> if !@has(x) then @els.push x
+  delete: (x) -> @els = @els.filter (y) -> !EJSON.equals(x,y)
+  elements: -> @els
+  shallowClone: -> new EJSONSmallSet(@els, true)
+  typeName: 'EJSONSmallSet'
+  toJSONValue: -> @els
+  @fromJSONValue: (json) -> new EJSONSmallSet(json, true)
+EJSON.addType('EJSONSmallSet', EJSONSmallSet.fromJSONValue)
+
+#@EJSONKeyedSet = EJSONSmallSet
+
+
 class @EJSONKeyedMapToSet
   constructor: ->
     @map = new EJSONKeyedMap()
@@ -165,15 +187,28 @@ class Digraph
       if u not in visited then visit u
     stack.reverse()
 
+
+class Memo
+  constructor: -> @values = {}
+  clear: -> @values = {}
+  get: (key, recompute) ->
+    if (v = @values[key])? then v
+    else @values[key] = recompute()
+
+
 # helper functions
 forall = (list, pred) ->
   for x in list
     if !pred(x) then return false
   true
+exists = (list, pred) ->
+  for x in list
+    if pred(x) then return true
+  false
 without = (list, item) -> list.filter (x) -> x != item
 
 
 set = (x) -> new EJSONKeyedSet(x)
 T = -> new Tree(arguments...)
 
-exported {exported, set, Tree, T, Digraph}
+exported {exported, set, Tree, T, Digraph, Memo, forall, exists, without}

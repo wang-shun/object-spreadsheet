@@ -149,6 +149,110 @@ class PairsBinRel
     new PairsBinRel(sriap, @rangeType, @domainType)
 
 
+class CellsInMemory
+
+  _cnt = 0
+  _freshId = -> _cnt += 1 ; "cim.#{_cnt}"
+
+  constructor: ->
+    @byColumn = {}
+    @byId = {}
+    @recycle = new EJSONKeyedMap
+
+  insert: (doc) ->
+    #console.log "[insert(#{JSON.stringify doc})]"
+    if !doc._id?
+      doc._id = @mkId(doc)
+    column = doc.column ; key = doc.key
+    @byColumn[column] = byKey = @byColumn[column] ? new EJSONKeyedMap
+    #**  assume !byKey.get(key)?  **#
+    byKey.set(key, doc)
+    @byId[doc._id] = doc
+    doc._id
+
+  mkId: (doc) ->
+    if (rec = @recycle.get([doc.column, doc.key]))?
+      rec
+    else
+      _freshId()
+
+  findOne: (query) ->
+    if _.isString(query)
+      @byId[query]
+    else if (column = query.column)?
+      byKey = @byColumn[column]
+      if byKey?
+        if (key = query.key)?
+          byKey.get(key)
+        else
+          throw Error "unimplemented [findOne(query=#{JSON.stringify(query)})]"
+      else
+        undefined
+    else
+      throw Error "unimplemented [findOne(query=#{JSON.stringify(query)})]"
+
+  find: (query) ->
+    forEach: (cb) =>
+      for _id, doc of @byId
+        if doc.dirty == query.dirty
+          cb(doc)
+
+  update: (query, modifier, options) ->
+    #console.log "[update(#{JSON.stringify query}, #{JSON.stringify modifier}, #{JSON.stringify options})]"
+    doc = @findOne(query)
+    #console.log "  << #{JSON.stringify doc}"
+    if !doc? && options?.upsert
+      #** assert query.key? and query.column? **#
+      doc = {}
+      for k, v of query then doc[k] = _.clone(v)
+      @insert(doc)
+    s = JSON.stringify
+    for k, v0 of modifier
+      if k == "$set"
+        for k, v of v0
+          doc[k] = _.clone(v)
+      else if k == "$pull"
+        for k, v of v0
+          doc[k] = (x for x in doc[k] when !EJSON.equals(x, v))
+      else if k == "$addToSet"
+        for k, v of v0
+          l = doc[k]
+          if l.every((x) -> !EJSON.equals(x, v)) then l.push(v)
+      else if k[0] == "$"
+        throw Error "unimplemented [update(query=#{s query}, modifier=#{s modifier}, options=#{s options}) doc=#{s doc}]"
+      else
+        doc[k] = _.clone(v)
+    #console.log "  >> #{JSON.stringify doc}"
+
+  upsert: (query, modifier, options) ->
+    if options? then throw Error "unimplemented upsert(..., options)"
+    @update(query, modifier, {upsert: true})
+
+  remove: (query) ->
+    if (column = query.column)?
+      byKey = @byColumn[column]
+      if (key = query.key)?
+        if (doc = byKey[key])?
+          @stash(doc)
+          byKey.delete(key)
+      else
+        if byKey?
+          for k, doc of byKey.obj
+            @stash(doc)
+          delete @byColumn[column]
+    else
+      if (key = query.key)?
+        for k, v of @byColumn
+          @remove {column: k, key: key}
+      else
+        @byColumn = {}
+        @byId = {}
+
+  stash: (doc) ->
+    #console.log "  stash[doc=#{JSON.stringify doc}]"
+    delete @byId[doc._id]
+    @recycle.set([doc.column, doc.key],  doc._id)
+
 #
 # Provides transaction-like behaviour by taking a snapshot of the
 # Cells collection in memory, manipulating it and then storing the
@@ -159,7 +263,8 @@ class Transaction
   class @Cells
     
     constructor: (@dbCells) ->
-      @mem = new Mongo.Collection(null)
+      #@mem = new Mongo.Collection(null)
+      @mem = new CellsInMemory
       
     prefetch: ->
       @mem.insert(doc) for doc in @dbCells.find().fetch()
@@ -193,12 +298,15 @@ class Transaction
     findOne: (query={})  ->  @mem.findOne(query)
     
     commit: ->
+      raw = @dbCells.rawCollection()
       @dbCells.find().forEach (doc) =>
         if ! @mem.findOne(doc._id)
-          @dbCells.remove(doc._id)
+          raw.remove({_id: doc._id}, (err) -> if err? then console.log "remove: #{err}")
+          #@dbCells.remove(doc._id)
       @mem.find({dirty: true}).forEach (doc) =>
         delete doc.dirty
-        @dbCells.upsert(doc._id, doc)
+        raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> if err? then console.log "remove: #{err}")
+        #@dbCells.upsert(doc._id, doc)
     
   constructor: (dbCells) ->
     @Cells = new Transaction.Cells(dbCells ? Cells)

@@ -17,6 +17,7 @@ class Model
   #@columns: EJSONKeyedMap<ColumnId, Column>
 
   constructor: ->
+    @settings = {compiler: false, profiling: 0}
     # Load from DB.
     # Future: Need a way to make a temporary model for a transaction without reloading.
     for col in Columns.find().fetch()
@@ -225,14 +226,26 @@ class Model
   evaluateFamily1: (qFamilyId) ->
     col = @getColumn(qFamilyId.columnId)
     if col.formula?
+      s = JSON.stringify
+      if @settings.profiling >=2 then console.log "[evaluateFamily1(qFamilyId=#{s qFamilyId}) formula=#{s col.formula}]"
+      compiled = $$.formulaEngine.compiled[qFamilyId.columnId]
       if col.typecheckError?
         throw new EvaluationError("Formula failed type checking: #{col.typecheckError}")
       vars = new EJSONKeyedMap(
         [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
-      return evaluateFormula(this, vars, col.formula)
+      result = evaluateFormula(this, vars, col.formula)
+      if compiled?
+        result1 = new TypedSet(col.type, compiled($$.formulaEngine, vars.get("this").set.elements()))
+        if !EJSON.equals(result, result1)
+          console.log "Wrong output from compiler;\nformula=#{s col.formula}]"
+          console.log "> interpreter result = #{s result}"
+          console.log "> compiled result    = #{s result1}"
+          console.log "-----------------------------"
+      if @settings.profiling >=2 then console.log "[/evaluateFamily1]"
+      return result
     else
-      # State column (there are no domain columns yet)
-      # If it were nonempty, we wouldn't have gotten here.
+      # State column;
+      # Must be empty, otherwise we wouldn't have gotten here.
       # XXX: Be consistent about which state families exist in the DB.
       return new TypedSet(col.type)
 
@@ -284,6 +297,10 @@ class Model
                       "Column #{columnId} formula returns #{type}, which is not a subtype of specified type #{col.specifiedType}")
           else
             @_changeColumnType(columnId, type)
+          if @settings.compiler
+            fc = new FormulaCompiler($$.formulaEngine)
+            if fc.isCompilationSupported(col.formula)
+              $$.formulaEngine.compiled[columnId] = fc.compileAsFunc(col.formula)
         catch e
           unless e instanceof FormulaValidationError
             throw e
@@ -293,15 +310,17 @@ class Model
     type
 
   typecheckAll: ->
+    if @settings.profiling >= 1 then console.log "<typecheckAll>"
     for [columnId, _] in @getAllColumns()
       @typecheckColumn(columnId)
+    if @settings.profiling >= 1 then console.log "</typecheckAll>"
 
   evaluateAll: ->
     # We're now assuming that everything that can make the computed data invalid
     # during one run of the server calls invalidateDataCache, so we don't do it
     # here.  Extra evaluateAll calls will find everything already done and make
     # no changes.
-
+    if @settings.profiling >= 1 then console.log "<evaluateAll>"
     @typecheckAll()
 
     evaluateSubtree = (qCellId) =>
@@ -315,6 +334,7 @@ class Model
 
     # Future: Only evaluate what users are viewing.
     evaluateSubtree({columnId: rootColumnId, cellId: rootCellId})
+    if @settings.profiling >= 1 then console.log "</evaluateAll>"
 
   ## Removes all column definitions and data!
   drop: ->
@@ -323,12 +343,15 @@ class Model
     Cells.remove({})
 
   invalidateSchemaCache: ->
+    if @settings.profiling >= 1 then console.log "--- invalidateSchemaCache ---"
     @invalidateDataCache()
+    $$.formulaEngine?.invalidateSchemaCache()
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       @_changeColumnType(columnId, null)
       @_changeColumnTypecheckError(columnId, null)
 
   invalidateDataCache: ->
+    if @settings.profiling >= 1 then console.log "--- invalidateDataCache ---"
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       if col.formula?
         Cells.remove({column: columnId})
@@ -356,9 +379,13 @@ class Model
         throw e
 
 Meteor.startup () ->
+  WebApp.connectHandlers.use (req, res, next) ->
+    res.setHeader("Access-Control-Allow-Origin", '*')   # XSS loophole!!!
+    next()
   Tablespace.onCreate ->
     @do ->
       @model = new Model
+      @formulaEngine = new FormulaEngine
       appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
       if appName == 'ptc'
         if @model.wasEmpty
@@ -376,6 +403,9 @@ Meteor.startup () ->
 
   #Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
   #tspace.run()
+  Tablespace.get('ptc').runTransaction ->
+    $$.model.invalidateDataCache()
+    $$.model.evaluateAll()
 
 
 Meteor.methods({

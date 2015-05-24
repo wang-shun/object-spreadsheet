@@ -65,14 +65,14 @@
 @columnLogicalChildrenByName = (id, wantName) ->
   col = getColumn(id)
   ret = []
-  visit = (name, childId, isValues, direction) ->
-    if name == wantName then ret.push([childId, isValues, direction])
-  visit(col.fieldName, id, true, 'up')
+  visit = (name, descriptor) ->  # descriptor = [childId, isValues, direction]
+    if name == wantName then ret.push(descriptor)
+  visit(col.fieldName, [id, true, 'up'])
   for physChildCol in Columns.find({parent: id}).fetch()
     if physChildCol.isObject
-      visit(objectNameWithFallback(physChildCol), physChildCol._id, false, 'down')
+      visit(objectNameWithFallback(physChildCol), [physChildCol._id, false, 'down'])
     else
-      visit(physChildCol.fieldName, physChildCol._id, true, 'down')
+      visit(physChildCol.fieldName, [physChildCol._id, true, 'down'])
   return ret
 
 @parseTypeStr = (s) ->

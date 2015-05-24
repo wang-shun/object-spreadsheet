@@ -60,7 +60,7 @@ dispatch = {
     execute: (model, mutableVars, conditionTset, thenBody, elseBody) ->
       executeStatements1(
         model, mutableVars,
-        if evalAsSingleton(conditionTset.set) then thenBody else elseBody)
+        if singleElement(conditionTset.set) then thenBody else elseBody)
   foreach:
     argAdapters: [VarName, EagerSubformula, Statements]
     execute: (model, mutableVars, bindVarName, domainTset, body) ->
@@ -103,7 +103,7 @@ dispatch = {
   check:
     argAdapters: [EagerSubformula]
     execute: (model, mutableVars, conditionTset) ->
-      unless evalAsSingleton(conditionTset.set)
+      unless singleElement(conditionTset.set)
         throw new EvaluationError('check statement failed')
 }
 

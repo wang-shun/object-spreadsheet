@@ -44,10 +44,29 @@ valExpectType = (what, actualType, expectedType) ->
   valAssert(mergeTypes(actualType, expectedType) == expectedType,
             "#{what} has type #{actualType}, wanted #{expectedType}")
 
-@evalAsSingleton = (set) ->
+@singleElement = (set) ->
   elements = set.elements()
   evalAssert(elements.length == 1, 'Expected a singleton')
   elements[0]
+
+
+class FormulaEngine
+  constructor: ->
+    @goUpMemo = new Memo
+    @compiled = {}
+
+  readFamily: (column, key) ->
+    # TODO move functionality from model.evaluateFamily here
+    Cells.findOne({column, key})?.values || []
+
+  calcLevelsUp: (sourceColId, targetColId) ->
+    @goUpMemo.get "#{sourceColId}-#{targetColId}", ->
+      [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId)
+      upPath.length - 1
+
+  invalidateSchemaCache: ->
+    @goUpMemo.clear()
+
 
 IDENTIFIER_RE = /[_A-Za-z][_A-Za-z0-9]*/
 
@@ -190,15 +209,20 @@ typecheckDown = (model, vars, startCellsType, targetColId, keysType, wantValues)
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
   # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
-  [upPath, downPath] = findCommonAncestorPaths(startCellsTset.type, targetColId)
 
   # Go up.
-  numIdStepsToDrop = upPath.length - 1
-  result = new TypedSet(targetColId)
-  for startCellId in startCellsTset.set.elements()
-    targetCellId = startCellId.slice(0, startCellId.length - numIdStepsToDrop)
-    # Duplicates are thrown out.  Future: multisets?
-    result.add(targetColId, startCellId.slice(0, startCellId.length - numIdStepsToDrop))
+  if startCellsTset.type == targetColId
+    result = startCellsTset
+  else
+    numIdStepsToDrop = $$.formulaEngine.goUpMemo.get "#{startCellsTset.type}-#{targetColId}", ->
+      [upPath, downPath] = findCommonAncestorPaths(startCellsTset.type, targetColId)
+      upPath.length - 1
+    s = set()
+    for startCellId in startCellsTset.set.elements()
+      targetCellId = startCellId.slice(0, startCellId.length - numIdStepsToDrop)
+      # Duplicates are thrown out.  Future: multisets?
+      s.add(targetCellId)
+    result = new TypedSet(targetColId, s)
 
   if wantValues then getValues(model, vars, result) else result
 
@@ -229,6 +253,8 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
       targetName
     catch e
+      console.log EJSON.stringify(expectedFmla)
+      console.log EJSON.stringify(actualFmla)
       targetName + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
@@ -310,7 +336,7 @@ singletonInfixOperator = (symbol, precedence, associativity,
     valExpectType("Right operand of '#{symbol}'", rhsType, rhsExpectedType)
     resultType
   evaluate: (model, vars, lhs, rhs) ->
-    new TypedSet(resultType, set([evaluateFn(evalAsSingleton(lhs.set), evalAsSingleton(rhs.set))]))
+    new TypedSet(resultType, set([evaluateFn(singleElement(lhs.set), singleElement(rhs.set))]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
@@ -427,7 +453,7 @@ dispatch = {
       type
     evaluate: (model, vars, conditionTset, thenFmla, elseFmla) ->
       evaluateFormula(model, vars,
-                      if evalAsSingleton(conditionTset.set) then thenFmla else elseFmla)
+                      if singleElement(conditionTset.set) then thenFmla else elseFmla)
     stringify: (model, vars, conditionSinfo, thenSinfo, elseSinfo) ->
       str: "if(#{conditionSinfo.strFor(PRECEDENCE_LOWEST)}, #{thenSinfo.strFor(PRECEDENCE_LOWEST)}, #{elseSinfo.strFor(PRECEDENCE_LOWEST)})"
       outerPrecedence: PRECEDENCE_ATOMIC
@@ -475,7 +501,7 @@ dispatch = {
           _.filter(domainTset.set.elements(), (x) ->
             # Future: Figure out where to put this code once we start duplicating it.
             tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
-            evalAsSingleton(predicateLambda(tset).set)
+            singleElement(predicateLambda(tset).set)
           )))
     stringify: (model, vars, domainSinfo, predicateLambda) ->
       # XXX Wasteful
@@ -501,7 +527,7 @@ dispatch = {
       res = 0
       for x in domainTset.elements()
         tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
-        res += evalAsSingleton(addendLambda(tset).set)
+        res += singleElement(addendLambda(tset).set)
       return new TypedSet('_number', new EJSONKeyedSet([res]))
     stringify: (model, vars, domainSinfo, addendLambda) ->
       addendSinfo = addendLambda(
@@ -530,7 +556,7 @@ dispatch = {
       valExpectType("Operand of unary '-'", argType, '_number')
       '_number'
     evaluate: (model, vars, arg) ->
-      new TypedSet('_number', set([-evalAsSingleton(arg.set)]))
+      new TypedSet('_number', set([-singleElement(arg.set)]))
     stringify: (model, vars, argSinfo) ->
       str: "-#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG
@@ -554,7 +580,7 @@ dispatch = {
       valExpectType("Operand of '!'", argType, '_bool')
       '_bool'
     evaluate: (model, vars, arg) ->
-      new TypedSet('_bool', set([!evalAsSingleton(arg.set)]))
+      new TypedSet('_bool', set([!singleElement(arg.set)]))
     stringify: (model, vars, argSinfo) ->
       str: "!#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG
@@ -582,11 +608,11 @@ validateSubformula = (vars, formula) ->
   valAssert(_.isArray(formula), 'Subformula must be an array.')
   valAssert(_.isString(opName = formula[0]), 'Subformula must begin with an operation name (a string).')
   valAssert(dispatch.hasOwnProperty(opName),
-            'Unknown operation ' + opName)
+            "Unknown operation '#{opName}'")
   d = dispatch[opName]
   args = formula[1..]
   valAssert(args.length == d.argAdapters.length,
-            'Wrong number of arguments to ' + opName)
+            "Wrong number of arguments to '#{opName}' (required #{d.argAdapters.length}, got #{args.length})")
   for adapter, i in d.argAdapters
     if adapter.validate?
       adapter.validate(vars, args[i])
@@ -617,7 +643,7 @@ dispatchFormula = (action, formula, contextArgs...) ->
 # vars: EJSONKeyedMap<string, type (nullable string)>
 # Returns type (nullable string).
 @typecheckFormula = (model, vars, formula) ->
-  dispatchFormula('typecheck', formula, model, vars)
+  formula.type = dispatchFormula('typecheck', formula, model, vars)
 
 # Assumes formula has passed typechecking.
 # vars: EJSONKeyedMap<string, TypedSet>
@@ -753,3 +779,6 @@ stringifySubformula = (model, vars, formula) ->
   # either client or server.
   stringifySubformula(
     liteModel, new EJSONKeyedMap([['this', thisType]]), formula).strFor(PRECEDENCE_LOWEST)
+
+
+exported {FormulaEngine}
