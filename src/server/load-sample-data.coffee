@@ -320,7 +320,7 @@
   # These columns will be added to the view when they are defined.
   defineParsedFormulaColumn("",
                             4, "clientUser", null, true, "ParentView",
-                            '$Person',
+                            '$Person.Student.[parent].parent',
                             '1')
   defineParsedFormulaColumn("ParentView",
                             0, "name", null, false, null,

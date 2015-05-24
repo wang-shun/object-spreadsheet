@@ -1,12 +1,12 @@
 <template name="DoubleOhFiveQueue">
+  {{> DoubleOhFive_nav}}
+  {{> DoubleOhFiveQueueStylesheet}}
+  
+<!-- This is what it basically is:
+    
   <form>
     Hi! My name is <input name="name" required> and I need help with
-    <input type="text" name="matter" list="skills">.
-    <datalist id="skills">
-      {{#each root.Skill}}
-      <option value="{{name}}"></option>
-      {{/each}}
-    </datalist>
+    <input type="text" name="issue" list="skills">.
     I'm at <input name="location">
     <button type="submit">HELP ME!</button>
   </form>
@@ -18,15 +18,75 @@
       {{/each}}
     </ul>
   </div>
+  </div>
 
-  <hr>
+  -->  
+  
+  <div id="login" class="ui page dimmer">
+    <div class="content">
+      <div class="center">
+        <div class="ui input">
+          <input type="password" placeholder="password">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="centered student title">
+    005q
+    <div class="centered subtitle">
+      There {{people root.Call}} in the queue!
+    </div>
+  </div>
+  <form class="centered container">
+    <div id="help" class="content">
+      My name is
+      <div class="ui inline input">
+        <input id="name" type="text" placeholder="name">
+      </div>
+      and I need help with
+      <div class="ui inline input">
+        <input id="issue" type="text" placeholder="something!"
+               list="skills">
+      </div>
+      <br>
+      <div class="ui inline input">
+        <input id="location" type="text" placeholder="where are you?">
+      </div>
+    </div>
+    <br>
+    <button class="ui huge purple disabled help button">
+      Help me!
+    </button>
+  </form>
+  <div id="student-queue" class="centered">
+    <div class="queue title">
+      Currently in the queue:
+    </div>
+    {{#each sortBy root.Call "time"}}
+    <div class="{{#if assign}} blink {{/if}} item">{{name}}</div>
+    {{/each}}
+  </div>
+  
+  <datalist id="skills">
+    {{#each root.Skill}}
+    <option value="{{name}}"></option>
+    {{/each}}
+  </datalist>
+</template>
+
+
+<template name="DoubleOhFiveQueueStaff">
+  {{> DoubleOhFive_nav}}
+  {{> DoubleOhFiveQueueStylesheet}}
+  <div style="margin: 9px;">
+
   <h3>Staff login</h3>
   {{#each root.Staff}}
-  <div>
+  <div class="staff queue">
     <b>{{name}}</b>, your calls are:
     <ul>
       {{#each calls}}
-      <li>{{name}} ({{#each matter}}{{name}}{{/each}})
+      <li>{{name}} ({{#each issue}}{{name}}{{/each}})
         {{#with call=this user=..}}
         {{#if call.assign.length}}
         <button class="done">Done</button>
@@ -40,4 +100,35 @@
     </ul>
   </div>
   {{/each}}
+  </div>
+</template>
+
+
+
+<template name="DoubleOhFive_nav">
+  <div class="ui purple inverted menu">
+    <a class="logo item">
+      005q
+    </a>
+    <div class="right menu">
+      {{#if currentUser}}
+        <!--<a class="changelog icon item">-->
+          <!--<i class="info icon"></i>-->
+        <!--</a>-->
+        <a class="report item">
+          Reports
+        </a>
+        <a class="queue item">
+          Queue
+        </a>
+        <a class="logout item">
+          Sign Out
+        </a>
+      {{else}}
+        <a class="login item" href="005q/staff">
+          Staff Login
+        </a>
+      {{/if}}
+    </div>
+  </div>
 </template>

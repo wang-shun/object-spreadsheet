@@ -1,29 +1,46 @@
 <template name="PTC_Parent">
-  <h1>Parent view for {{viewData.name}}</h1>
+  {{#with viewData}}
+  <h1>Parent view for {{name}}</h1>
   <ul>
-  {{#each viewData.student}}
+    {{#each student}}
     <li>{{name}}
     <ul>
       {{#each enrollment}}
-        {{>PTC_Parent_enrollment}}
+        {{>PTC_Parent_enrollment clientUser=../../../clientUser enrollment=.}}
       {{/each}}
     </ul>
     </li>
-  {{/each}}
+    {{/each}}
+  </ul>
+  {{/with}}
+</template>
+
+<template name="PTC_Parent_login">
+  <h1>Parent login</h1>
+  <ul>
+    {{#each root.ParentView}}
+    <li><a href="parent/{{clientUser}}">{{name}}</a></li>
+    {{/each}}
   </ul>
 </template>
 
 <template name="PTC_Parent_enrollment">
-<li>{{className}} with {{teacherName}}:
-  {{#if meeting}}
-  meeting at {{meetingTime}} <button class="cancel">Cancel</button>
-  {{else}}
-  available times:
-  <ul>
-    {{#each availableSlot}}
-    <li>{{slotTime}} <button class="schedule">Schedule</button></li>
-    {{/each}}
-  </ul>
-  {{/if}}
-</li>
+  {{#with enrollment}}
+  <li>{{className}} with {{teacherName}}:
+    {{#if meeting}}
+    {{#with meeting=meeting meetingTime=meetingTime clientUser=../clientUser}}
+    meeting at {{meetingTime}} <button class="cancel">Cancel</button>
+    {{/with}}
+    {{else}}
+    available times:
+    <ul>
+      {{#each availableSlot}}
+      {{#with slot=availableSlot time=slotTime enrollment=../enrollment clientUser=../../clientUser}}
+      <li>{{time}} <button class="schedule">Schedule</button></li>
+      {{/with}}
+      {{/each}}
+    </ul>
+    {{/if}}
+  </li>
+  {{/with}}
 </template>

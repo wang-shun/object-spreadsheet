@@ -31,7 +31,7 @@ if Meteor.isServer
     compileProcedures: (cc, appName) -> cc.run -> Relsheets.compile(appName)
 
 
-Relsheets.readObj = (t, rootCellId, expandRefs=false, keyField=undefined, visited=undefined) ->
+Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, visited=undefined) ->
   obj = {qCellId: {columnId: t.root, cellId: rootCellId}}
   if !visited?
     visited = new EJSONKeyedMap
@@ -63,8 +63,11 @@ Relsheets.readObj = (t, rootCellId, expandRefs=false, keyField=undefined, visite
   obj
 
 # Future: Deprecate this in favor of something like readSubtree?
-Relsheets.read = ->
-  @readObj(View.rootLayout(), [], true)
+Relsheets.read = (viewId) ->
+  layout = 
+    if viewId? then (new View(viewId).def())?.layout || new Tree(rootColumnId)
+    else View.rootLayout()
+  @readObj(layout, [], true)
 
 Relsheets.readSubtree = (columnStr, rootCellId) ->
   try

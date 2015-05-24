@@ -1,0 +1,192 @@
+<template name="DoubleOhFiveQueueStylesheet">
+  <link href='http://fonts.googleapis.com/css?family=Oswald' rel='stylesheet' type='text/css'>
+  <link href='http://fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
+  <link href='/semantic-ui/semantic.min.css' rel='stylesheet' type='text/css'>
+<style>
+body
+{
+  font-family: 'Oswald', sans-serif;
+  font-weight: 400;
+  background: #f5f5f5;
+  margin: 0;
+}
+
+button.ui {
+  font-family: 'Oswald', sans-serif;
+}
+  
+textarea,
+.day .table
+{
+  font-family: 'Raleway', sans-serif;
+}
+
+.right.aligned {
+  text-align: right;
+}
+
+.ui.menu {
+  border-radius: 0px !important;
+}
+
+.ui.button {
+  font-weight: 400 !important;
+}
+
+.purple.help.button {
+  width: 300px;
+}
+
+.student.title {
+  font-size: 8em;
+  margin-top: 20px;
+  margin-bottom: 50px;
+}
+
+.report.title {
+  font-size: 5em;
+  margin-bottom: 16px;
+}
+
+.day.title {
+  font-size: 3em;
+  margin-bottom: 0px;
+}
+
+
+.queue.title {
+  font-size: 2.5em;
+  margin-bottom: 8px;
+}
+
+#student-queue {
+  margin-top: 40px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  background: #615b9b;
+  color: #f5f5f5;
+  min-height: 300px;
+}
+
+#student-queue .item {
+  font-size: 2em;
+}
+
+.title .subtitle {
+  font-size: .2em;
+}
+
+#student-queue.list {
+  width: 100px;
+  margin: 0 auto;
+}
+
+.centered {
+  text-align: center;
+}
+
+#help
+{
+  font-size: 2.3em;
+}
+
+#help input,
+#login input {
+  font-family: 'Oswald', sans-serif;
+  text-align: center;
+  font-size: 2.3em;
+  padding: 0;
+  border: none;
+  border-radius: 0 !important;
+  border-bottom: 2px solid black;
+  background: transparent;
+}
+
+textarea[type=notes] {
+  border-radius: 0 !important;
+  font-size: .6em !important;
+  height: 100px !important;
+}
+
+.notes .field {
+  margin: 0 !important;
+}
+
+#login input
+{
+  color: white;
+  border-bottom: 2px solid white;
+}
+
+.staff.queue {
+  background: white;
+  padding: 9px;
+  margin-bottom: 1em;
+  border: 2px solid rgba(0,0,0,0.3);
+}
+  
+.staff.queue.item {
+  width: 50vw;
+  min-width: 320px;
+  margin: 8px auto;
+  font-size: 1.5em;
+}
+
+.location {
+  color: #828282;
+}
+
+.top.right.remove.label {
+  border-top-right-radius: 0 !important;
+  background-color: transparent !important;
+}
+
+.staff .remove.icon {
+  margin: 0;
+}
+
+.segment {
+  border-radius: 0 !important;
+}
+
+.bottom.segment {
+  padding: 8px;
+}
+
+.day.segment {
+  min-width: 320px;
+  width: 60vw;
+  margin: 16px auto;
+}
+
+.hour {
+  font-size: 2em;
+}
+
+@-webkit-keyframes blink {
+  0% {
+    opacity:1;
+  }
+  50% {
+    opacity:.7;
+    text-shadow: 0 0 6px white;
+  }
+  100% {
+    opacity:1;
+  }
+}
+.blink {
+  -webkit-transition: all 1s ease-in-out;
+  -moz-transition: all 1s ease-in-out;
+  -o-transition: all 1s ease-in-out;
+  -ms-transition: all 1s ease-in-out;
+  transition: all 1s ease-in-out;
+
+  -webkit-animation-direction: normal;
+  -webkit-animation-duration: 2s;
+  -webkit-animation-iteration-count: infinite;
+  -webkit-animation-name: blink;
+  -webkit-animation-timing-function: ease-in-out;
+}
+</style>
+</template>

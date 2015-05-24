@@ -1,13 +1,16 @@
 
 if Meteor.isClient
-  # That's actually a Person cell ID in JSON.  So the URL should be like:
-  # /ptc/apps/ptc/parent/["5"]
+  Router.route "/:sheet/apps/ptc/parent", ->
+    @render "PTC_Parent_login", data: {sheet: @params.sheet}
+  # That's actually a Person token.  So the URL should be like:
+  # /ptc/apps/ptc/parent/5
+  # which means that the Person id is ["5"].
   # Future: Hacks to get prettier URLs?
   Router.route "/:sheet/apps/ptc/parent/:clientUser", ->
     @render "PTC_Parent", data: {
       sheet: @params.sheet,
       # XXX: validate (not to mention authentication)
-      clientUser: JSON.parse(@params.clientUser)}
+      clientUser: [@params.clientUser]}
 
   Template.PTC_Parent.created = ->
     # No proceduresAppName: procedures are currently defined by
@@ -18,15 +21,20 @@ if Meteor.isClient
   Template.PTC_Parent.helpers
     viewData: -> Relsheets.readSubtree('ParentView', [@clientUser])
 
-  Template.PTC_Parent_enrollment.events
-    # Apparently, Template.parentData does count each {{#each}} or {{#with}}
-    # block, but it starts from the root of the template on which the event is
-    # defined, not from the data context of the element handling the event,
-    # leaving us no way to access intermediate data contexts in the template.
-    # Thus, we introduce the PTC_Parent_enrollment sub-template to be able to
-    # reference the enrollment.  (Alternatively, we could extract it from the
-    # qCellId or modify readObj to copy ancestor keys into sub-objects.)
+  Template.PTC_Parent_login.created = ->
+    Relsheets.open(@data?.sheet)
+    
+  Template.PTC_Parent_login.helpers
+    root: -> 
+      v = Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
+      console.log(v)
+      v
 
+  blur = (jbutton) ->
+    jbutton.width(jbutton.width())
+    jbutton.text("∙ ∙ ∙")
+      
+  Template.PTC_Parent_enrollment.events
     # Future: We could modify the transaction procedures to take objects in
     # the view subtree, instead of the original domain objects, as parameters.
     # This would let us avoid duplicating the write access control checks in the
@@ -35,12 +43,14 @@ if Meteor.isClient
     # integrity constraints, it definitely seems preferable to define them
     # directly and infer the valid choices to show in the view from them (if
     # possible).  Further experience should inform the design here.
-    "click .schedule": ->
+    "click .schedule": (ev) ->
+      blur($(ev.target))
       Relsheets.call("parentCreateMeeting", {
-        clientUser: [Template.parentData(2).clientUser],
-        enr: [Template.currentData().enrollment],
-        slot: [@availableSlot]})
-    "click .cancel": ->
+        clientUser: [@clientUser],
+        enr: [@enrollment],
+        slot: [@slot]})
+    "click .cancel": (ev) ->
+      blur($(ev.target))
       Relsheets.call("parentCancelMeeting", {
-        clientUser: [Template.parentData(2).clientUser],
-        meeting: [@meeting[0]]})
+        clientUser: [@clientUser],
+        meeting: @meeting})

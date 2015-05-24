@@ -9,9 +9,11 @@ body { margin: 0; }
   width: 100%;
 }
 
+@media screen {
 .separator:not(.rsHeader) {
   background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
+}
 }
 
 .handsontable div.htContainer td.incomparable:not(.rsHeader) {
