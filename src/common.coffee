@@ -3,7 +3,9 @@
 
 @rootColumnId = '_root'
 
-@typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type)
+PRIMITIVE_TYPES = ["text", "number", "date", "any"]
+
+@typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type) || type in PRIMITIVE_TYPES
 
 # Multisets unsupported for now: twindex removed.
 

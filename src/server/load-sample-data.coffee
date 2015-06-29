@@ -8,7 +8,7 @@
     children: [
       {
       fieldName: 'name'
-      type: '_string'
+      type: 'text'
       # TODO: Required, singleton; probably unique but maybe not in schema
       }
       {
@@ -21,7 +21,6 @@
         # There can be more than one parent, but there can be only one meeting per
         # enrollment, which we imagine several of the parents may attend if they
         # believe it is necessary.
-        isObject: true
       ]
       }
       # We don't flag parents explicitly.  A person is a parent by virtue of being
@@ -40,10 +39,10 @@
           # time a direct child of Teacher when it has no direct meaning in the
           # context of the Teacher.  Such decisions won't always be clear. ~ Matt
           fieldName: 'time'
-          # TODO: Change to _datetime once supported.  As long as we are using
-          # strings as placeholder values, set this to _string so editing
+          # TODO: Change to datetime once supported.  As long as we are using
+          # strings as placeholder values, set this to text so editing
           # behaves sensibly.
-          type: '_string' # TODO: define format
+          type: 'text' # TODO: define format
           }
         ]
         }
@@ -57,12 +56,12 @@
     children: [
       {
       fieldName: 'code'
-      type: '_string'
+      type: 'text'
       # TODO: Required, singleton, unique
       }
       {
       fieldName: 'name'
-      type: '_string'
+      type: 'text'
       # TODO: Required, singleton, unique (assuming department is sane)
       }
       {
@@ -147,19 +146,19 @@
       {
       name: V('Matt McCutchen')
       Student: U({
-        '[parent]': V(I(5))
+        'parent': V(I(5))
       })
       }
       {
       name: V('Michael McCutchen')
       Student: U({
-        '[parent]': V(I(5))
+        'parent': V(I(5))
       })
       }
       {
       name: V('Shachar Itzhaky')
       Student: U({
-        '[parent]': V(I(6))
+        'parent': V(I(6))
       })
       }
       {
@@ -270,7 +269,7 @@
                 parentId, order, fieldName, specifiedType, isObject, objectName,
                 parseFormula(parentId, formulaStr), view)
 
-  defineParsedFormulaColumn("Person:Student:[parent]",
+  defineParsedFormulaColumn("Person:Student",
                             0, "parentName", null, false, null,
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
@@ -320,7 +319,7 @@
   # These columns will be added to the view when they are defined.
   defineParsedFormulaColumn("",
                             4, "clientUser", null, true, "ParentView",
-                            '$Person.Student.[parent].parent',
+                            '$Person.Student.parent',
                             '1')
   defineParsedFormulaColumn("ParentView",
                             0, "name", null, false, null,
@@ -328,7 +327,7 @@
                             '1')
   defineParsedFormulaColumn("ParentView",
                             1, "student", null, true, null,
-                            '{c : $Person.Student | clientUser in c.[parent].parent}',
+                            '{c : $Person.Student | clientUser in c.parent}',
                             '1')
   defineParsedFormulaColumn("ParentView:[student]",
                             0, "name", null, false, null,
@@ -394,7 +393,7 @@ check $valid
              ['enr', 'Class:Section:Enrollment'],
              ['slot', 'Person:Teacher:Slot']]
     body: '''
-check clientUser in enr.student.[parent].parent
+check clientUser in enr.student.parent
 let m = new $Meeting
 m.enrollment := enr
 m.slot := slot
@@ -404,7 +403,7 @@ check $valid
     params: [['clientUser', 'Person'],
              ['meeting', 'Meeting']]
     body: '''
-check clientUser in meeting.enrollment.student.[parent].parent
+check clientUser in meeting.enrollment.student.parent
 delete meeting
 check $valid
 '''

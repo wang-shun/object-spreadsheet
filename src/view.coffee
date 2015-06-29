@@ -3,7 +3,11 @@
 class View
   constructor: (@id) ->
 
-  def: -> Views.findOne(@id)
+  def: ->
+    if @id?
+      Views.findOne(@id) || {layout: new Tree(rootColumnId)}
+    else
+      {layout: View.rootLayout()}
 
   addColumn: (columnId) ->
     def = @def()
@@ -13,7 +17,7 @@ class View
       layoutSubtree = layoutTree.find(parentId)
       if layoutSubtree?
         layoutSubtree.subtrees.push(new Tree(columnId))
-        Views.update(@id, def)
+        Views.upsert(@id, def)
 
   removeColumn: (columnId) ->
     def = @def()

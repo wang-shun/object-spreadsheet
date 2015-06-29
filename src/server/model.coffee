@@ -65,9 +65,12 @@ class Model
     return Columns.findOne(columnId)
 
   getAllColumns: (columnId=rootColumnId) ->
-    #columnId = columnId ? rootColumnId
     col = @getColumn columnId
-    [[columnId, col]].concat (@getAllColumns c for c in col.children)...
+    # A bit of auto-repair in case some columns were deleted
+    validChildren = col.children.filter (x) -> @getColumn(x)?
+    if validChildren.length != col.children.length
+      Columns.update(columnId, {$set: {children: validChildren}})
+    [[columnId, col]].concat (@getAllColumns c for c in validChildren)...
 
   defineColumn: (parentId, index, fieldName, specifiedType, isObject, objectName, formula, attrs) ->
     # Future: validate everything
@@ -231,10 +234,13 @@ class Model
       compiled = $$.formulaEngine.compiled[qFamilyId.columnId]
       if col.typecheckError?
         throw new EvaluationError("Formula failed type checking: #{col.typecheckError}")
-      vars = new EJSONKeyedMap(
-        [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
-      result = evaluateFormula(this, vars, col.formula)
       if compiled?
+        result = new TypedSet(col.type, compiled($$.formulaEngine, [qFamilyId.cellId]))
+      else
+        vars = new EJSONKeyedMap(
+          [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
+        result = evaluateFormula(this, vars, col.formula)
+      if 0 #compiled?
         result1 = new TypedSet(col.type, compiled($$.formulaEngine, vars.get("this").set.elements()))
         if !EJSON.equals(result, result1)
           console.log "Wrong output from compiler;\nformula=#{s col.formula}]"
@@ -297,7 +303,7 @@ class Model
                       "Column #{columnId} formula returns #{type}, which is not a subtype of specified type #{col.specifiedType}")
           else
             @_changeColumnType(columnId, type)
-          if @settings.compiler
+          if @settings.compiler && !($$.formulaEngine.compiled[columnId])?
             fc = new FormulaCompiler($$.formulaEngine)
             if fc.isCompilationSupported(col.formula)
               $$.formulaEngine.compiled[columnId] = fc.compileAsFunc(col.formula)
@@ -307,6 +313,9 @@ class Model
           # If type was unspecified, it is left as TYPE_ERROR, i.e., unknown
           # for the purposes of other formulas.
           @_changeColumnTypecheckError(columnId, e.message)
+          type = "<error>"
+
+    console.assert(type?)
     type
 
   typecheckAll: ->
@@ -401,11 +410,11 @@ Meteor.startup () ->
           @model = new Model
       @model.evaluateAll()
 
-  #Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
-  #tspace.run()
-  Tablespace.get('ptc').runTransaction ->
-    $$.model.invalidateDataCache()
-    $$.model.evaluateAll()
+  Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
+  tspace.run()
+  #Tablespace.get('ptc').runTransaction ->
+  #  $$.model.invalidateDataCache()
+  #  $$.model.evaluateAll()
 
 
 Meteor.methods({

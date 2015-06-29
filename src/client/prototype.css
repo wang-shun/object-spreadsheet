@@ -71,7 +71,7 @@ right and a bottom border:
 
 /* Connect through to the symbol in the type row. */
 
-.handsontable td.rsHeaderFieldNameObject {
+.handsontable.showTypes td.rsHeaderFieldNameObject {
   border-bottom: none;
 }
 
@@ -100,7 +100,7 @@ right and a bottom border:
 
 .handsontable td.rsHeaderFieldNameKeyedObject,
 .handsontable td.rsHeaderTypeKeyedObject {
-  border-right: 1px dashed #CCC;
+  border-right: 1px solid rgba(204,204,204,0.4);
 }
 
 /* Dotted border between object and key cells in body. */
@@ -109,34 +109,51 @@ right and a bottom border:
   border-right: 1px dashed #CCC;
 }
 
-.handsontable td.rsHeaderColor0:not(.area),
+.handsontable {
+  font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
+  font-size: 12px;
+}
+
+.handsontable td.rsHeader {
+  background-color: #EEE;
+}
+
+.handsontable.pal-rainbow td.rsHeaderColor0:not(.area),
 .rsColor0 {
   background-color: #FAA;
 }
-.handsontable td.rsHeaderColor1:not(.area),
+.handsontable.pal-rainbow td.rsHeaderColor1:not(.area),
 .rsColor1 {
   background-color: #FFA;
 }
-.handsontable td.rsHeaderColor2:not(.area),
+.handsontable.pal-rainbow td.rsHeaderColor2:not(.area),
 .rsColor2 {
   background-color: #AFA;
 }
-.handsontable td.rsHeaderColor3:not(.area),
+.handsontable.pal-rainbow td.rsHeaderColor3:not(.area),
 .rsColor3 {
   background-color: #AFF;
 }
-.handsontable td.rsHeaderColor4:not(.area),
+.handsontable.pal-rainbow td.rsHeaderColor4:not(.area),
 .rsColor4 {
   background-color: #AAF;
 }
-.handsontable td.rsHeaderColor5:not(.area),
+.handsontable.pal-rainbow td.rsHeaderColor5:not(.area),
 .rsColor5 {
   background-color: #FAF;
 }
-
-.handsontable td.rsCaption:not(.area) {
+.handsontable.pal-rainbow td.rsCaption:not(.area) {
   background-color: #888;
   color: #FFF;
+}
+.handsontable.pal-rainbow button.headerCollapse {
+  border-color: white !important;
+  color: white;
+}
+
+.handsontable td.rsCaption:not(.area) {
+  background-color: #DDD;
+  color: #222;
 }
 
 .handsontable td.rsRowNum {
@@ -150,8 +167,8 @@ right and a bottom border:
 
 .handsontable button.headerCollapse {
   background: transparent;
-  border: 1px solid white !important;
-  color: white;
+  border: 1px solid #222 !important;
+  color: #222;
   font-family: monospace;
   padding: 0 2px;
 }
@@ -179,6 +196,8 @@ right and a bottom border:
 #ActionBar {
   height: 4em;
   padding: 9px;
+  font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
+  font-size: 10pt;
   background: rgb(133,178,211); /* Old browsers */
   background: -moz-linear-gradient(top, rgba(133,178,211,1) 0%, rgba(167,199,220,1) 100%); /* FF3.6+ */
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(133,178,211,1)), color-stop(100%,rgba(167,199,220,1))); /* Chrome,Safari4+ */
@@ -186,6 +205,16 @@ right and a bottom border:
 }
 
 #ActionBar label { color: #006; }
+
+.hint {
+  font-size: smaller;
+  color: rgba(0,0,0,0.8);
+}
+
+.labelBox {
+  white-space: nowrap;
+  width: 1px;
+}
 
 .buttonBox {
   white-space: nowrap;

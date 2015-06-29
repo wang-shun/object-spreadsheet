@@ -15,6 +15,7 @@ andThen = (cont) ->
 # version of CoffeeScript is doing), but apparently we can throw any object we
 # like, it just won't have a stack trace.
 class NotReadyError
+  constructor: (@what) ->
 
 Router.route "/", -> @render "Spreadsheet"  # @deprecated (should show list of avail sheets)
 
@@ -82,7 +83,7 @@ class ViewSection
     @col = getColumn(@columnId)
     # Typechecking should always fill in a type, even _error.
     unless @col? && @col.type?
-      throw new NotReadyError()
+      throw new NotReadyError("column #{@columnId}")
     # Future: Set this when we know it.
     @relationSingular = false
     # Future: Consider rendering _unit with isObject = true specially to save
@@ -126,7 +127,7 @@ class ViewSection
     else if ce?.error?
       new ViewVlist(parentCellId, 1, null, ce.error)
     else
-      throw new NotReadyError()
+      throw new NotReadyError("Cell #{@columnId}:#{JSON.stringify parentCellId}")
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
@@ -317,6 +318,7 @@ Template.formulaValueBar.helpers({
   loading: () -> isLoading.get()
   fullTextToShow: () -> fullTextToShow.get()
   addStateCellArgs: () -> addStateCellArgs.get()
+  changeColumnArgs: () -> changeColumnArgs.get()
   changeFormulaArgs: () -> changeFormulaArgs.get()
 })
 
@@ -355,7 +357,7 @@ class StateEdit
       # unprivileged users, we probably want the server to generate it, but we
       # may not reuse this code for unprivileged users anyway.
       Random.id()
-    else if type == '_string'
+    else if type == '_string' || type == 'text'
       text
     else
       JSON.parse text
@@ -390,6 +392,43 @@ class StateEdit
     col = getColumn(columnId)
     # May as well not let the user try to edit _unit.
     col? && columnIsState(col) && col.type not in ['_token', '_unit']
+
+#
+# Template changeColumn
+#
+changeColumnArgs = new ReactiveVar([], EJSON.equals)
+
+Template.changeColumn.helpers
+  columnName: ->
+    c = getColumn(@columnId)
+    objName = if c.parent then getColumn(c.parent).objectName else ""
+    prefix = if objName? then "#{objName}:" else ""
+    prefix + (c?.objectName ? c?.fieldName)
+  columnType: ->
+    c = getColumn(@columnId)
+    if typeIsPrimitive(c.type) then c.type
+    else
+      c = getColumn(c.type)
+      if c?
+        objName = if c.parent then getColumn(c.parent).objectName else ""
+        prefix = if objName? then "#{objName}:" else ""
+        prefix + c.objectName
+
+Template.changeColumn.events
+  'submit form': (event, template) ->
+    document.activeElement.blur()
+    newVal = template.find('input[name=type]').value
+    parsed = false
+    try
+      type = if newVal == '' then null else parseTypeStr(newVal)
+      parsed = true
+    catch e
+      alert('Invalid type.')
+    if parsed
+      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
+                  standardServerCallback
+    false # prevent refresh
+
 
 changeFormulaArgs = new ReactiveVar([], EJSON.equals)
 # We mainly care that this doesn't crash.
@@ -483,6 +522,9 @@ headerExpanded = new ReactiveVar(false)
 class ClientView
 
   constructor: (@view) ->
+    @options =
+      showTypes: false    # Show type row in header
+      palette: 'boring'   # 'boring' for grey, 'rainbow' for dazzling colors
     @reload()
     @hot = null
 
@@ -502,6 +544,12 @@ class ClientView
       for cell in row
         cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here
     headerHeight = grid.length
+    if !@options.showTypes # HACK: Delete the last header row
+      grid.pop()
+      for row,i in grid
+        for cell in row
+          if cell.rowspan > grid.length - i
+            cell.rowspan = grid.length - i
     gridData = @mainSection.renderHlist(hlist, hlist.minHeight)
 
     # Resolve cell cross-references.
@@ -531,6 +579,9 @@ class ClientView
     gridCaption.push(
       [new ViewCell('Field', 1, 1, ['rsCaption'])],
       [new ViewCell('Type', 1, 1, ['rsCaption'])])
+    if !@options.showTypes # HACK: Same
+      gridCaption.pop()
+      headerHeight = headerHeight - 1
     gridVertExtend(gridCaption,
                    ([new ViewCell(i+1, 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
     gridHorizExtend(gridCaption, grid)
@@ -806,6 +857,8 @@ class ClientView
 
   hotCreate: (domElement) ->
     @hot = new Handsontable(domElement, @hotConfig())
+    $(domElement).addClass("pal-#{@options.palette}")
+    if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
     @hot
@@ -868,6 +921,13 @@ class ClientView
           canAddUnit: (col.type == '_unit' && !selectedCell.isObject &&
                        !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
         }]
+      else
+        []
+    )
+    changeColumnArgs.set(
+      if selectedCell? &&
+         (ci = selectedCell.columnId)? && ci != rootColumnId
+        [{columnId: ci}]
       else
         []
     )
@@ -934,6 +994,7 @@ guarded = (op) ->
       op arguments...
     catch e
       if e instanceof NotReadyError
+        window.why = e
         return  # Let the autorun run again once we have the data.
       throw e
 

@@ -34,6 +34,7 @@ readFamilyForFormula = (model, qFamilyId) ->
 
 readColumnTypeForFormula = (model, columnId) ->
   type = model.typecheckColumn(columnId)
+  valAssert(type?, "column '${columnId}': type missing")
   if type != TYPE_ERROR
     return type
   else
@@ -66,6 +67,7 @@ class FormulaEngine
 
   invalidateSchemaCache: ->
     @goUpMemo.clear()
+    @compiled = {}
 
 
 IDENTIFIER_RE = /[_A-Za-z][_A-Za-z0-9]*/
@@ -253,8 +255,8 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
       targetName
     catch e
-      console.log EJSON.stringify(expectedFmla)
-      console.log EJSON.stringify(actualFmla)
+      # Notice: this happens regularly in the client when column
+      # type information is wiped
       targetName + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
@@ -682,7 +684,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.
   startCellsType = validateAndTypecheckFormula(model, vars, startCellsFmla)
-  valAssert(!typeIsPrimitive(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
+  valAssert(startCellsType && !typeIsPrimitive(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
 
   # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or
@@ -725,7 +727,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 liteModel = {
   # Eta-expand to avoid load-order dependency.
   getColumn: (columnId) -> getColumn(columnId)
-  typecheckColumn: (columnId) -> getColumn(columnId).type
+  typecheckColumn: (columnId) -> getColumn(columnId).type || throw new Error("Not ready")
 }
 
 # Reused by parseProcedure. :/

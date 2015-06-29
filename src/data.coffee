@@ -174,7 +174,8 @@ class CellsInMemory
     if (rec = @recycle.get([doc.column, doc.key]))?
       rec
     else
-      _freshId()
+      while @byId[fid = _freshId()]? then 0
+      fid
 
   findOne: (query) ->
     if _.isString(query)
@@ -329,11 +330,11 @@ class Transaction
 if Meteor.isServer
   Meteor.methods
     ColumnBinRel_add: (cc, columnId, key, value) ->
-      cc.run -> new ColumnBinRel(columnId).add(key, value)
+      cc.runTransaction -> new ColumnBinRel(columnId).add(key, value)
     ColumnBinRel_remove: (cc, columnId, key, value) ->
-      cc.run -> new ColumnBinRel(columnId).remove(key, value)
+      cc.runTransaction -> new ColumnBinRel(columnId).remove(key, value)
     ColumnBinRel_removeAdd: (cc, columnId, key, oldValue, newValue) ->
-      cc.run -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
+      cc.runTransaction -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
 
 exported {Tablespace, ColumnBinRel, PairsBinRel, Transaction}

@@ -2,8 +2,10 @@
   <script src="/jquery/jquery-1.11.1.min.js"></script>
   <script src="/handsontable/handsontable.full.js"></script>
   <link rel="stylesheet" type="text/css" href="/handsontable/handsontable.full.css">
+  <!--
   <script src="/jstree/jstree.js"></script>
   <link rel="stylesheet" type="text/css" href="/jstree/themes/default/style.min.css">
+-->
 </head>
 <body>
 </body>
@@ -29,6 +31,9 @@
   {{/if}}
   {{#each addStateCellArgs}}
     {{> addStateCell}}
+  {{/each}}
+  {{#each changeColumnArgs}}
+    {{> changeColumn}}
   {{/each}}
   {{#each changeFormulaArgs}}
     {{> changeFormula}}
@@ -57,20 +62,30 @@
   {{/if}}
 </template>
 
+<template name="changeColumn">
+  <form>
+  {{columnName}} :: <input name="type" value="{{columnType}}">
+  </form>
+</template>
+
 <template name="changeFormula">
   {{#if formula}}
   <form>
     <!-- hack to extend formula bar to fill the window and leave room -->
     <!-- for the buttons -->
-    <table style="width: 100%"><tr><td>
-      <label for="changeFormula-formula">Formula ({{#if contextText}}in context of <span class="rsColor{{contextColorIndex}}">{{contextText}}</span>; {{/if}}see src/formulas.coffee):</label>
-      <br/>
+    <table style="width: 100%">
+      <tr>
+      <th class="labelBox"><label for="changeFormula-formula">Formula</label></th>
+      <td>
       <input id="changeFormula-formula" type="text" name="formula"
              style="width: 100%" class="formula {{formulaClass}}"/>
-    </td><td class="buttonBox">
-      <input type="submit" value="Save"/>
-      <input type="reset" value="Revert"/>
-    </td></tr></table>
+      </td>
+      <td class="buttonBox">
+        <input type="submit" value="Save"/>
+        <input type="reset" value="Revert"/>
+      </td>
+      </tr>
+    </table>
   </form>
   {{else}}
   <button class="create">Create formula</button>
