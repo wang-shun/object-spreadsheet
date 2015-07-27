@@ -270,7 +270,7 @@
                 parseFormula(parentId, formulaStr), view)
 
   defineParsedFormulaColumn("Person:Student",
-                            0, "parentName", null, false, null,
+                            1, "parentName", null, false, null,
                             'parent.name')
   defineParsedFormulaColumn("Person:Teacher:Slot",
                             1, "scheduledMeeting", null, true, null,
@@ -289,7 +289,7 @@
                             '$Class.Section.Enrollment[Student]')
 
   defineParsedFormulaColumn("Class:Section:Enrollment",
-                            0, "scheduledMeeting", null, false, null,
+                            2, "scheduledMeeting", null, false, null,
                             '{m : $Meeting | m.enrollment = Enrollment}')
 
   # Future: Add special support for referential integrity?

@@ -173,6 +173,10 @@ right and a bottom border:
   vertical-align: middle;
 }
 
+.handsontable td.leaf:not(.vlast) {
+  border-bottom-style: dashed;
+}
+
 .handsontable button.headerCollapse {
   background: transparent;
   border: 1px solid #222 !important;

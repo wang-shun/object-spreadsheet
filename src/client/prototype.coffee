@@ -68,6 +68,25 @@ gridMergedCell = (height, width, value = '', cssClasses = []) ->
   grid[0][0].cssClasses = cssClasses
   grid
 
+gridCell = (grid, row, col) ->
+  for i in [0..row]
+    for j in [0..col]
+      cell = grid[i][j]
+      if i + cell.rowspan > row && j + cell.colspan > col
+        return cell
+  throw new Error("cell (#{row},#{col}) does not exist in grid")
+  
+gridBottomRow = (grid) ->
+  if grid.length == 0
+    []
+  else
+    i = grid.length - 1
+    j = 0
+    while j < grid[i].length
+      cell = gridCell(grid, i, j)
+      j += cell.colspan
+      cell
+  
 class ViewVlist
   constructor: (@parentCellId, @minHeight, @hlists, @error) ->
 
@@ -145,7 +164,7 @@ class ViewSection
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
     minHeight = Math.max(1, (vlist.minHeight for vlist in vlists)...)
-    new ViewHlist(cellId, minHeight, displayValue, vlists, @markDisplayClasses())
+    new ViewHlist(cellId, minHeight, displayValue, vlists, @markDisplayClasses().concat(@valueDisplayClasses()))
 
   renderVlist: (vlist, height) ->
     qFamilyId = {columnId: @columnId, cellId: vlist.parentCellId}
@@ -165,6 +184,8 @@ class ViewSection
           bottomGrid = gridMergedCell(height - grid.length, @width)
           bottomGrid[0][0].qFamilyId = qFamilyId
           gridVertExtend(grid, bottomGrid)
+      for cell in gridBottomRow(grid)
+        cell.cssClasses.push('vlast')
     else
       grid = gridMergedCell(height, @width, '!')
       grid[0][0].fullText = 'Error: ' + vlist.error
@@ -173,6 +194,9 @@ class ViewSection
 
   markDisplayClasses: ->
     if @col.type == '_unit' then ['centered'] else []
+      
+  valueDisplayClasses: ->
+    if @subsections.length == 0 then ['leaf'] else []
 
   # Only applicable if @col.isObject.
   objectSymbol: ->
