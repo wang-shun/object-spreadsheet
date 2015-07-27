@@ -319,7 +319,6 @@ Template.formulaValueBar.helpers({
   fullTextToShow: () -> fullTextToShow.get()
   addStateCellArgs: () -> addStateCellArgs.get()
   changeColumnArgs: () -> changeColumnArgs.get()
-  changeFormulaArgs: () -> changeFormulaArgs.get()
 })
 
 addStateCellArgs = new ReactiveVar([], EJSON.equals)
@@ -396,8 +395,30 @@ class StateEdit
 #
 # Template changeColumn
 #
-changeColumnArgs = new ReactiveVar([], EJSON.equals)
 
+stringifyType = (type) ->
+  if typeIsPrimitive(type) then type
+  else
+    c = getColumn(type)
+    if c?
+      objName = if c.parent then getColumn(c.parent).objectName else ""
+      prefix = if objName? then "#{objName}:" else ""
+      prefix + c.objectName
+    else
+      "?<#{type}>"
+    
+changeColumnArgs = new ReactiveVar([], EJSON.equals)
+# We mainly care that this doesn't crash.
+origFormulaStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.formula
+  formula && stringifyFormula(getColumn(columnId).parent, formula)
+newFormulaStr = new ReactiveVar(null)
+Template.changeColumn.rendered = () ->
+  orig = origFormulaStrForColumnId(Template.currentData().columnId)
+  newFormulaStr.set(orig)
+  # Handles case when showing only the "Create formula" button for a non-formula column.
+  if orig
+    @find('input[name=formula]').value = orig
 Template.changeColumn.helpers
   columnName: ->
     c = getColumn(@columnId)
@@ -406,43 +427,10 @@ Template.changeColumn.helpers
     prefix + (c?.objectName ? c?.fieldName)
   columnType: ->
     c = getColumn(@columnId)
-    if typeIsPrimitive(c.type) then c.type
-    else
-      c = getColumn(c.type)
-      if c?
-        objName = if c.parent then getColumn(c.parent).objectName else ""
-        prefix = if objName? then "#{objName}:" else ""
-        prefix + c.objectName
-
-Template.changeColumn.events
-  'submit form': (event, template) ->
-    document.activeElement.blur()
-    newVal = template.find('input[name=type]').value
-    parsed = false
-    try
-      type = if newVal == '' then null else parseTypeStr(newVal)
-      parsed = true
-    catch e
-      alert('Invalid type.')
-    if parsed
-      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
-                  standardServerCallback
-    false # prevent refresh
-
-
-changeFormulaArgs = new ReactiveVar([], EJSON.equals)
-# We mainly care that this doesn't crash.
-origFormulaStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.formula
-  if formula? then stringifyFormula(getColumn(columnId).parent, formula) else ''
-newFormulaStr = new ReactiveVar(null)
-Template.changeFormula.rendered = () ->
-  orig = origFormulaStrForColumnId(Template.currentData().columnId)
-  newFormulaStr.set(orig)
-  # Handles case when showing only the "Create formula" button for a non-formula column.
-  if orig
-    @find('input[name=formula]').value = orig
-Template.changeFormula.helpers
+    if c?.type then stringifyType(c.type) else ''
+  columnSpecifiedType: ->
+    c = getColumn(@columnId)
+    if c?.specifiedType then stringifyType(c.specifiedType) else ''
   formula: ->
     origFormulaStrForColumnId(@columnId)
   formulaClass: ->
@@ -461,27 +449,44 @@ Template.changeFormula.helpers
       colorIndexForDepth(columnDepth(col.parent))
     else null
 
-Template.changeFormula.events({
+Template.changeColumn.events
   'input .formula': (event, template) ->
     newFormulaStr.set(template.find('input[name=formula]').value)
   'submit form': (event, template) ->
-    formulaStr = newFormulaStr.get()
+    # Set the type
+    newVal = template.find('input[name=type]').value
+    parsed = false
     try
-      formula = parseFormula(getColumn(@columnId).parent, formulaStr)
+      type = if newVal == '' then null else parseTypeStr(newVal)
+      parsed = true
     catch e
-      unless e instanceof FormulaValidationError
-        throw e
-      alert('Failed to parse formula: ' + e.message)
+      alert("Invalid type '#{newVal}'.")
       return false
-    # Canonicalize the string in the field, otherwise the field might stay
-    # yellow after successful submission.
-    formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
-    template.find('input[name=formula]').value = formulaStr
-    newFormulaStr.set(formulaStr)
-    Meteor.call('changeColumnFormula', $$,
-                @columnId,
-                formula,
-                standardServerCallback)
+    if parsed
+      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
+                  standardServerCallback
+    # Set the formula
+    formulaStr = newFormulaStr.get()
+    if formulaStr?
+      if formulaStr == ''
+        formula = null   # remove formula
+      else
+        try
+          formula = parseFormula(getColumn(@columnId).parent, formulaStr)
+        catch e
+          unless e instanceof FormulaValidationError
+            throw e
+          alert('Failed to parse formula: ' + e.message)
+          return false
+        # Canonicalize the string in the field, otherwise the field might stay
+        # yellow after successful submission.
+        formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
+        template.find('input[name=formula]').value = formulaStr
+        newFormulaStr.set(formulaStr)
+      Meteor.call('changeColumnFormula', $$,
+                  @columnId,
+                  formula,
+                  standardServerCallback)
     false # prevent refresh
   'click [type=reset]': (event, template) ->
     orig = origFormulaStrForColumnId(@columnId)
@@ -497,7 +502,7 @@ Template.changeFormula.events({
     # TODO warn user if column has data!!
   'keydown form': (event, template) ->
     if (event.which == 27) then template.find("[type=reset]")?.click()
-})
+
 
 insertBlankColumn = (parentId, index, view) ->
   # Obey the restriction on a state column as child of a formula column.
@@ -523,8 +528,9 @@ class ClientView
 
   constructor: (@view) ->
     @options =
-      showTypes: false    # Show type row in header
-      palette: 'boring'   # 'boring' for grey, 'rainbow' for dazzling colors
+      showTypes: false         # Show type row in header
+      headerExpandable: false  # Show '+' button on top left corner
+      palette: 'boring'        # 'boring' for grey, 'rainbow' for dazzling colors
     @reload()
     @hot = null
 
@@ -569,16 +575,23 @@ class ClientView
     gridVertExtend(grid, gridData)
 
     gridCaption = []
-    if headerHeight > 2
-      # This is terrible but it will take ten times as long to do properly...
-      # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
-      cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-                "#{if headerExpanded.get() then '-' else '+'}</button> Obj")
+    if @options.headerExpandable
+      if headerHeight > 2
+        # This is terrible but it will take ten times as long to do properly...
+        # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
+        cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
+                  "#{if headerExpanded.get() then '-' else '+'}</button> Obj")
+        gridVertExtend(gridCaption,
+                       gridMergedCell(headerHeight - 2, 1, cnHtml, ['htBottom', 'rsCaption']))
+      gridCaption.push(
+        [new ViewCell('Field', 1, 1, ['rsCaption'])],
+        [new ViewCell('Type', 1, 1, ['rsCaption'])])
+    else
       gridVertExtend(gridCaption,
-                     gridMergedCell(headerHeight - 2, 1, cnHtml, ['htBottom', 'rsCaption']))
-    gridCaption.push(
-      [new ViewCell('Field', 1, 1, ['rsCaption'])],
-      [new ViewCell('Type', 1, 1, ['rsCaption'])])
+                     gridMergedCell(headerHeight - 1, 1, "", ['htBottom', 'rsCaption']))
+      gridVertExtend(gridCaption,
+                     gridMergedCell(1, 1, "", ['rsCaption']))
+      
     if !@options.showTypes # HACK: Same
       gridCaption.pop()
       headerHeight = headerHeight - 1
@@ -790,7 +803,7 @@ class ClientView
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
-              @hot.deselectCell() # <- Otherwise changeFormula form gets hosed.
+              @hot.deselectCell() # <- Otherwise changeColumn form gets hosed.
               Meteor.call('deleteColumn', $$, ci,
                           standardServerCallback)
           }
@@ -927,13 +940,6 @@ class ClientView
     changeColumnArgs.set(
       if selectedCell? &&
          (ci = selectedCell.columnId)? && ci != rootColumnId
-        [{columnId: ci}]
-      else
-        []
-    )
-    changeFormulaArgs.set(
-      if selectedCell? && selectedCell.kind == 'below' &&
-         (ci = selectedCell.columnId) != rootColumnId
         [{_id: ci, columnId: ci}]
       else
         []

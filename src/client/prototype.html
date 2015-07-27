@@ -35,9 +35,6 @@
   {{#each changeColumnArgs}}
     {{> changeColumn}}
   {{/each}}
-  {{#each changeFormulaArgs}}
-    {{> changeFormula}}
-  {{/each}}
 </template>
 
 <template name="addStateCell">
@@ -64,22 +61,22 @@
 
 <template name="changeColumn">
   <form>
-  {{columnName}} :: <input name="type" value="{{columnType}}">
-  </form>
-</template>
-
-<template name="changeFormula">
-  {{#if formula}}
-  <form>
     <!-- hack to extend formula bar to fill the window and leave room -->
     <!-- for the buttons -->
     <table style="width: 100%">
       <tr>
-      <th class="labelBox"><label for="changeFormula-formula">Formula</label></th>
+      <td class="labelBox">
+        {{columnName}} :: <input name="type" value="{{columnSpecifiedType}}" placeholder="{{columnType}}">
+      </td>
+      {{#if formula}}
+      <th class="labelBox"><label for="changeFormula-formula">=</label></th>
       <td>
       <input id="changeFormula-formula" type="text" name="formula"
              style="width: 100%" class="formula {{formulaClass}}"/>
       </td>
+      {{else}}
+      <td><button type="button" class="create">Create formula</button></td>
+      {{/if}}
       <td class="buttonBox">
         <input type="submit" value="Save"/>
         <input type="reset" value="Revert"/>
@@ -87,7 +84,4 @@
       </tr>
     </table>
   </form>
-  {{else}}
-  <button class="create">Create formula</button>
-  {{/if}}
 </template>
