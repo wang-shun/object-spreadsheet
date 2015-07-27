@@ -97,12 +97,13 @@ class ViewSection
     @subsections = []
     # @headerMinHeight refers to the expanded header.
     @headerMinHeight = @col.isObject + 2  # fieldName, type
-    for sublayout in @layoutTree.subtrees
+    for sublayout, i in @layoutTree.subtrees
       subsection = new ViewSection(sublayout)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
-      haveSep = (!@rightEdgeSingular && !nextLeftEdgeSingular)
+      # TODO removed inner sep for now. Replace with dashed lines?
+      haveSep = (@col._id == rootColumnId && i > 0) # (!@rightEdgeSingular && !nextLeftEdgeSingular)
       @haveSeparatorColBefore.push(haveSep)
       if haveSep
         @width++
@@ -152,11 +153,18 @@ class ViewSection
       grid = []
       for hlist in vlist.hlists
         gridVertExtend(grid, @renderHlist(hlist, hlist.minHeight))
-      # Add blank cell at bottom
       if grid.length < height
-        bottomGrid = gridMergedCell(height - grid.length, @width)
-        bottomGrid[0][0].qFamilyId = qFamilyId
-        gridVertExtend(grid, bottomGrid)
+        if grid.length == 1
+          # Make this row span 'height' rows
+          for i in [1...height]
+            grid.push(new ViewCell() for j in [0...@width])
+          for cell in grid[0]
+            cell.rowspan = height
+        else
+          # Add blank cell at bottom
+          bottomGrid = gridMergedCell(height - grid.length, @width)
+          bottomGrid[0][0].qFamilyId = qFamilyId
+          gridVertExtend(grid, bottomGrid)
     else
       grid = gridMergedCell(height, @width, '!')
       grid[0][0].fullText = 'Error: ' + vlist.error
@@ -631,6 +639,12 @@ class ClientView
                   if adjcol in @separatorColumns then ['incomparable'] else []
         if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
+        ancestors = if cell.qCellId? then @qCellId_getAncestors(cell.qCellId)  \
+                    else if cell.qFamilyId? then @qFamilyId_getAncestors(cell.qFamilyId) \
+                    else []
+        for ancestor in ancestors
+          if (refc = @refId(ancestor))?
+            classes.push("parent-#{refc}")
         {
           renderer: if col == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
@@ -908,15 +922,42 @@ class ClientView
 
   highlightReferent: (referent) ->
     $(".referent").removeClass("referent")
-    if referent?
-      refc = @refId(referent)
-      if refc?
-        $(".ref-#{refc}").addClass("referent")
+    if referent? && (refc = @refId(referent))?
+      $(".ref-#{refc}").addClass("referent")
 
+  highlightObject: (obj) ->
+    $(".selected-object").removeClass("selected-object")
+    if obj? && (refc = @refId(obj))?
+      $(".parent-#{refc}").addClass("selected-object")
+        
+  # Should be moved to common.coffee, or an external class?
+  qCellId_getParent: (qCellId) ->
+    c = getColumn(qCellId.columnId)
+    if c && c.parent?
+      columnId: c.parent
+      cellId: cellIdParent(qCellId.cellId)
+      
+  qCellId_getAncestors: (qCellId) ->
+    ancestors = []
+    while qCellId?
+      ancestors.push(qCellId)
+      qCellId = @qCellId_getParent(qCellId)
+    ancestors
+    
+  qFamilyId_getParent: (qFamilyId) -> # returns a qCellId
+    c = getColumn(qFamilyId.columnId)
+    if c && c.parent?
+      columnId: c.parent
+      cellId: qFamilyId.cellId
+      
+  qFamilyId_getAncestors: (qFamilyId) ->
+    @qCellId_getAncestors(@qFamilyId_getParent(qFamilyId))
+        
   onSelection: ->
     selectedCell = view.getSingleSelectedCell()  # global variable
     fullTextToShow.set(selectedCell?.fullText)
     @highlightReferent(selectedCell?.referent)
+    @highlightObject(selectedCell?.qCellId)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
     addStateCellArgs.set(
       if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
