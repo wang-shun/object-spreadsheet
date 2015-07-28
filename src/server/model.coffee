@@ -115,8 +115,21 @@ class Model
     col = @getColumn(columnId)
     if fieldName == col.fieldName
       return
-    parentCol = @getColumn(col.parent)
     Columns.update(columnId, {$set: {fieldName: fieldName}})
+    @invalidateColumnCache()
+
+  changeColumnObjectName: (columnId, objectName) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
+    col = @getColumn(columnId)
+    if objectName == col.objectName
+      return
+    if !col.isObject && objectName?
+      throw new Meteor.Error('defineColumn-objectName-not-isObject',
+                             'A column with isObject = false cannot have an objectName.')      
+    Columns.update(columnId, {$set: {objectName: objectName}})
+    @invalidateColumnCache()
 
   changeColumnIsObject: (columnId, isObject) ->
     if columnId == rootColumnId
@@ -142,19 +155,7 @@ class Model
         @invalidateSchemaCache()
         Columns.update(columnId, {$set: {specifiedType: '_any'}})
     Columns.update(columnId, {$set: {isObject: isObject}})
-
-  changeColumnObjectName: (columnId, objectName) ->
-    if columnId == rootColumnId
-      throw new Meteor.Error('modify-root-column',
-                             'Cannot modify the root column.')
-    col = @getColumn(columnId)
-    if objectName == col.objectName
-      return
-    if !col.isObject && objectName?
-      throw new Meteor.Error('defineColumn-objectName-not-isObject',
-                             'A column with isObject = false cannot have an objectName.')      
-    parentCol = @getColumn(col.parent)
-    Columns.update(columnId, {$set: {objectName: objectName}})
+    @invalidateColumnCache()
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
     if columnId == rootColumnId
@@ -191,6 +192,17 @@ class Model
       Columns.update(columnId, {$set: {specifiedType: null}})
     Columns.update(columnId, {$set: {formula: formula}})
 
+  reorderColumn: (columnId, newIndex) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
+    col = @getColumn(columnId)
+    parentCol = @getColumn(col.parent)
+    children = (x for x in parentCol.children when x != columnId)
+    children.splice(newIndex, 0, columnId)
+    Columns.update(col.parent,  {$set: {children}})
+    @invalidateColumnCache()
+    
   deleteColumn: (columnId) ->
     if columnId == rootColumnId
       throw new Meteor.Error('delete-root-column',
@@ -340,10 +352,13 @@ class Model
     for c in Columns.find().fetch()
       @columnCache[c._id] = c
 
+  invalidateColumnCache: ->
+    @columnCache = {}
+      
   invalidateSchemaCache: ->
     if @settings.profiling >= 1 then console.log "--- invalidateSchemaCache ---"
     @invalidateDataCache()
-    @columnCache = {}
+    @invalidateColumnCache()
     $$.formulaEngine?.invalidateSchemaCache()
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       @_changeColumnType(columnId, null)
@@ -434,6 +449,8 @@ Meteor.methods({
     cc.run ->
       @model.changeColumnFormula(columnId, formula)
       @model.evaluateAll()
+  reorderColumn: (cc, columnId, newIndex) ->
+    cc.run -> @model.reorderColumn(columnId, newIndex)
   deleteColumn: (cc, columnId) ->
     cc.run ->
       @model.deleteColumn(columnId)

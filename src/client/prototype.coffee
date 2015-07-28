@@ -701,6 +701,9 @@ class ClientView
 
       afterSelection: (r1, c1, r2, c2) ->
         thisView.onSelection()
+        
+      beforeKeyDown: (event) ->
+        thisView.onKeyDown(event)
 
       beforeChange: (changes, source) =>
         for [row, col, oldVal, newVal] in changes
@@ -978,7 +981,7 @@ class ClientView
     @qCellId_getAncestors(@qFamilyId_getParent(qFamilyId))
         
   onSelection: ->
-    selectedCell = view.getSingleSelectedCell()  # global variable
+    selectedCell = @getSingleSelectedCell()
     fullTextToShow.set(selectedCell?.fullText)
     @highlightReferent(selectedCell?.referent)
     @highlightObject(selectedCell?.qCellId)
@@ -1010,6 +1013,26 @@ class ClientView
         []
     )
 
+  onKeyDown: (event) ->
+    Handsontable.Dom.enableImmediatePropagation(event)
+    if event.altKey && event.metaKey
+      event.stopImmediatePropagation()
+    else if event.altKey && !event.ctrlKey
+      # Use Alt + Left/Right to reorder columns inside parent
+      selectedCell = @getSingleSelectedCell()
+      if selectedCell? && (ci = selectedCell.columnId)? && 
+          (col = getColumn(ci))? && col.parent? && (parentCol = getColumn(col.parent))
+        index = parentCol.children.indexOf(ci)
+        if event.which == 37 || event.which == 39
+          event.stopImmediatePropagation()
+          event.stopPropagation()
+          event.preventDefault()
+          if event.which == 37 && index > 0
+            $$.call 'reorderColumn', ci, index-1
+          else if event.which == 39 && index < parentCol.children.length - 1
+            $$.call 'reorderColumn', ci, index+1
+          
+  
   selectSingleCell: (r1, c1) ->
     cell = @grid[r1][c1]
     @hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
