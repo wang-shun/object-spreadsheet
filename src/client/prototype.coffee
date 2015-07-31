@@ -371,6 +371,7 @@ Template.addStateCell.events({
 class StateEdit
 
   @parseValue: (qFamilyId, text) ->
+    if !text? then return "-"  # placeholder. TODO use a special object as placeholder
     type = getColumn(qFamilyId.columnId).type
     if !typeIsPrimitive(type)
       if (m = /^@(\d+)$/.exec(text))
@@ -672,8 +673,8 @@ class ClientView
         {
           renderer: if col == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
-          # Only column header "top" and "below" cells can be edited,
-          # for the purpose of changing the objectName and fieldName respectively.
+          # Only column header "top", "below", and "type" cells can be edited,
+          # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
                       cell.qCellId? && !cell.isObject && StateEdit.canEdit(cell.qCellId.columnId) ||
                       cell.qFamilyId? && !cell.isObject && StateEdit.canEdit(cell.qFamilyId.columnId))
@@ -746,7 +747,7 @@ class ClientView
           # insert/delete, but this is a less common case.
 
           addObjectType: {
-            name: 'Add object type'
+            name: 'Make into object'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
@@ -758,75 +759,33 @@ class ClientView
                           standardServerCallback)
           }
           removeObjectType: {
-            name: 'Remove object type'
+            name: 'Make into value'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
                 (col = getColumn(ci)).isObject &&
-                !col.children.length)
+                (col.children.length == (if col.type == '_token' then 1 else 0)))
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
               Meteor.call('changeColumnIsObject', $$, ci, false,
                           standardServerCallback)
           }
-          addSiblingLeft: {
-            name: 'Insert left sibling column'
+
+          addChildLast: {
+            name: 'Add child column'
             disabled: () =>
               c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId &&
-                (c.kind == 'top' || !(col = getColumn(ci)).isObject))
+              !(c?.columnId)?
+              #!((ci = c?.columnId)? && c.kind == 'top' &&
+              #  (col = getColumn(ci)).isObject && col.type == '_token')
             callback: () =>
               c = @getSingleSelectedCell()
               ci = c.columnId
               col = getColumn(ci)
-              parentId = col.parent
-              parentCol = getColumn(parentId)
-              index = parentCol.children.indexOf(ci)
-              @hot.deselectCell()
-              insertBlankColumn parentId, index, @view
-          }
-          # Note: "Sibling" here refers to the user-facing conceptual model, as
-          # in columnLogicalChildrenByName.  If we were to call this command
-          # simply "Insert column right", we'd risk surprising the user when
-          # he/she runs it on a corner cell that has sub-objects, since the cell
-          # doesn't span all the way to where the new column is inserted.
-          addSiblingRight: {
-            name: 'Insert right sibling column'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? &&
-                (c.kind == 'top' && ci != rootColumnId ||
-                 /^(tokenObject-)?(below|type)$/.test(c.kind)))
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              col = getColumn(ci)
-              if c.kind == 'top' || !col.isObject
-                # Like addSiblingLeft except + 1
-                parentId = col.parent
-                parentCol = getColumn(parentId)
-                index = parentCol.children.indexOf(ci) + 1
-              else
-                # Child of the selected column
-                parentId = ci
-                index = 0
-              @hot.deselectCell()
-              insertBlankColumn parentId, index, @view
-          }
-          addChildFirst: {
-            name: 'Insert first child column'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && c.kind == 'top' &&
-                (col = getColumn(ci)).isObject && col.type == '_token')
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              parentId = ci
-              index = 0
-              @hot.deselectCell()
-              insertBlankColumn parentId, index, @view
+              index = col.children.length
+              #@hot.deselectCell()
+              insertBlankColumn ci, index, @view
           }
           deleteColumn: {
             name: 'Delete column'
@@ -849,35 +808,6 @@ class ClientView
                           standardServerCallback)
           }
           sep1: '----------'
-          # Future: Consider enabling.  I'm not sure what is the best UI. ~ Matt
-          ###
-          addAutomaticStateCell: {
-            name: 'Add cell'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !(c? && (qf = c.qFamilyId)? &&
-                columnIsState(col = getColumn(qf.columnId)) &&
-                # Adding a duplicate value has no effect, but disallow it as a
-                # hint to the user.
-                !(col.type == '_unit' &&
-                  Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length))
-            callback: () =>
-              c = @getSingleSelectedCell()
-              qf = c.qFamilyId
-              if getColumn(qf.columnId).type in ['_unit', '_token']
-                StateEdit.addCell c.qFamilyId, null, standardServerCallback
-              else
-                # Didn't work without the setTimeout.  Maybe the dismissal of
-                # the context menu is reselecting the table cell?  Obviously
-                # this approach doesn't scale when Handsontable starts using
-                # setTimeout(0)...
-                # - Doesn't work when the form hasn't been rendered yet!
-                setTimeout((=>
-                    @hot.unlisten()
-                    $('#addStateCell-value')[0].focus()),
-                  0)
-          }
-          ###
           jumpToReferent: {
             name: 'Jump to referent'
             # Future: There should be some way to take advantage of this feature
@@ -1017,20 +947,43 @@ class ClientView
     Handsontable.Dom.enableImmediatePropagation(event)
     if event.altKey && event.metaKey
       event.stopImmediatePropagation()
-    else if event.altKey && !event.ctrlKey
-      # Use Alt + Left/Right to reorder columns inside parent
-      selectedCell = @getSingleSelectedCell()
-      if selectedCell? && (ci = selectedCell.columnId)? && 
-          (col = getColumn(ci))? && col.parent? && (parentCol = getColumn(col.parent))
-        index = parentCol.children.indexOf(ci)
-        if event.which == 37 || event.which == 39
+    else if !event.altKey && !event.ctrlKey && !event.metaKey 
+      if event.which == 13    # Enter
+        selectedCell = @getSingleSelectedCell()
+        if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
+          if col.type == '_token'
+            StateEdit.addCell qf, '*'
+      else if event.which == 46    # Delete
+        selectedCell = @getSingleSelectedCell()
+        if (qc = selectedCell?.qCellId)? && columnIsState(col = getColumn(qc.columnId))
+          if col.type == '_token'
+            StateEdit.removeCell qc
+    else if event.ctrlKey && !event.altKey && !event.metaKey
+      if event.which == 13    # Enter
+        selectedCell = @getSingleSelectedCell()
+        if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
+          StateEdit.addCell qf, undefined   # insert placeholder
           event.stopImmediatePropagation()
-          event.stopPropagation()
-          event.preventDefault()
-          if event.which == 37 && index > 0
+    else if event.altKey && !event.ctrlKey && !event.metaKey
+      # Use Alt + Left/Right to reorder columns inside parent
+      #     Alt + Up/Down to make column into object/value
+      if event.which == 37 || event.which == 39 || event.which == 38 || event.which == 40
+        event.stopImmediatePropagation()
+        event.stopPropagation()
+        event.preventDefault()
+        selectedCell = @getSingleSelectedCell()
+        if selectedCell? && (ci = selectedCell.columnId)? && 
+            (col = getColumn(ci))? && col.parent? && (parentCol = getColumn(col.parent))
+          n = parentCol.children.length
+          index = parentCol.children.indexOf(ci)
+          if event.which == 37 && index > 0                # Left
             $$.call 'reorderColumn', ci, index-1
-          else if event.which == 39 && index < parentCol.children.length - 1
+          else if event.which == 39 && index < n - 1       # Right
             $$.call 'reorderColumn', ci, index+1
+          else if event.which == 38 && !col.isObject       # Up
+            $$.call 'changeColumnIsObject', ci, true
+          else if event.which == 40 && col.isObject        # Down
+            $$.call 'changeColumnIsObject', ci, false
           
   
   selectSingleCell: (r1, c1) ->

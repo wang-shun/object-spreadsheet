@@ -64,8 +64,6 @@ class Model
     parentCol = @getColumn(parentId)
     unless parentCol?
       throw new Meteor.Error('defineColumn-no-parent', 'The specified parent column does not exist.')
-    unless parentCol.isObject
-      throw new Meteor.Error('defineColumn-parent-not-isObject', 'The parent column must be an object to have children.')
     unless 0 <= index <= parentCol.children.length
       throw new Meteor.Error('defineColumn-index-out-of-range', 'Index out of range')
     if !isObject && objectName?
@@ -99,9 +97,13 @@ class Model
       formula: formula
       children: []
     }
-    for k,v of attrs
+    for k,v of attrs || {}
       col[k] = v
     Columns.insert(col)
+    if !parentCol.isObject
+      @changeColumnIsObject(parentCol._id, true)
+      parentCol = @getColumn(parentId)
+      index = 1
     parentCol.children.splice(index, 0, thisId)
     # Meteor is nice for so many things, but not ORM...
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
@@ -138,22 +140,54 @@ class Model
     col = @getColumn(columnId)
     if isObject == col.isObject
       return
-    # The way you get a (state) token column is to "add object type" to a state
-    # column that still has the default type of _any.  Conversely, removing the
-    # object type changes the type back to _any.  Future: better flow!
+    
     if isObject
-      if !col.formula? && col.specifiedType == '_any'
+      # When making a state column into an object column: 
+      # column type becomes "_token", existing values are moved to a 
+      # newly created child column
+      if !col.formula?
         @invalidateSchemaCache()
-        Columns.update(columnId, {$set: {specifiedType: '_token'}})
+        Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: col.fieldName, fieldName: null}})
+        childId = @defineColumn(columnId, 0, "*", col.specifiedType, false, null, null, {})
+        Cells.find({column: columnId}).forEach (family) ->
+          tokens = (Random.id() for value in family.values)
+          Cells.update(family._id, {$set: {values: tokens}})
+          for [token, value] in zip(tokens, family.values)
+            key = cellIdChild(family.key, token)
+            Cells.insert({column: childId, key, values: [value]})
     else
-      if col.children?.length
-        throw new Meteor.Error('delete-column-has-children',  # XXX this is not deleteColumn
-                               'Please delete all child columns first.')
-      if col.objectName?
-        Columns.update(columnId, {$set: {objectName: null}})
-      if col.specifiedType == '_token'
+      # When making a state column into a value column:
+      # - If column type is "_token", values are copied from the column's only child,
+      #   and that child is removed.
+      # - Otherwise, column must have no children.
+      if col.type == '_token'
+        if col.children?.length > 1
+          throw new Meteor.Error('remove-object-has-children',
+                                 'Object must have a single field before converting to values.')
+        if col.children?.length == 1
+          childId = col.children[0]
+          childCol = @getColumn(childId)
+          if childCol.isObject || childCol.children?.length
+            throw new Meteor.Error('remove-object-complex-value',
+                                   "Child '#{childCol.objectName ? childCol.fieldName}' is not a simple value.")
+          Cells.find({column: columnId}).forEach (family) ->
+            newValues = []
+            for value in family.values
+              Cells.find({column: childId, key: value}).forEach (family) ->
+                newValues.push(family.values...)
+            Cells.update(family._id, {$set: {values: newValues}})
+          Columns.update(columnId, {$set: {specifiedType: childCol.type, children: []}})
+          Columns.remove(childId)
+          Cells.remove({column: childId})
+        else
+          Columns.update(columnId, {$set: {specifiedType: '_any'}})
         @invalidateSchemaCache()
-        Columns.update(columnId, {$set: {specifiedType: '_any'}})
+      else
+        if col.children?.length
+          throw new Meteor.Error('remove-object-has-children',
+                                 'Please delete all child columns first.')
+      if col.objectName?
+        Columns.update(columnId, {$set: {objectName: null, fieldName: col.objectName}})
     Columns.update(columnId, {$set: {isObject: isObject}})
     @invalidateColumnCache()
 

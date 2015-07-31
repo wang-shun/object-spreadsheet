@@ -321,7 +321,7 @@ optComma
 atomicLiteral
     : STRING
         { // replace escaped characters with actual character
-          $$ = ['lit','_string',[
+          $$ = ['lit','text',[
                  yytext.replace(/\\(\\|")/g, "$"+"1")
                        .replace(/\\n/g,'\n')
                        .replace(/\\r/g,'\r')

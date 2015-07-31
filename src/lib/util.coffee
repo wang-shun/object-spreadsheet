@@ -207,8 +207,13 @@ exists = (list, pred) ->
   false
 without = (list, item) -> list.filter (x) -> x != item
 
+zip = () ->
+  lengthArray = (arr.length for arr in arguments)
+  length = Math.min(lengthArray...)
+  for i in [0...length]
+    arr[i] for arr in arguments
 
 set = (x) -> new EJSONKeyedSet(x)
 T = -> new Tree(arguments...)
 
-exported {exported, set, Tree, T, Digraph, Memo, forall, exists, without}
+exported {exported, set, Tree, T, Digraph, Memo, forall, exists, without, zip}
