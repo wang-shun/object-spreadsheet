@@ -2,10 +2,6 @@
   <script src="/jquery/jquery-1.11.1.min.js"></script>
   <script src="/handsontable/handsontable.full.js"></script>
   <link rel="stylesheet" type="text/css" href="/handsontable/handsontable.full.css">
-  <!--
-  <script src="/jstree/jstree.js"></script>
-  <link rel="stylesheet" type="text/css" href="/jstree/themes/default/style.min.css">
--->
 </head>
 <body>
 </body>
@@ -15,14 +11,13 @@
     {{> formulaValueBar}}
   </div>
   <div id="ViewWrapper">
-    <!-- Handsontable (i.e., WalkontableOverlay.prototype.getScrollableElement)
-         requires an inline style for fixed rows/columns to work. -->
-    <div id="View" style="overflow: scroll;"></div>
+    <!-- Handsontable requires an inline overflow style for fixed rows/columns to work. -->
+    <!-- (see WalkontableOverlay.prototype.getScrollableElement) -->
+    <div id="View" style="overflow: auto"></div>
   </div>
 </template>
 
 <template name="formulaValueBar">
-  {{! Hack to reduce the jerking for addStateCell/changeFormula. }}
   {{#if loading}}
     <div>Loading... This may take a minute, especially if the sheet is being filled with a sample data set.</div>
   {{/if}}

@@ -636,6 +636,7 @@ class ClientView
 
     separatorColumns = (i for cell,i in grid[headerHeight - 1] when i != 0 && !cell.columnId)
     @separatorColumns = separatorColumns
+    SEPCOL_WIDTH = 20
 
     d = {
       data: ((cell.display || cell.value for cell in row) for row in grid)
@@ -645,7 +646,7 @@ class ClientView
       fixedColumnsLeft: 1
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths: (for i in [0...@grid[0].length]  # no way grid can be empty
-                    if i in separatorColumns then 10 else undefined)
+                    if i in separatorColumns then SEPCOL_WIDTH else undefined)
       rowHeights:
         # Specify all the row heights (23 pixels is the Handsontable default),
         # otherwise the fixed clone of the left column sometimes reduced the
@@ -1000,21 +1001,18 @@ class ClientView
 
 
 view = null
-viewHOT = null
 
 
 rebuildView = (viewId) ->
-  if !view || !viewHOT
-    if viewHOT
-      viewHOT.destroy()
-      viewHOT = null
-      view = null
+  if !view || !view.hot
+    if view?.hot?
+      view.hot.destroy()
     view = new ClientView(new View(viewId))
-    viewHOT = view.hotCreate $('#View')[0]
+    view.hotCreate $('#View')[0]
   else
     view.reload() #viewDef
     view.hotReconfig()
-  exported {view, viewHOT}  # for debugging
+  exported {view}  # for debugging
   # Try to select a cell similar to the one previously selected.
   if selectedCell?
     ((selectedCell.qCellId? &&
@@ -1056,4 +1054,4 @@ Template.Spreadsheet.rendered = ->
 
 
 $ ->
-  exported {View, rebuildView, StateEdit}
+  exported {ClientView, rebuildView, StateEdit}

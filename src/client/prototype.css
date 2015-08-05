@@ -1,12 +1,17 @@
-body { margin: 0; }
+body { 
+  margin: 0;
+  height: 100vh;
+}
 
 #ViewWrapper {
   box-sizing: border-box;
-  padding: 9px;
+  padding: 5px 5px 0 5px;
   width: 100%;
+  height: calc(100% - 70px);
 }
 #View {
   width: 100%;
+  height: 100%;
 }
 
 @media screen {
@@ -206,7 +211,8 @@ right and a bottom border:
 }
 
 #ActionBar {
-  height: 4em;
+  box-sizing: border-box;
+  height: 70px;
   padding: 9px;
   font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
   font-size: 10pt;
