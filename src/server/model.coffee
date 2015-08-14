@@ -462,9 +462,9 @@ Meteor.methods({
   open: (cc) -> cc.run()
   defineColumn: (cc, parentId, index, fieldName, specifiedType, isObject, objectName, formula, viewId) ->
     cc.run ->
-      attrs = if viewId? then {view: viewId} else {}
-      id = @model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula, attrs)
-      if viewId? then new View(viewId).addColumn(id)  # FIXME: honor index
+      #attrs = if viewId? then {view: viewId} else {}
+      id = @model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula)
+      if viewId? then new View(viewId).addColumn(id, true)  # FIXME: honor index
       @model.evaluateAll()
   changeColumnFieldName: (cc, columnId, fieldName) ->
     cc.run -> @model.changeColumnFieldName(columnId, fieldName)

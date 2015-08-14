@@ -457,7 +457,7 @@ Template.changeColumn.helpers
     c = getColumn(@columnId)
     objName = if c.parent then getColumn(c.parent).objectName else ""
     prefix = if objName? then "#{objName}:" else ""
-    prefix + (c?.objectName ? c?.fieldName)
+    prefix + (c?.objectName ? c?.fieldName ? '<unnamed>')
   columnType: ->
     c = getColumn(@columnId)
     if c?.type then stringifyType(c.type) else ''

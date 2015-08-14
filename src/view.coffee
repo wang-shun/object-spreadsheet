@@ -9,7 +9,7 @@ class View
     else
       {layout: View.rootLayout()}
 
-  addColumn: (columnId) ->
+  addColumn: (columnId, own=false) ->
     def = @def()
     parentId = Columns.findOne(columnId)?.parent
     if parentId?
@@ -18,6 +18,8 @@ class View
       if layoutSubtree?
         layoutSubtree.subtrees.push(new Tree(columnId))
         Views.upsert(@id, def)
+      if own
+        Columns.update(columnId, {$set: {view: @id}})
 
   removeColumn: (columnId) ->
     def = @def()

@@ -265,9 +265,10 @@
     # order to parse formulas.
     model.typecheckAll()
     parentId = if parentRef then parseObjectTypeRef(parentRef) else rootColumnId
-    Meteor.call('defineColumn', $$,
+    id = model.defineColumn(
                 parentId, order, fieldName, specifiedType, isObject, objectName,
-                parseFormula(parentId, formulaStr), view)
+                parseFormula(parentId, formulaStr))
+    if view then new View(view).addColumn(id, true)
 
   defineParsedFormulaColumn("Person:Student",
                             1, "parentName", null, false, null,
@@ -289,7 +290,11 @@
                             '$Class.Section.Enrollment[Student]')
 
   defineParsedFormulaColumn("Class:Section:Enrollment",
-                            2, "scheduledMeeting", null, false, null,
+                            0, "studentName", null, false, null,
+                            'student.Person.name')
+
+  defineParsedFormulaColumn("Class:Section:Enrollment",
+                            1, "scheduledMeeting", null, false, null,
                             '{m : $Meeting | m.enrollment = Enrollment}')
 
   # Future: Add special support for referential integrity?
