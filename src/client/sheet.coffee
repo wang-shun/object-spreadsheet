@@ -158,7 +158,8 @@ class ViewSection
       if !typeIsPrimitive(@col.type) then new CellReference({columnId: @col.type, cellId: value})
       # Should be OK if the user knows which columns are string-typed.
       else if typeof value == 'string' then value
-      # Make sure IDs (especially) are unambiguous.
+      else if value.constructor == Date then value.toString("yyyy-MM-dd HH:mm")
+      # Reasonable fallback
       else JSON.stringify(value)
     vlists =
       for subsection in @subsections
@@ -391,6 +392,8 @@ class StateEdit
       Random.id()
     else if type == '_string' || type == 'text'
       text
+    else if type == 'date'
+      Date.parse(text) || throw new Error("Invalid date, '#{text}'")
     else
       JSON.parse text
 
@@ -665,8 +668,8 @@ class ClientView
                   if adjcol in @separatorColumns then ['incomparable'] else []
         if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
-        ancestors = if cell.qCellId? then @qCellId_getAncestors(cell.qCellId)  \
-                    else if cell.qFamilyId? then @qFamilyId_getAncestors(cell.qFamilyId) \
+        ancestors = if cell.qCellId? then new CellId(cell.qCellId).getAncestors()  \
+                    else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).getAncestors() \
                     else []
         for ancestor in ancestors
           if (refc = @refId(ancestor))?
@@ -887,29 +890,6 @@ class ClientView
     $(".selected-object").removeClass("selected-object")
     if obj? && (refc = @refId(obj))?
       $(".parent-#{refc}").addClass("selected-object")
-        
-  # Should be moved to common.coffee, or an external class?
-  qCellId_getParent: (qCellId) ->
-    c = getColumn(qCellId.columnId)
-    if c && c.parent?
-      columnId: c.parent
-      cellId: cellIdParent(qCellId.cellId)
-      
-  qCellId_getAncestors: (qCellId) ->
-    ancestors = []
-    while qCellId?
-      ancestors.push(qCellId)
-      qCellId = @qCellId_getParent(qCellId)
-    ancestors
-    
-  qFamilyId_getParent: (qFamilyId) -> # returns a qCellId
-    c = getColumn(qFamilyId.columnId)
-    if c && c.parent?
-      columnId: c.parent
-      cellId: qFamilyId.cellId
-      
-  qFamilyId_getAncestors: (qFamilyId) ->
-    @qCellId_getAncestors(@qFamilyId_getParent(qFamilyId))
         
   onSelection: ->
     selectedCell = @getSingleSelectedCell()

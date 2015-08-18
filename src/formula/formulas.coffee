@@ -346,9 +346,9 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
   typecheck: (model, vars, lhsType, rhsType) ->
     valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
               "Mismatched types to '#{symbol}' operator (#{lhsType} and #{rhsType})")
-    '_bool'
+    'bool'
   evaluate: (model, vars, lhs, rhs) ->
-    new TypedSet('_bool', new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)]))
+    new TypedSet('bool', new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 dispatch = {
@@ -384,7 +384,7 @@ dispatch = {
           # XXX: Canonicalize order?
           '{' + (JSON.stringify(x) for x in list).join(',') + '}'
       outerPrecedence:
-        if type == '_number' and list.length == 1 and list[0] < 0
+        if type == 'number' and list.length == 1 and list[0] < 0
           # Should never be reached by parsing concrete syntax.
           PRECEDENCE_NEG
         else
@@ -462,9 +462,9 @@ dispatch = {
 
   count:
     argAdapters: [EagerSubformula]
-    typecheck: (model, vars, domainType) -> '_number'
+    typecheck: (model, vars, domainType) -> 'number'
     evaluate: (model, vars, domainTset) ->
-      new TypedSet('_number', set([domainTset.elements().length]))
+      new TypedSet('number', set([domainTset.elements().length]))
     stringify: (model, vars, domainSinfo) ->
       # TODO: Factor out helper for function syntax.
       str: "count(#{domainSinfo.strFor(PRECEDENCE_LOWEST)})"
@@ -493,7 +493,7 @@ dispatch = {
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, predicateLambda) ->
       predicateType = predicateLambda(domainType)
-      valExpectType('Predicate', predicateType, '_bool')
+      valExpectType('Predicate', predicateType, 'bool')
       domainType
     evaluate: (model, vars, domainTset, predicateLambda) ->
       new TypedSet(
@@ -530,7 +530,7 @@ dispatch = {
       for x in domainTset.elements()
         tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]))
         res += singleElement(addendLambda(tset).set)
-      return new TypedSet('_number', new EJSONKeyedSet([res]))
+      return new TypedSet('number', new EJSONKeyedSet([res]))
     stringify: (model, vars, domainSinfo, addendLambda) ->
       addendSinfo = addendLambda(
         try
@@ -555,34 +555,34 @@ dispatch = {
   'neg':
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, argType) ->
-      valExpectType("Operand of unary '-'", argType, '_number')
-      '_number'
+      valExpectType("Operand of unary '-'", argType, 'number')
+      'number'
     evaluate: (model, vars, arg) ->
-      new TypedSet('_number', set([-singleElement(arg.set)]))
+      new TypedSet('number', set([-singleElement(arg.set)]))
     stringify: (model, vars, argSinfo) ->
       str: "-#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG
 
-  '+' : singletonInfixOperator('+' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x +  y)
-  '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x -  y)
-  '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x *  y)
-  '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, '_number', '_number', '_number', (x, y) -> x /  y)
-  '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'_number', '_number', '_number', Math.pow)
-  '<' : singletonInfixOperator('<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x <  y)
-  '<=': singletonInfixOperator('<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x <= y)
-  '>' : singletonInfixOperator('>' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x >  y)
-  '>=': singletonInfixOperator('>=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, '_number', '_number', '_bool', (x, y) -> x >= y)
+  '+' : singletonInfixOperator('+' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x +  y)
+  '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x -  y)
+  '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x *  y)
+  '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x /  y)
+  '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'number', 'number', 'number', Math.pow)
+  '<' : singletonInfixOperator('<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x <  y)
+  '<=': singletonInfixOperator('<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x <= y)
+  '>' : singletonInfixOperator('>' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x >  y)
+  '>=': singletonInfixOperator('>=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x >= y)
 
   # TODO: Short circuit?
-  '&&': singletonInfixOperator('&&', PRECEDENCE_AND, ASSOCIATIVITY_LEFT, '_bool', '_bool', '_bool', (x, y) -> x && y)
-  '||': singletonInfixOperator('||', PRECEDENCE_OR, ASSOCIATIVITY_LEFT, '_bool', '_bool', '_bool', (x, y) -> x || y)
+  '&&': singletonInfixOperator('&&', PRECEDENCE_AND, ASSOCIATIVITY_LEFT, 'bool', 'bool', 'bool', (x, y) -> x && y)
+  '||': singletonInfixOperator('||', PRECEDENCE_OR, ASSOCIATIVITY_LEFT, 'bool', 'bool', 'bool', (x, y) -> x || y)
   '!':
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, argType) ->
-      valExpectType("Operand of '!'", argType, '_bool')
-      '_bool'
+      valExpectType("Operand of '!'", argType, 'bool')
+      'bool'
     evaluate: (model, vars, arg) ->
-      new TypedSet('_bool', set([!singleElement(arg.set)]))
+      new TypedSet('bool', set([!singleElement(arg.set)]))
     stringify: (model, vars, argSinfo) ->
       str: "!#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG

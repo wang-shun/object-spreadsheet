@@ -332,11 +332,11 @@ atomicLiteral
                ]];
         }
     | NUMBER
-        {$$ = ['lit','_number',[Number(yytext)]];}
+        {$$ = ['lit','number',[Number(yytext)]];}
     | TRUE
-        {$$ = ['lit','_bool',[true]];}
+        {$$ = ['lit','bool',[true]];}
     | FALSE
-        {$$ = ['lit','_bool',[false]];}
+        {$$ = ['lit','bool',[false]];}
     ;
 
 %%

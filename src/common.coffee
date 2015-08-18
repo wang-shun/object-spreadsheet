@@ -3,7 +3,7 @@
 
 @rootColumnId = '_root'
 
-PRIMITIVE_TYPES = ["text", "number", "date", "any"]
+PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
 
 @typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type) || type in PRIMITIVE_TYPES
 
@@ -157,7 +157,41 @@ PRIMITIVE_TYPES = ["text", "number", "date", "any"]
   else
     t2
 
-class @TypedSet
+    
+class CellId
+  constructor: ({@columnId, @cellId}) ->
+  
+  getParent: ->
+    c = getColumn(@columnId)
+    if c && c.parent?
+      new CellId
+        columnId: c.parent
+        cellId: cellIdParent(@cellId)
+      
+  getAncestors: ->
+    c = @
+    ancestors = []
+    while c?
+      ancestors.push(c)
+      c = c.getParent()
+    ancestors
+    
+
+class FamilyId
+  constructor: ({@columnId, @cellId}) ->
+
+  getParent: -> # returns a qCellId
+    c = getColumn(@columnId)
+    if c && c.parent?
+      new CellId
+        columnId: c.parent
+        cellId: @cellId
+      
+  getAncestors: ->
+    @getParent().getAncestors()
+        
+      
+class TypedSet
   # public fields
   #@type: column ID or primitive, or TYPE_ANY if we don't know because the set is empty.
   #@set: EJSONKeyedSet<@type>
@@ -180,3 +214,6 @@ class @TypedSet
   @fromJSONValue: (json) ->
     new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set))
 EJSON.addType('TypedSet', TypedSet.fromJSONValue)
+
+
+exported {CellId, FamilyId, TypedSet}
