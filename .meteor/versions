@@ -8,6 +8,7 @@ callback-hook@1.0.3
 callingcontext@0.9.0
 check@1.0.5
 coffeescript@1.0.6
+datejs@0.9.0
 ddp@1.1.0
 deps@1.0.7
 ejson@1.0.6

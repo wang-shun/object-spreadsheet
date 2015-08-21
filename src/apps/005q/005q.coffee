@@ -25,7 +25,6 @@ if Meteor.isClient
   Template.DoubleOhFiveQueue.events
     "submit form": (event) ->
       formData =
-        time: [new Date().getTime()]   # should be done on server...
         name: [event.target.name.value]
         issue: [event.target.issue.value]
         location: [event.target.location.value]
@@ -45,23 +44,22 @@ if Meteor.isClient
     
   Template.DoubleOhFiveQueueStaff.events
     "click .pick": ->
-      Relsheets.call("pick", {call: [@call.qCellId.cellId], user: [@user.qCellId.cellId]})
+      Relsheets.call("pick", {@call, @user})
     "click .forfeit": ->
-      Relsheets.call("forfeit", {call: [@call.qCellId.cellId], user: [@user.qCellId.cellId]})
+      Relsheets.call("forfeit", {@call, @user})
     "click .done": ->
-      Relsheets.call("done", {call: [@call.qCellId.cellId]})
+      Relsheets.call("done", {@call})
 
     
 if Meteor.isServer
 
   Relsheets.procedures '005q',
     enqueue:
-      params: [['time', '_int'],
-               ['name', '_string'],
-               ['issue', '_string'],
-               ['location', '_string']]
+      params: [['name', 'text'],
+               ['issue', 'text'],
+               ['location', 'text']]
       body: '''let q = new $Call
-               q.time := time
+               q.time := d"now"
                q.name := name
                q.location := location
                q.issue := {s : $Skill | s.name = issue}'''

@@ -1,0 +1,18 @@
+<template name="MilkMaid">
+  <style>
+    div.header { background: rgba(0,60,60,0.2); padding: 9px; }
+    div.Cycle { margin: 9px; }
+    table { border-collapse: collapse; }
+    table td { border: 1px solid #CCC; padding: 6px; }
+    tr:not([data-isNext='']) td { background: rgba(0,0,255,0.2); }
+  </style>
+  <div class="header">Milkmaid</div>
+  <div class="Cycle">
+    <table>
+      {{#each milk.Cycle}}
+      <tr data-isNext="{{isNext}}"><td>{{name}}</td>
+        <td>{{#each isNext}}{{#with me=..}}<button>Supply</button>{{/with}}{{/each}}</td></tr>
+      {{/each}}
+    </table>
+  </div>
+</template>

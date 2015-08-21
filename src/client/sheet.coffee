@@ -489,40 +489,43 @@ Template.changeColumn.events
   'input .formula': (event, template) ->
     newFormulaStr.set(template.find('input[name=formula]').value)
   'submit form': (event, template) ->
-    # Set the type
-    newVal = template.find('input[name=type]').value
-    parsed = false
     try
-      type = if newVal == '' then null else parseTypeStr(newVal)
-      parsed = true
+      # Set the type
+      newVal = template.find('input[name=type]').value
+      parsed = false
+      try
+        type = if newVal == '' then null else parseTypeStr(newVal)
+        parsed = true
+      catch e
+        alert("Invalid type '#{newVal}'.")
+        return false
+      if parsed
+        Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
+                    standardServerCallback
+      # Set the formula
+      formulaStr = newFormulaStr.get()
+      if formulaStr?
+        if formulaStr == ''
+          formula = null   # remove formula
+        else
+          try
+            formula = parseFormula(getColumn(@columnId).parent, formulaStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
+          template.find('input[name=formula]').value = formulaStr
+          newFormulaStr.set(formulaStr)
+        Meteor.call('changeColumnFormula', $$,
+                    @columnId,
+                    formula,
+                    standardServerCallback)
     catch e
-      alert("Invalid type '#{newVal}'.")
-      return false
-    if parsed
-      Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
-                  standardServerCallback
-    # Set the formula
-    formulaStr = newFormulaStr.get()
-    if formulaStr?
-      if formulaStr == ''
-        formula = null   # remove formula
-      else
-        try
-          formula = parseFormula(getColumn(@columnId).parent, formulaStr)
-        catch e
-          unless e instanceof FormulaValidationError
-            throw e
-          alert('Failed to parse formula: ' + e.message)
-          return false
-        # Canonicalize the string in the field, otherwise the field might stay
-        # yellow after successful submission.
-        formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
-        template.find('input[name=formula]').value = formulaStr
-        newFormulaStr.set(formulaStr)
-      Meteor.call('changeColumnFormula', $$,
-                  @columnId,
-                  formula,
-                  standardServerCallback)
+      console.error e
     false # prevent refresh
   'click [type=reset]': (event, template) ->
     orig = origFormulaStrForColumnId(@columnId)

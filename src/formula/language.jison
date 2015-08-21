@@ -13,6 +13,7 @@ frac "."[0-9]+
 {int}{frac}?{exp}?\b return 'NUMBER'
 /* Hm, this does not match the unescaping code below. ~ Matt 2015-02-05 */
 \"(?:'\\'[\\"bfnrt/]|'\\u'[a-fA-F0-9]{4}|[^\\\0-\x09\x0a-\x1f"])*\" yytext = yytext.substr(1,yyleng-2); return 'STRING'
+d\"(?:'\\'[\\"bfnrt/]|'\\u'[a-fA-F0-9]{4}|[^\\\0-\x09\x0a-\x1f"])*\" yytext = yytext.substr(2,yyleng-3); return 'DATESTRING'
 "true" return 'TRUE'
 "false" return 'FALSE'
 
@@ -331,6 +332,8 @@ atomicLiteral
                        .replace(/\\b/g,'\b')
                ]];
         }
+    | DATESTRING
+        {$$ = ['date',yytext];}
     | NUMBER
         {$$ = ['lit','number',[Number(yytext)]];}
     | TRUE

@@ -171,6 +171,11 @@ ColumnId = {
     valAssert(model.getColumn(arg)?, "No column exists with ID #{arg}")
     arg
 }
+String = {
+  validate: (vars, arg) ->
+    valAssert(_.isString(arg), 'Must be a string')
+  typecheck: (model, vars, arg) -> arg
+}
 Type = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Type must be a string')
@@ -351,6 +356,39 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
     new TypedSet('bool', new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
+# Usage:
+#   overloaded([[argument-types...], handler],
+#              [[argument-types...], handler], ...)
+overloaded = (alternatives...) ->
+  arities = (a[0].length for a in alternatives)
+  minArity = Math.min(arities...)
+  maxArity = Math.max(arities...)
+  getHandler = (argtypes) ->
+    for [decltypes, handler] in alternatives
+      if decltypes.length == argtypes.length && 
+         forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) != TYPE_ERROR)
+        return handler
+  argAdapters: (EagerSubformula for i in [0...minArity]).concat(OptionalEagerSubformula for i in [minArity...maxArity])
+  typecheck: (model, vars, argtypes...) ->
+    handler = getHandler(argtypes)
+    valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+    handler.typecheck(model, vars, argtypes...)
+  evaluate: (model, vars, args...) ->      
+    argtypes = (ts.type for ts in args)
+    handler = getHandler(argtypes)
+    handler?.evaluate(model, vars, args...)
+  stringify: (model, vars, sinfos...) ->
+    # Does it even make sense to have different stringifies for different alternatives?
+    [_, handler] = alternatives[0]
+    handler.stringify(model, vars, sinfos...)
+      
+compareInfixOperator = (symbol, precedence, associativity, evaluateFn) ->
+  overloaded(
+        [['number', 'number'], singletonInfixOperator(symbol, precedence, associativity, 'number', 'number', 'bool', evaluateFn)],
+        [['date', 'date'],     singletonInfixOperator(symbol, precedence, associativity, 'date',   'date',   'bool', evaluateFn)]
+  )
+
+
 dispatch = {
 
   # ["lit", type ID (string), elements (array)]:
@@ -390,6 +428,16 @@ dispatch = {
         else
           PRECEDENCE_ATOMIC
 
+  # ["date", string]
+  date:
+    argAdapters: [String]
+    typecheck: -> 'date'
+    evaluate: (model, vars, string) ->
+      new TypedSet('date', new EJSONKeyedSet([Date.parse(string)]))
+    stringify: (model, vars, string) ->
+      str: "d#{JSON.stringify(string)}"
+      outerPrecedence: PRECEDENCE_ATOMIC
+          
   # ["var", varName (string)]:
   # Gets the value of a bound variable.
   # Concrete syntax: myVar
@@ -568,10 +616,11 @@ dispatch = {
   '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x *  y)
   '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x /  y)
   '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'number', 'number', 'number', Math.pow)
-  '<' : singletonInfixOperator('<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x <  y)
-  '<=': singletonInfixOperator('<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x <= y)
-  '>' : singletonInfixOperator('>' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x >  y)
-  '>=': singletonInfixOperator('>=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, 'number', 'number', 'bool', (x, y) -> x >= y)
+  
+  '<' : compareInfixOperator(  '<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x <  y)
+  '<=': compareInfixOperator(  '<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x <= y)
+  '>' : compareInfixOperator(  '>' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x >  y)
+  '>=': compareInfixOperator(  '>=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x >= y)
 
   # TODO: Short circuit?
   '&&': singletonInfixOperator('&&', PRECEDENCE_AND, ASSOCIATIVITY_LEFT, 'bool', 'bool', 'bool', (x, y) -> x && y)

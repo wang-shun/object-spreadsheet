@@ -8,7 +8,7 @@ if Meteor.isClient
           $$.call('compileProcedures', proceduresAppName)
         $$.subscribeAll())
     call: (transaction, argsObj, callback) ->
-      $$.call('executeCannedTransaction', transaction, argsObj,
+      $$.call('executeCannedTransaction', transaction, glue(argsObj),
               andThen (result) -> callback?(result))
 
 
@@ -86,6 +86,17 @@ Relsheets.readSubtree = (columnStr, rootCellId) ->
   #  columnTree = columnTree.subtrees[0]
   Relsheets.readObj(columnTree, rootCellId)
 
+  
+glue = (argsobj) ->
+  value = (a) ->
+    if a.qCellId? then a.qCellId.cellId else a
+  arg = (a) ->
+    if _.isArray(a) then a.map value
+    else [value(a)]
+  new ->
+    @[k] = arg(v) for k,v of argsobj ; null
+    
+  
 exported = (d) ->
   for k,v of d
     @[k] = v
