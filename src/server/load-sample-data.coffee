@@ -367,87 +367,14 @@
                             'availableSlot.time',
                             '1')
 
-  model
 
 
-# Future: Add special support for "check $valid"?  But we might want similar
-# functionality for other checks, if the Derailer study is any evidence.
-# Cleanup: Introduce a formula to reduce duplication in enrollment authorization
-# checks?
-sampleProcedures = {
-  teacherCreateSlot:
-    params: [['clientUser', 'Person'],
-             ['time', '_string']]
-    body: '''
-let t = clientUser.Teacher
-check t != {}
-let s = new t.Slot
-s.time := time
-check $valid
-'''
-  teacherDeleteSlot:
-    params: [['clientUser', 'Person'],
-             ['slot', 'Person:Teacher:Slot']]
-    body: '''
-check slot.Person = clientUser
-delete slot
-check $valid
-'''
-  parentCreateMeeting:
-    params: [['clientUser', 'Person'],
-             ['enr', 'Class:Section:Enrollment'],
-             ['slot', 'Person:Teacher:Slot']]
-    body: '''
-check clientUser in enr.student.parent
-let m = new $Meeting
-m.enrollment := enr
-m.slot := slot
-check $valid
-'''
-  parentCancelMeeting:
-    params: [['clientUser', 'Person'],
-             ['meeting', 'Meeting']]
-    body: '''
-check clientUser in meeting.enrollment.student.parent
-delete meeting
-check $valid
-'''
-
-  # This is just a test of a make statement, not something that actually belongs
-  # in the PTC application.
-  enroll:
-    params: [['student', 'Person:Student'],
-             ['section', 'Class:Section']]
-    body: '''
-make section.Enrollment[student]
-'''
-}
-
-@definePTCProcedures = (model) ->
-  # Needed to parse procedures; server-startup evaluateAll hasn't run yet.
-  model.typecheckAll()
-  for name, proc of sampleProcedures
-    try
-      model.cannedTransactions.set(
-        name, parseCannedTransaction(proc.params, proc.body))
-    catch e
-      # Incompatible schema change?
-      console.log("Failed to define PTC sample procedure #{name}:", e.stack)
-
-###
-Example of calling a transaction from the browser console:
-
-Meteor.call('executeCannedTransaction', $$, 'teacherCreateSlot', {clientUser: [["1"]], time: ['2014-12-16 15:00']})
-
-Object IDs can be copied from the full text of the bullet cell.  Remember to
-promote all arguments to lists.
-###
-
-@loadDump = (appName) ->
+@loadDump = (model, appName) ->
   try
     for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells']]
-      docs = JSON.parse(Assets.getText("dump/#{appName}:#{collName}.json"))
+      docs = EJSON.parse(Assets.getText("dump/#{appName}:#{collName}.json"))
       for doc in docs
         coll.upsert(doc._id, doc)  # upsert needed to overwrite root column
+    model.invalidateSchemaCache()
   catch e
     console.log("Failed to load dump for #{appName} into sheet '#{$$.id}':", e.stack)

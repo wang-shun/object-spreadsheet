@@ -71,6 +71,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 /* Identifiers */
 /* XXX: Allow non-Latin word characters? */
 [_A-Za-z][_A-Za-z0-9]* return 'IDENT'
+[`][^`]*[`] yytext = yytext.substr(1,yyleng-2); return 'IDENT'
 
 <<EOF>> return 'EOF'
 

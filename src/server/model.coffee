@@ -435,25 +435,19 @@ Meteor.startup () ->
       @model = new Model
       @formulaEngine = new FormulaEngine
       appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
-      if appName == 'ptc'
-        if @model.wasEmpty
-          loadPTCData(@model)
-        definePTCProcedures(@model)
-      else if appName in ['005q', 'beta']
-        # TO MAKE A DUMP:
-        # for c in APPNAME:{columns,cells}; do mongoexport --port 3001 --db meteor -c $c --jsonArray >private/dump/$c.json; done
-        if @model.wasEmpty
-          loadDump(appName)
-          # Hack to redo the invalidateSchemaCache since these dumps may contain
-          # computed data.
-          @model = new Model
+      if @model.wasEmpty
+        if appName == 'ptc' then loadPTCData(@model)
+        else if appName in ['005q', 'beta', 'milk']
+          loadDump(@model, appName)
+          # TO MAKE A DUMP:
+          # for c in APPNAME:{columns,cells}; do mongoexport --port 3001 --db meteor -c $c --jsonArray >private/dump/$c.json; done
       @model.evaluateAll()
 
   Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
   tspace.run()
 
 
-Meteor.methods({
+Meteor.methods
   # The model methods do not automatically evaluate so that we can do bulk
   # changes from the server side, but for now we always evaluate after each
   # change from the client.  It would be a little harder for the client itself
@@ -493,6 +487,6 @@ Meteor.methods({
   executeCannedTransaction: (cc, name, argsObj) ->
     cc.run ->
       @model.executeCannedTransaction(name, argsObj)
-})
+
 
 exported {Model}
