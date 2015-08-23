@@ -252,10 +252,10 @@
       # The sample data set uses the internal model with key and leaf columns
       # treated the same, so we don't care about the isValues part of the result.
       childColumnId = columnLogicalChildrenByName(columnId, childColumnName)[0][0]
-      childColumn = new ColumnBinRel(childColumnId)
+      fam = new FamilyId({columnId: childColumnId, cellId})
       for entry in childCells  # No point in making a map just to expand it again.
         [value, childCellData] = entry
-        childColumn.add(cellId, value, (->), false)
+        fam.add(value)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
   insertCells(rootColumnId, rootCellId, sampleData)
 

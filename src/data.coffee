@@ -31,6 +31,7 @@ class Tablespace extends ControlContext
     if Meteor.isServer
       for collection in [@Columns,@Cells,@Views]
         @publish collection
+      @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }  # @@@ Matt will kill me
 
   publish: (collection) ->
     # Do not inline this into the same function as the loop over collections, or
@@ -60,93 +61,88 @@ class Tablespace extends ControlContext
 
 EJSON.addType('Tablespace', Tablespace.fromJSONValue)
 
+    
+    
+_toColumnId = (selector) ->
+  selector._id ?
+  if _.isRegExp(selector) then parseColumnRef(selector.source)[0]
+  else selector
 
-# NOTE: This class treats erroneous families in formula columns as empty!  Do
-# not use it if you care about error propagation.
-class ColumnBinRel
-  constructor: (@columnId) ->
-
-  cells: ->
-    families = Cells.find({column: @columnId}).fetch()
-    famcells = (family) -> ([family.key, v] for v in family.values || [])
-    [].concat((famcells x for x in families)...)
-
-  cellset: ->
-    c = Columns.findOne(@columnId)
-    new TypedSet([c.parent, c.type], set(@cells()))
-
-  # NOTE: "callback" is supported only on the client, and "evaluate" is
-  # supported only on the server (calls from the client always evaluate).
-
-  add: (key, value, callback=(->), evaluate=true) ->
-    if Meteor.isServer
-      $$.model.invalidateDataCache()
-      Cells.upsert {column: @columnId, key}, {$addToSet: {values: value}}
-      if evaluate
-        $$.model.evaluateAll()
+    
+class CellId
+  constructor: ({columnId, @cellId}) -> @columnId = _toColumnId(columnId)
+  
+  parent: ->
+    c = getColumn(@columnId)
+    if c && c.parent?
+      new CellId
+        columnId: c.parent
+        cellId: cellIdParent(@cellId)
+      
+  ancestors: ->
+    c = @
+    ancestors = []
+    while c?
+      ancestors.push(c)
+      c = c.parent()
+    ancestors
+    
+  value: (set, callback=->) -> 
+    if set? then @remove(); @family().add(set, callback)
+    else cellIdLastStep(@cellId)
+  
+  family: (columnId) ->
+    if columnId?
+      new FamilyId({columnId, @cellId})
     else
-      $$.call 'ColumnBinRel_add', @columnId, key, value, callback
+      new FamilyId({@columnId, cellId: cellIdParent(@cellId)})
+    
+  remove: (callback=->) -> @family().remove(@value(), callback)
+  
 
-  remove: (key, value, callback=(->), evaluate=true) ->
-    if !value?
-      cellId = key
-      key = cellIdParent(cellId)
-      value = cellIdLastStep(cellId)
-    if Meteor.isServer
-      $$.model.invalidateDataCache()
-      Cells.update {column: @columnId, key}, {$pull: {values: value}}
-      if evaluate
-        $$.model.evaluateAll()
-    else
-      $$.call 'ColumnBinRel_remove', @columnId, key, value, callback
+class FamilyId
+  constructor: ({columnId, @cellId}) -> @columnId = _toColumnId(columnId)
 
-  ## remove(key, oldValue) + add(key, newValue) in a single operation
-  removeAdd: (key, oldValue, newValue, callback=(->), evaluate=true) ->
-    if !oldValue?
-      cellId = key
-      key = cellIdParent(cellId)
-      oldValue = cellIdLastStep(cellId)
-    if ! EJSON.equals(oldValue, newValue)
-      if Meteor.isServer
-        # This WOULD have been nice, but is not supported (Mongo ticket SERVER-1050)
-        #Cells.upsert {column: @columnId, key}, {$pull: {values: oldValue}, $addToSet: {values: newValue}}
-        $$.model.invalidateDataCache()
-        Cells.update {column: @columnId, key}, {$pull: {values: oldValue}}
-        Cells.upsert {column: @columnId, key}, {$addToSet: {values: newValue}}
-        if evaluate
-          $$.model.evaluateAll()
-      else
-        $$.call 'ColumnBinRel_removeAdd', @columnId, key, oldValue, newValue, callback
+  parent: -> # returns a qCellId
+    c = getColumn(@columnId)
+    if c && c.parent?
+      new CellId
+        columnId: c.parent
+        cellId: @cellId
+      
+  ancestors: ->
+    @parent().ancestors()
+    
+  read: -> Cells.findOne({column: @columnId, key: @cellId})
+  
+  values: -> @read()?.values ? []  # note: ignores errorneous families  
+  
+  child: (value) -> 
+    new CellId({@columnId, cellId: cellIdChild(@cellId, value)})
+  
+  children: -> @values().map (v) => @child(v)
+  
+  add: (value, callback=->) ->
+    upsertOne Cells, {column: @columnId, key: @cellId}, {$addToSet: {values: value}}, callback
+    @child(value)
+    
+  remove: (value, callback=->) ->
+    updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
+        
 
-  lookup: (keys) ->
-    # @param keys: an EJSONKeyedSet or TypedSet
-    # @return a TypedSet with matching values from column, {x.column | x in keys}
-    if keys instanceof TypedSet
-      # TODO check type
-      keys = keys.set
-    cells = @cells()
-    c = Columns.findOne(@columnId)
-    values = set(cell[1] for cell in cells when keys.has cell[0])
-    new TypedSet(c.type, values)
+rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
 
 
-class PairsBinRel
-  constructor: (@pairs, @domainType='_any', @rangeType='_any') ->
-
-  cells: -> @pairs
-
-  cellset: -> new TypedSet([@domainType, @rangeType], set(@pairs))
-
-  lookup: (keys) ->
-    if keys instanceof TypedSet
-      # TODO check type
-      keys = keys.set
-    values = set(cell[1] for cell in @pairs when keys.has cell[0])
-    new TypedSet(@rangeType, values)
-
-  transpose: ->
-    sriap = ([x[1], x[0]] for x in @pairs)
-    new PairsBinRel(sriap, @rangeType, @domainType)
+updateOne = (collection, selector, modifier, callback) ->
+  if (doc = collection.findOne(selector))?
+    collection.update(doc._id, modifier, callback)
+    
+upsertOne = (collection, selector, modifier, callback) ->
+  doc = collection.findOne(selector)
+  if doc then id = doc._id
+  else id = collection.insert(selector)
+  collection.update(id, modifier, callback)
+      
 
 
 class CellsInMemory
@@ -326,15 +322,5 @@ class Transaction
     undefined
 
         
-      
-if Meteor.isServer
-  Meteor.methods
-    ColumnBinRel_add: (cc, columnId, key, value) ->
-      cc.runTransaction -> new ColumnBinRel(columnId).add(key, value)
-    ColumnBinRel_remove: (cc, columnId, key, value) ->
-      cc.runTransaction -> new ColumnBinRel(columnId).remove(key, value)
-    ColumnBinRel_removeAdd: (cc, columnId, key, oldValue, newValue) ->
-      cc.runTransaction -> new ColumnBinRel(columnId).removeAdd(key, oldValue, newValue)
 
-
-exported {Tablespace, ColumnBinRel, PairsBinRel, Transaction}
+exported {Tablespace, CellId, FamilyId, rootCell, Transaction}

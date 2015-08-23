@@ -147,7 +147,10 @@ class ViewSection
     else if ce?.error?
       new ViewVlist(parentCellId, 1, null, ce.error)
     else
-      throw new NotReadyError("Cell #{@columnId}:#{JSON.stringify parentCellId}")
+      if @col.formula?
+        throw new NotReadyError("Cell #{@columnId}:#{JSON.stringify parentCellId}")
+      else
+        new ViewVlist(parentCellId, 0, null, "internal error: missing family")
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
@@ -363,16 +366,17 @@ Template.addStateCell.events({
       StateEdit.addCell @qFamilyId, valueStr,
       # Clear the field on successful submission (only)
       andThen -> if inputField? then inputField.value = ''
-      false # prevent clear
     catch e
-      console.log e.stack
-      false
+      console.error e
+    false # prevent clear
 })
 
 class StateEdit
 
+  @PLACEHOLDER = {}
+  
   @parseValue: (qFamilyId, text) ->
-    if !text? then return "-"  # placeholder. TODO use a special object as placeholder
+    if text == @PLACEHOLDER then return "-"  # placeholder. TODO use a special object as placeholder
     type = getColumn(qFamilyId.columnId).type
     if !typeIsPrimitive(type)
       if (m = /^@(\d+)$/.exec(text))
@@ -405,23 +409,21 @@ class StateEdit
       null
 
   @addCell: (qFamilyId, enteredValue, callback=->) ->
-    key = qFamilyId.cellId
+    #key = qFamilyId.cellId
     if (newValue = @parseValueUi qFamilyId, enteredValue)?
-      new ColumnBinRel(qFamilyId.columnId)
-        .add key, newValue, callback
+      new FamilyId(qFamilyId).add(newValue, -> $$.call 'notify', callback)
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
-    key = cellIdParent(qCellId.cellId)
-    if (newValue = @parseValueUi(
-        {columnId: qCellId.columnId, cellId: key}, enteredValue))?
+    #key = cellIdParent(qCellId.cellId)
+    cel = new CellId(qCellId)
+    fam = cel.family()
+    if (newValue = @parseValueUi(fam, enteredValue))?
       # TODO check if cell has children!
-      new ColumnBinRel(qCellId.columnId)
-        .removeAdd qCellId.cellId, null, newValue, callback
+      cel.value(newValue, -> $$.call 'notify', callback)
 
   @removeCell: (qCellId, callback=->) ->
     # TODO check if cell has children!
-    new ColumnBinRel(qCellId.columnId)
-      .remove qCellId.cellId, null, callback
+    new CellId(qCellId).remove(-> $$.call 'notify', callback)
 
   @canEdit: (columnId) ->
     col = getColumn(columnId)
@@ -671,8 +673,8 @@ class ClientView
                   if adjcol in @separatorColumns then ['incomparable'] else []
         if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
-        ancestors = if cell.qCellId? then new CellId(cell.qCellId).getAncestors()  \
-                    else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).getAncestors() \
+        ancestors = if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
+                    else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).ancestors() \
                     else []
         for ancestor in ancestors
           if (refc = @refId(ancestor))?
@@ -937,7 +939,7 @@ class ClientView
         if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
           if col.type == '_token'
             StateEdit.addCell qf, '*'
-      else if event.which == 46    # Delete
+      else if event.which == 46 || event.which == 8   # Delete / Backspace
         selectedCell = @getSingleSelectedCell()
         if (qc = selectedCell?.qCellId)? && columnIsState(col = getColumn(qc.columnId))
           if col.type == '_token'
@@ -946,7 +948,7 @@ class ClientView
       if event.which == 13    # Enter
         selectedCell = @getSingleSelectedCell()
         if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-          StateEdit.addCell qf, undefined   # insert placeholder
+          StateEdit.addCell qf, StateEdit.PLACEHOLDER
           event.stopImmediatePropagation()
     else if event.altKey && !event.ctrlKey && !event.metaKey
       # Use Alt + Left/Right to reorder columns inside parent

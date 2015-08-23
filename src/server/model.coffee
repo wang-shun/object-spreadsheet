@@ -484,6 +484,10 @@ Meteor.methods
       @model.deleteColumn(columnId)
       View.removeColumnFromAll(columnId)
       @model.evaluateAll()
+  notify: (cc) ->
+    cc.run ->
+      @model.invalidateDataCache()
+      @model.evaluateAll()
   executeCannedTransaction: (cc, name, argsObj) ->
     cc.run ->
       @model.executeCannedTransaction(name, argsObj)

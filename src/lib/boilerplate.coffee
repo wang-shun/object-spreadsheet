@@ -44,7 +44,7 @@ Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, vis
   for x in t.subtrees
     c = Columns.findOne(x.root)
     if c?
-      vals = new ColumnBinRel(x.root).lookup(set([rootCellId])).set.elements()
+      vals = new FamilyId({cellId: rootCellId, columnId: x.root}).values()
       if c.isObject
         fam = (@readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited) for v in vals)
         fam.qFamilyId = {columnId: x.root, cellId: rootCellId}

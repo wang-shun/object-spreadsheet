@@ -23,9 +23,7 @@ if Meteor.isClient
     
   Template.PTC_Parent_login.helpers
     root: -> 
-      v = Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
-      console.log(v)
-      v
+      Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
 
   blur = (jbutton) ->
     jbutton.width(jbutton.width())
