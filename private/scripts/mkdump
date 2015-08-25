@@ -1,0 +1,4 @@
+#!/bin/bash
+for c in $1:{columns,cells}
+  do mongoexport --port 3001 --db meteor -c $c --jsonArray >private/dump/$c.json
+done

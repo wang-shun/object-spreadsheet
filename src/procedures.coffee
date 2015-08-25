@@ -141,6 +141,8 @@ mergeTypeMaps = (vars1, vars2) ->
     this.varsStack.push([this.varsPreviousBranch, this.vars])
     this.varsPreviousBranch = null
     this.vars = this.vars.shallowClone()
+  parser.yy.popVars = () ->
+    [this.varsPreviousBranch, _] = this.varsStack.pop()
   parser.yy.rollbackVars = () ->
     [this.varsPreviousBranch, this.vars] = this.varsStack.pop()
   parser.yy.nextBranch = () ->

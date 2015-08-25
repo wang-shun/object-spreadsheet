@@ -4,10 +4,12 @@
 int ([0-9]|[1-9][0-9]+)
 exp [eE][-+]?[0-9]+
 frac "."[0-9]+
+ws [ \t\r]
 
 %%
-\ + /* skip whitespace */
+{ws}+ /* skip whitespace */
 \n return 'NL'
+\#[^\n]*\n return 'NL'  /* single-line comments */
 
 /* Primitive literals */
 {int}{frac}?{exp}?\b return 'NUMBER'
