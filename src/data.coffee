@@ -96,6 +96,9 @@ class CellId
       new FamilyId({columnId, @cellId})
     else
       new FamilyId({@columnId, cellId: cellIdParent(@cellId)})
+      
+  families: ->
+    (@family(childId) for childId in getColumn(@columnId)?.children ? [])
     
   remove: (callback=->) -> @family().remove(@value(), callback)
   
@@ -116,6 +119,10 @@ class FamilyId
   read: -> Cells.findOne({column: @columnId, key: @cellId})
   
   values: -> @read()?.values ? []  # note: ignores errorneous families  
+  
+  type: -> Columns.find(@columnId).type
+  
+  typedValues: -> new TypedSet(@type(), set(@values()))
   
   child: (value) -> 
     new CellId({@columnId, cellId: cellIdChild(@cellId, value)})

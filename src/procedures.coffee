@@ -176,8 +176,7 @@ mergeTypeMaps = (vars1, vars2) ->
   try
     return {params, body: parser.parse(bodyString)}
   catch e
-    # Yuck.  Any better way to recognize parse errors caused by user input?
-    if /^(Lexical|Parse) error/.test(e.message)
+    if e instanceof SyntaxError
       throw new FormulaValidationError(e.message)
     else
       throw e

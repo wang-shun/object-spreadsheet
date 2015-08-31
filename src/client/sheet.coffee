@@ -97,7 +97,7 @@ colorIndexForDepth = (depth) -> depth % 6
 
 class ViewSection
 
-  constructor: (@layoutTree) ->
+  constructor: (@layoutTree, @valueFormat=(x)->x.toString()) ->
     @columnId = @layoutTree.root
     @col = getColumn(@columnId)
     # Typechecking should always fill in a type, even _error.
@@ -117,7 +117,7 @@ class ViewSection
     # @headerMinHeight refers to the expanded header.
     @headerMinHeight = @col.isObject + 2  # fieldName, type
     for sublayout, i in @layoutTree.subtrees
-      subsection = new ViewSection(sublayout)
+      subsection = new ViewSection(sublayout, @valueFormat)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
@@ -154,16 +154,7 @@ class ViewSection
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
-    # TODO: More type-specific rendering?
-    displayValue =
-      # Show _unit values for now so we can see if they aren't 'X'.
-      #if @col.type == '_unit' then 'X'
-      if !typeIsPrimitive(@col.type) then new CellReference({columnId: @col.type, cellId: value})
-      # Should be OK if the user knows which columns are string-typed.
-      else if typeof value == 'string' then value
-      else if value.constructor == Date then value.toString("yyyy-MM-dd HH:mm")
-      # Reasonable fallback
-      else JSON.stringify(value)
+    displayValue = @valueFormat(value, @col)
     vlists =
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
@@ -343,6 +334,36 @@ class ViewSection
       makeCorner(true)
     grid
 
+    
+class ValueFormat
+  
+  constructor: ->
+    @tinyModel =
+      evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
+      typecheckColumn: (columnId) -> getColumn(columnId).type
+  
+  asText: (value, col) ->
+    try
+      type = col.type
+      if col.display? 
+        vars = new EJSONKeyedMap([['this', new TypedSet(col.type, set([value]))]])
+        fmtd = evaluateFormula(@tinyModel, vars, col.display)
+        type = fmtd.type
+        elems = fmtd.elements()
+        if elems.length > 1
+          throw Error("display function returned #{elems.length} elements (#{JSON.stringify elems})")
+        value = elems[0]
+      # TODO: More type-specific rendering?
+      if !typeIsPrimitive(type) then new CellReference({columnId: type, cellId: value})
+      # Should be OK if the user knows which columns are string-typed.
+      else if typeof value == 'string' then value
+      else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
+      # Reasonable fallback
+      else JSON.stringify(value)
+    catch e
+      e.message
+
+        
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
@@ -409,12 +430,10 @@ class StateEdit
       null
 
   @addCell: (qFamilyId, enteredValue, callback=->) ->
-    #key = qFamilyId.cellId
     if (newValue = @parseValueUi qFamilyId, enteredValue)?
       new FamilyId(qFamilyId).add(newValue, -> $$.call 'notify', callback)
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
-    #key = cellIdParent(qCellId.cellId)
     cel = new CellId(qCellId)
     fam = cel.family()
     if (newValue = @parseValueUi(fam, enteredValue))?
@@ -451,12 +470,18 @@ origFormulaStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.formula
   formula && stringifyFormula(getColumn(columnId).parent, formula)
 newFormulaStr = new ReactiveVar(null)
+origDisplayStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.display
+  formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
+newDisplayStr = new ReactiveVar(null)
+newDisplayStr.initial = new ReactiveVar(null)
 Template.changeColumn.rendered = () ->
-  orig = origFormulaStrForColumnId(Template.currentData().columnId)
-  newFormulaStr.set(orig)
-  # Handles case when showing only the "Create formula" button for a non-formula column.
-  if orig
-    @find('input[name=formula]').value = orig
+  formula = origFormulaStrForColumnId(Template.currentData().columnId)
+  newFormulaStr.set(formula)
+  @find('input[name=formula]')?.value = formula
+  display = origDisplayStrForColumnId(Template.currentData().columnId)
+  newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
+  @find('input[name=display]')?.value = display
 Template.changeColumn.helpers
   columnName: ->
     c = getColumn(@columnId)
@@ -472,10 +497,9 @@ Template.changeColumn.helpers
   formula: ->
     origFormulaStrForColumnId(@columnId)
   formulaClass: ->
-    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId)
-      'formulaModified'
-    else
-      ''
+    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
+  displayClass: ->
+    if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
   contextText: ->
     col = getColumn(@columnId)
     if col.isObject
@@ -489,7 +513,9 @@ Template.changeColumn.helpers
 
 Template.changeColumn.events
   'input .formula': (event, template) ->
-    newFormulaStr.set(template.find('input[name=formula]').value)
+    newFormulaStr.set(event.target.value) #template.find('input[name=formula]').value)
+  'input .display': (event, template) ->
+    newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
   'submit form': (event, template) ->
     try
       # Set the type
@@ -526,13 +552,37 @@ Template.changeColumn.events
                     @columnId,
                     formula,
                     standardServerCallback)
+      # Set the display
+      displayStr = newDisplayStr.get()
+      if displayStr? && displayStr != newDisplayStr.initial.get()
+        if displayStr == ''
+          display = null   # revert to default
+        else
+          try
+            display = parseFormula(getColumn(@columnId).type, displayStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse display formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          displayStr = stringifyFormula(getColumn(@columnId), display)
+          template.find('input[name=display]').value = displayStr
+          newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
+        Meteor.call('changeColumnDisplay', $$,
+                    @columnId,
+                    display,
+                    standardServerCallback)
     catch e
       console.error e
     false # prevent refresh
   'click [type=reset]': (event, template) ->
     orig = origFormulaStrForColumnId(@columnId)
     newFormulaStr.set(orig)
-    template.find('input[name=formula]').value = orig
+    template.find('input[name=formula]')?.value = orig
+    newDisplayStr.set(newDisplayStr.initial.get())
+    template.find('input[name=display]')?.value = newDisplayStr.initial.get()
     false # prevent clear
   'click .create': (event, template) ->
     # Default formula to get the new column created ASAP.
@@ -549,7 +599,7 @@ insertBlankColumn = (parentId, index, view) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
   formula = if getColumn(parentId).formula? then DUMMY_FORMULA else null
-  Meteor.call('defineColumn', $$,
+  $$.call('defineColumn',
               parentId,
               index,
               null,  # fieldName
@@ -572,12 +622,14 @@ class ClientView
       showTypes: false         # Show type row in header
       headerExpandable: false  # Show '+' button on top left corner
       palette: 'boring'        # 'boring' for grey, 'rainbow' for dazzling colors
-    @reload()
+    @valueFormat = new ValueFormat
     @hot = null
+
+    @reload()
 
   reload: () ->
     @layoutTree = @view?.def()?.layout || View.rootLayout()
-    @mainSection = new ViewSection(@layoutTree)
+    @mainSection = new ViewSection(@layoutTree, @valueFormat.asText.bind(@valueFormat))
 
   hotConfig: ->
     thisView = this
@@ -948,7 +1000,7 @@ class ClientView
       if event.which == 13    # Enter
         selectedCell = @getSingleSelectedCell()
         if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-          StateEdit.addCell qf, StateEdit.PLACEHOLDER
+          StateEdit.addCell qf, (if col.type == '_token' then '*' else StateEdit.PLACEHOLDER)
           event.stopImmediatePropagation()
     else if event.altKey && !event.ctrlKey && !event.metaKey
       # Use Alt + Left/Right to reorder columns inside parent

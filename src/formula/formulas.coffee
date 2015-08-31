@@ -376,7 +376,8 @@ overloaded = (alternatives...) ->
   evaluate: (model, vars, args...) ->      
     argtypes = (ts.type for ts in args)
     handler = getHandler(argtypes)
-    handler?.evaluate(model, vars, args...)
+    valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+    handler.evaluate(model, vars, args...)
   stringify: (model, vars, sinfos...) ->
     # Does it even make sense to have different stringifies for different alternatives?
     [_, handler] = alternatives[0]
@@ -718,10 +719,10 @@ validateAndTypecheckFormula = (model, vars, formula) ->
 resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   interpretations = []
   unless startCellsFmla?
-    valAssert(targetName != 'this',
-              'Explicit "this" is not allowed in concrete syntax.  ' +
-              'Please use the object name for clarity.')
-    if vars.get('this')?
+    if vars.get('this')? && !typeIsPrimitive(vars.get('this'))
+      valAssert(targetName != 'this',
+                'Explicit "this" is not allowed in concrete syntax.  ' +
+                'Please use the object name for clarity.')
       if vars.get(targetName)?
         interpretations.push(['var', targetName])
       startCellsFmla = ['var', 'this']
@@ -792,6 +793,7 @@ liteModel = {
     this.vars.delete(varName)
   parser.yy.navigate = (startCellsFmla, targetName, keysFmla) ->
     resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla)
+  parser.yy.parseError = (err, hash) -> console.log err, hash ; throw new SyntaxError(err)
   return parser
 
 @parseFormula = (thisType, fmlaString) ->
@@ -807,8 +809,7 @@ liteModel = {
   try
     return parser.parse(fmlaString)
   catch e
-    # Yuck.  Any better way to recognize parse errors caused by user input?
-    if /^(Lexical|Parse) error/.test(e.message)
+    if e instanceof SyntaxError
       throw new FormulaValidationError(e.message)
     else
       throw e

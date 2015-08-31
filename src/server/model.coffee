@@ -224,8 +224,16 @@ class Model
     # automatically remove the default type of '_any'.
     if !col.formula? && col.specifiedType == '_any'
       Columns.update(columnId, {$set: {specifiedType: null}})
-    Columns.update(columnId, {$set: {formula: formula}})
+    Columns.update(columnId, {$set: {formula}})
 
+  changeColumnDisplay: (columnId, display) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
+    if display?
+      validateFormula(display)
+    Columns.update(columnId, {$set: {display}})
+    
   reorderColumn: (columnId, newIndex) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
@@ -427,9 +435,6 @@ class Model
         throw e
 
 Meteor.startup () ->
-  WebApp.connectHandlers.use (req, res, next) ->
-    res.setHeader("Access-Control-Allow-Origin", '*')   # XSS loophole!!!
-    next()
   Tablespace.onCreate ->
     @do ->
       @model = new Model
@@ -440,7 +445,7 @@ Meteor.startup () ->
         else if appName in ['005q', 'beta', 'milk']
           loadDump(@model, appName)
           # TO MAKE A DUMP:
-          # for c in APPNAME:{columns,cells}; do mongoexport --port 3001 --db meteor -c $c --jsonArray >private/dump/$c.json; done
+          # ./private/scripts/mkdump APPNAME
       @model.evaluateAll()
 
   Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
@@ -477,6 +482,9 @@ Meteor.methods
     cc.run ->
       @model.changeColumnFormula(columnId, formula)
       @model.evaluateAll()
+  changeColumnDisplay: (cc, columnId, display) ->
+    cc.run ->
+      @model.changeColumnDisplay(columnId, display)
   reorderColumn: (cc, columnId, newIndex) ->
     cc.run -> @model.reorderColumn(columnId, newIndex)
   deleteColumn: (cc, columnId) ->
