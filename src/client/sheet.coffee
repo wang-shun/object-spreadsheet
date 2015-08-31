@@ -1,21 +1,5 @@
-# Future: Make this better.
-standardServerCallback = (error, result) ->
-  if error?
-    alert('The operation failed on the server: ' + error.message)
 
-andThen = (cont) ->
-  (error, result) ->
-    if error?
-      standardServerCallback(arguments...)
-    else
-      cont(result)
-
-# The Error constructor is not usable by subclasses
-# (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
-# version of CoffeeScript is doing), but apparently we can throw any object we
-# like, it just won't have a stack trace.
-class NotReadyError
-  constructor: (@what) ->
+# Is this where we want routes to be?
 
 Router.route "/", -> @render "Spreadsheet"  # @deprecated (should show list of avail sheets)
 
@@ -23,8 +7,14 @@ Router.route "/:sheet", ->
   @render "Spreadsheet", data: {sheet: @params.sheet}
 Router.route "/:sheet/views/:_id", ->
   @render "Spreadsheet", data: {sheet: @params.sheet, viewId: @params._id}
-Router.route "/:sheet/schema", ->
-  @render "Schema", data: {sheet: @param.sheet}
+
+
+# The Error constructor is not usable by subclasses
+# (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
+# version of CoffeeScript is doing), but apparently we can throw any object we
+# like, it just won't have a stack trace.
+class NotReadyError
+  constructor: (@what) ->
 
 # Grid utilities
 
@@ -93,11 +83,9 @@ class ViewVlist
 class ViewHlist
   constructor: (@cellId, @minHeight, @value, @vlists, @cssClasses=[]) ->
 
-colorIndexForDepth = (depth) -> depth % 6
-
 class ViewSection
 
-  constructor: (@layoutTree, @valueFormat=(x)->x.toString()) ->
+  constructor: (@layoutTree, @valueFormat=((x)->x.toString()), @options={}) ->
     @columnId = @layoutTree.root
     @col = getColumn(@columnId)
     # Typechecking should always fill in a type, even _error.
@@ -108,21 +96,24 @@ class ViewSection
     # Future: Consider rendering _unit with isObject = true specially to save
     # space, e.g., a single column of hollow bullets.  We'd need to figure out
     # how to make this not confusing.
-    @width = (@col.type != '_token') + @col.isObject
+    @width = (@col.type != '_token') + !!@col.isObject
     @leftEdgeSingular = true
     @rightEdgeSingular = true
     # field index -> bool (have a separator column before this field)
     @haveSeparatorColBefore = []
     @subsections = []
     # @headerMinHeight refers to the expanded header.
-    @headerMinHeight = @col.isObject + 2  # fieldName, type
+    @headerMinHeight = !!@col.isObject + 2  # fieldName, type
     for sublayout, i in @layoutTree.subtrees
-      subsection = new ViewSection(sublayout, @valueFormat)
+      subsection = new ViewSection(sublayout, @valueFormat, @options)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
-      # TODO removed inner sep for now. Replace with dashed lines?
-      haveSep = (@col._id == rootColumnId && i > 0) # (!@rightEdgeSingular && !nextLeftEdgeSingular)
+      # TODO removed inner sep for now. Replaced with dashed lines
+      haveSep =
+        if @options.sepcols
+          (!@rightEdgeSingular && !nextLeftEdgeSingular)
+        else (@col._id == rootColumnId && i > 0)
       @haveSeparatorColBefore.push(haveSep)
       if haveSep
         @width++
@@ -237,7 +228,7 @@ class ViewSection
   # based on depth.
   renderHeader: (expanded, depth) ->
     # Part that is always the same.
-    myColorClass = 'rsHeaderColor' + colorIndexForDepth(if @col.isObject then depth else depth-1)
+    myColorClass = 'rsHeaderColor' + @colorIndexForDepth(if @col.isObject then depth else depth-1)
     grid = [[], []]  # c.f. renderHlist
     if @col.isObject
       fieldNameCell = new ViewCell(
@@ -334,7 +325,9 @@ class ViewSection
       makeCorner(true)
     grid
 
-    
+  colorIndexForDepth: (depth) -> depth % 6
+
+
 class ValueFormat
   
   constructor: ->
@@ -367,30 +360,6 @@ class ValueFormat
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
-
-fullTextToShow = new ReactiveVar(null)
-isLoading = new ReactiveVar(true)
-
-Template.formulaValueBar.helpers({
-  loading: () -> isLoading.get()
-  fullTextToShow: () -> fullTextToShow.get()
-  addStateCellArgs: () -> addStateCellArgs.get()
-  changeColumnArgs: () -> changeColumnArgs.get()
-})
-
-addStateCellArgs = new ReactiveVar([], EJSON.equals)
-Template.addStateCell.events({
-  'submit form': (event, template) ->
-    try
-      inputField = template.find('input[name=value]')
-      valueStr = inputField?.value
-      StateEdit.addCell @qFamilyId, valueStr,
-      # Clear the field on successful submission (only)
-      andThen -> if inputField? then inputField.value = ''
-    catch e
-      console.error e
-    false # prevent clear
-})
 
 class StateEdit
 
@@ -449,151 +418,6 @@ class StateEdit
     # May as well not let the user try to edit _unit.
     col? && columnIsState(col) && col.type not in ['_token', '_unit']
 
-#
-# Template changeColumn
-#
-
-stringifyType = (type) ->
-  if typeIsPrimitive(type) then type
-  else
-    c = getColumn(type)
-    if c?
-      objName = if c.parent then getColumn(c.parent).objectName else ""
-      prefix = if objName? then "#{objName}:" else ""
-      prefix + c.objectName
-    else
-      "?<#{type}>"
-    
-changeColumnArgs = new ReactiveVar([], EJSON.equals)
-# We mainly care that this doesn't crash.
-origFormulaStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.formula
-  formula && stringifyFormula(getColumn(columnId).parent, formula)
-newFormulaStr = new ReactiveVar(null)
-origDisplayStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.display
-  formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
-newDisplayStr = new ReactiveVar(null)
-newDisplayStr.initial = new ReactiveVar(null)
-Template.changeColumn.rendered = () ->
-  formula = origFormulaStrForColumnId(Template.currentData().columnId)
-  newFormulaStr.set(formula)
-  @find('input[name=formula]')?.value = formula
-  display = origDisplayStrForColumnId(Template.currentData().columnId)
-  newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
-  @find('input[name=display]')?.value = display
-Template.changeColumn.helpers
-  columnName: ->
-    c = getColumn(@columnId)
-    objName = if c.parent then getColumn(c.parent).objectName else ""
-    prefix = if objName? then "#{objName}:" else ""
-    prefix + (c?.objectName ? c?.fieldName ? '<unnamed>')
-  columnType: ->
-    c = getColumn(@columnId)
-    if c?.type then stringifyType(c.type) else ''
-  columnSpecifiedType: ->
-    c = getColumn(@columnId)
-    if c?.specifiedType then stringifyType(c.specifiedType) else ''
-  formula: ->
-    origFormulaStrForColumnId(@columnId)
-  formulaClass: ->
-    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
-  displayClass: ->
-    if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
-  contextText: ->
-    col = getColumn(@columnId)
-    if col.isObject
-      objectNameWithFallback(getColumn(col.parent)) ? '<unnamed>'
-    else null
-  contextColorIndex: ->
-    col = getColumn(@columnId)
-    if col.isObject
-      colorIndexForDepth(columnDepth(col.parent))
-    else null
-
-Template.changeColumn.events
-  'input .formula': (event, template) ->
-    newFormulaStr.set(event.target.value) #template.find('input[name=formula]').value)
-  'input .display': (event, template) ->
-    newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
-  'submit form': (event, template) ->
-    try
-      # Set the type
-      newVal = template.find('input[name=type]').value
-      parsed = false
-      try
-        type = if newVal == '' then null else parseTypeStr(newVal)
-        parsed = true
-      catch e
-        alert("Invalid type '#{newVal}'.")
-        return false
-      if parsed
-        Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
-                    standardServerCallback
-      # Set the formula
-      formulaStr = newFormulaStr.get()
-      if formulaStr?
-        if formulaStr == ''
-          formula = null   # remove formula
-        else
-          try
-            formula = parseFormula(getColumn(@columnId).parent, formulaStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
-          template.find('input[name=formula]').value = formulaStr
-          newFormulaStr.set(formulaStr)
-        Meteor.call('changeColumnFormula', $$,
-                    @columnId,
-                    formula,
-                    standardServerCallback)
-      # Set the display
-      displayStr = newDisplayStr.get()
-      if displayStr? && displayStr != newDisplayStr.initial.get()
-        if displayStr == ''
-          display = null   # revert to default
-        else
-          try
-            display = parseFormula(getColumn(@columnId).type, displayStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse display formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          displayStr = stringifyFormula(getColumn(@columnId), display)
-          template.find('input[name=display]').value = displayStr
-          newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
-        Meteor.call('changeColumnDisplay', $$,
-                    @columnId,
-                    display,
-                    standardServerCallback)
-    catch e
-      console.error e
-    false # prevent refresh
-  'click [type=reset]': (event, template) ->
-    orig = origFormulaStrForColumnId(@columnId)
-    newFormulaStr.set(orig)
-    template.find('input[name=formula]')?.value = orig
-    newDisplayStr.set(newDisplayStr.initial.get())
-    template.find('input[name=display]')?.value = newDisplayStr.initial.get()
-    false # prevent clear
-  'click .create': (event, template) ->
-    # Default formula to get the new column created ASAP.
-	# Then the user can edit it as desired.
-    formula = DUMMY_FORMULA
-    Meteor.call 'changeColumnFormula', $$, @columnId, formula,
-                standardServerCallback
-    # TODO warn user if column has data!!
-  'keydown form': (event, template) ->
-    if (event.which == 27) then template.find("[type=reset]")?.click()
-
 
 insertBlankColumn = (parentId, index, view) ->
   # Obey the restriction on a state column as child of a formula column.
@@ -622,6 +446,7 @@ class ClientView
       showTypes: false         # Show type row in header
       headerExpandable: false  # Show '+' button on top left corner
       palette: 'boring'        # 'boring' for grey, 'rainbow' for dazzling colors
+      sepcols: false
     @valueFormat = new ValueFormat
     @hot = null
 
@@ -629,7 +454,7 @@ class ClientView
 
   reload: () ->
     @layoutTree = @view?.def()?.layout || View.rootLayout()
-    @mainSection = new ViewSection(@layoutTree, @valueFormat.asText.bind(@valueFormat))
+    @mainSection = new ViewSection(@layoutTree, @valueFormat.asText.bind(@valueFormat), @options)
 
   hotConfig: ->
     thisView = this
@@ -903,6 +728,8 @@ class ClientView
   hotCreate: (domElement) ->
     @hot = new Handsontable(domElement, @hotConfig())
     $(domElement).addClass("pal-#{@options.palette}")
+    if @options.sepcols
+      $(domElement).addClass("sepcols-on")
     if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
@@ -950,11 +777,11 @@ class ClientView
         
   onSelection: ->
     selectedCell = @getSingleSelectedCell()
-    fullTextToShow.set(selectedCell?.fullText)
+    ActionBar.fullTextToShow.set(selectedCell?.fullText)
     @highlightReferent(selectedCell?.referent)
     @highlightObject(selectedCell?.qCellId)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
-    addStateCellArgs.set(
+    ActionBar.addStateCellArgs.set(
       if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
         [{
           _id: EJSON.stringify(qf)
@@ -973,7 +800,7 @@ class ClientView
       else
         []
     )
-    changeColumnArgs.set(
+    ActionBar.changeColumnArgs.set(
       if selectedCell? &&
          (ci = selectedCell.columnId)? && ci != rootColumnId
         [{_id: ci, columnId: ci}]
@@ -1022,6 +849,8 @@ class ClientView
             $$.call 'changeColumnIsObject', ci, true
           else if event.which == 40 && col.isObject        # Down
             $$.call 'changeColumnIsObject', ci, false
+
+    ActionBar.keydownHook? event
           
   
   selectSingleCell: (r1, c1) ->
@@ -1067,7 +896,7 @@ rebuildView = (viewId) ->
   # Make sure various things are consistent with change in table data or
   # selection (view.selectMatchingCell doesn't seem to trigger this).
   view.onSelection()
-  isLoading.set(false)
+  ActionBar.isLoading.set(false)
 
 # Helper decorator for use with Tracker.autorun
 guarded = (op) ->
@@ -1091,4 +920,4 @@ Template.Spreadsheet.rendered = ->
 
 
 $ ->
-  exported {ClientView, rebuildView, StateEdit}
+  exported {ClientView, StateEdit, rebuildView, guarded}

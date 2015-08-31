@@ -25,10 +25,10 @@ if Meteor.isServer
   Relsheets.procedures 'milk',
     supply:
       params: [['me', 'Cycle']]
-      body: '''me.quota := me.quota - 2
+      body: '''$Gauge.reading := {l: $Gauge.Level | l.`*` = "Full"}
+               me.quota := me.quota - 2
                if (me.quota <= 0) {
                  me.lastTime := d"now" 
-                 $Gauge.reading := {l: $Gauge.Level | l.`*` = "Full"}
                  $Cycle.quota := 4      # reset all quotas
                  let m = new $Message
                  m.`to` := {c: $Cycle | c.isNext}
