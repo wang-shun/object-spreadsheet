@@ -218,13 +218,13 @@ class Model
     #                         'Can only changeFormula on a formula column!')
     if formula?
       validateFormula(formula)
-    @invalidateSchemaCache()  # could change type
     col = @getColumn(columnId)
     # Hack: When a state column is converted to a formula column,
     # automatically remove the default type of '_any'.
     if !col.formula? && col.specifiedType == '_any'
       Columns.update(columnId, {$set: {specifiedType: null}})
     Columns.update(columnId, {$set: {formula}})
+    @invalidateSchemaCache()  # type may change
 
   changeColumnDisplay: (columnId, display) ->
     if columnId == rootColumnId
@@ -399,8 +399,8 @@ class Model
       
   invalidateSchemaCache: ->
     if @settings.profiling >= 1 then console.log "--- invalidateSchemaCache ---"
-    @invalidateDataCache()
     @invalidateColumnCache()
+    @invalidateDataCache()
     $$.formulaEngine?.invalidateSchemaCache()
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       @_changeColumnType(columnId, null)

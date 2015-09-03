@@ -793,7 +793,7 @@ liteModel = {
     this.vars.delete(varName)
   parser.yy.navigate = (startCellsFmla, targetName, keysFmla) ->
     resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla)
-  parser.yy.parseError = (err, hash) -> console.log err, hash ; throw new SyntaxError(err)
+  parser.yy.parseError = (err, hash) -> throw new SyntaxError(err, hash)
   return parser
 
 @parseFormula = (thisType, fmlaString) ->

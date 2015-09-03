@@ -554,7 +554,7 @@ class ClientView
                     else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).ancestors() \
                     else []
         for ancestor in ancestors
-          if (refc = @refId(ancestor))?
+          if (refc = @refId(ancestor.q()))?
             classes.push("parent-#{refc}")
         {
           renderer: if col == 0 then 'html' else 'text'

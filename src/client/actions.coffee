@@ -1,0 +1,190 @@
+
+# Future: Make this better.
+standardServerCallback = (error, result) ->
+  if error?
+    alert('The operation failed on the server: ' + error.message)
+
+andThen = (cont) ->
+  (error, result) ->
+    if error?
+      standardServerCallback(arguments...)
+    else
+      cont(result)
+
+
+fullTextToShow = new ReactiveVar(null)
+isLoading = new ReactiveVar(true)
+
+Template.formulaValueBar.helpers
+  loading: -> isLoading.get()
+  fullTextToShow: -> fullTextToShow.get()
+  addStateCellArgs: -> addStateCellArgs.get()
+  changeColumnArgs: -> changeColumnArgs.get()
+
+#
+# Template addStateCell
+#
+addStateCellArgs = new ReactiveVar([], EJSON.equals)
+
+Template.addStateCell.events({
+  'submit form': (event, template) ->
+    try
+      inputField = template.find('input[name=value]')
+      valueStr = inputField?.value
+      StateEdit.addCell @qFamilyId, valueStr,
+      # Clear the field on successful submission (only)
+      andThen -> if inputField? then inputField.value = ''
+    catch e
+      console.error e
+    false # prevent clear
+})
+
+#
+# Template changeColumn
+#
+changeColumnArgs = new ReactiveVar([], EJSON.equals)
+
+stringifyType = (type) ->
+  if typeIsPrimitive(type) then type
+  else
+    c = getColumn(type)
+    if c?
+      objName = if c.parent then getColumn(c.parent).objectName else ""
+      prefix = if objName? then "#{objName}:" else ""
+      prefix + c.objectName
+    else
+      "?<#{type}>"
+    
+# We mainly care that this doesn't crash.
+origFormulaStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.formula
+  formula && stringifyFormula(getColumn(columnId).parent, formula)
+newFormulaStr = new ReactiveVar(null)
+origDisplayStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.display
+  formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
+newDisplayStr = new ReactiveVar(null)
+newDisplayStr.initial = new ReactiveVar(null)
+Template.changeColumn.rendered = () ->
+  formula = origFormulaStrForColumnId(Template.currentData().columnId)
+  newFormulaStr.set(formula)
+  @find('input[name=formula]')?.value = formula
+  display = origDisplayStrForColumnId(Template.currentData().columnId)
+  newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
+  @find('input[name=display]')?.value = display
+Template.changeColumn.helpers
+  columnName: ->
+    c = getColumn(@columnId)
+    objName = if c.parent then getColumn(c.parent).objectName else ""
+    prefix = if objName? then "#{objName}:" else ""
+    prefix + (c?.objectName ? c?.fieldName ? '<unnamed>')
+  columnType: ->
+    c = getColumn(@columnId)
+    if c?.type then stringifyType(c.type) else ''
+  columnSpecifiedType: ->
+    c = getColumn(@columnId)
+    if c?.specifiedType then stringifyType(c.specifiedType) else ''
+  formula: ->
+    origFormulaStrForColumnId(@columnId)
+  formulaClass: ->
+    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
+  displayClass: ->
+    if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
+  contextText: ->
+    col = getColumn(@columnId)
+    if col.isObject
+      objectNameWithFallback(getColumn(col.parent)) ? '<unnamed>'
+    else null
+  contextColorIndex: ->
+    col = getColumn(@columnId)
+    if col.isObject
+      colorIndexForDepth(columnDepth(col.parent))
+    else null
+
+Template.changeColumn.events
+  'input .formula': (event, template) ->
+    newFormulaStr.set(event.target.value) #template.find('input[name=formula]').value)
+  'input .display': (event, template) ->
+    newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
+  'submit form': (event, template) ->
+    try
+      # Set the type
+      newVal = template.find('input[name=type]').value
+      parsed = false
+      try
+        type = if newVal == '' then null else parseTypeStr(newVal)
+        parsed = true
+      catch e
+        alert("Invalid type '#{newVal}'.")
+        return false
+      if parsed
+        Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
+                    standardServerCallback
+      # Set the formula
+      formulaStr = newFormulaStr.get()
+      if formulaStr?
+        if formulaStr == ''
+          formula = null   # remove formula
+        else
+          try
+            formula = parseFormula(getColumn(@columnId).parent, formulaStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
+          template.find('input[name=formula]').value = formulaStr
+          newFormulaStr.set(formulaStr)
+        Meteor.call('changeColumnFormula', $$,
+                    @columnId,
+                    formula,
+                    standardServerCallback)
+      # Set the display
+      displayStr = newDisplayStr.get()
+      if displayStr? && displayStr != newDisplayStr.initial.get()
+        if displayStr == ''
+          display = null   # revert to default
+        else
+          try
+            display = parseFormula(getColumn(@columnId).type, displayStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse display formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          displayStr = stringifyFormula(getColumn(@columnId), display)
+          template.find('input[name=display]').value = displayStr
+          newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
+        Meteor.call('changeColumnDisplay', $$,
+                    @columnId,
+                    display,
+                    standardServerCallback)
+    catch e
+      console.error e
+    false # prevent refresh
+  'click [type=reset]': (event, template) ->
+    orig = origFormulaStrForColumnId(@columnId)
+    newFormulaStr.set(orig)
+    template.find('input[name=formula]')?.value = orig
+    newDisplayStr.set(newDisplayStr.initial.get())
+    template.find('input[name=display]')?.value = newDisplayStr.initial.get()
+    false # prevent clear
+  'click .create': (event, template) ->
+    # Default formula to get the new column created ASAP.
+	# Then the user can edit it as desired.
+    formula = DUMMY_FORMULA
+    Meteor.call 'changeColumnFormula', $$, @columnId, formula,
+                standardServerCallback
+    # TODO warn user if column has data!!
+  'keydown form': (event, template) ->
+    if (event.which == 27) then template.find("[type=reset]")?.click()
+
+
+
+
+exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs}, standardServerCallback, andThen}

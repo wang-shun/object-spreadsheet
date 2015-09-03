@@ -72,6 +72,8 @@ _toColumnId = (selector) ->
 class CellId
   constructor: ({columnId, @cellId}) -> @columnId = _toColumnId(columnId)
   
+  q: -> {@columnId, @cellId}
+  
   parent: ->
     c = getColumn(@columnId)
     if c && c.parent?
@@ -101,6 +103,8 @@ class CellId
     (@family(childId) for childId in getColumn(@columnId)?.children ? [])
     
   remove: (callback=->) -> @family().remove(@value(), callback)
+  
+  ref: -> new TypedSet(@columnId, set([@cellId]))
   
 
 class FamilyId
@@ -236,7 +240,7 @@ class CellsInMemory
     if (column = query.column)?
       byKey = @byColumn[column]
       if (key = query.key)?
-        if (doc = byKey[key])?
+        if (doc = byKey.get(key))?
           @stash(doc)
           byKey.delete(key)
       else
@@ -330,4 +334,4 @@ class Transaction
 
         
 
-exported {Tablespace, CellId, FamilyId, rootCell, Transaction}
+exported {Tablespace, CellId, FamilyId, rootCell, Transaction, CellsInMemory}

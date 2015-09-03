@@ -25,7 +25,7 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
 
 @SyntaxError = Meteor.makeErrorType('SyntaxError',
   class @SyntaxError
-    constructor: (@message) ->
+    constructor: (@message, @details) ->
 )
 
 @SemanticError = Meteor.makeErrorType('SemanticError',
