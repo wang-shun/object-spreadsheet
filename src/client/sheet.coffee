@@ -475,21 +475,6 @@ class ClientView
           if cell.rowspan > grid.length - i
             cell.rowspan = grid.length - i
     gridData = @mainSection.renderHlist(hlist, hlist.minHeight)
-
-    # Resolve cell cross-references.
-    @qCellIdToGridCoords = new EJSONKeyedMap()
-    for rowCells, i in gridData
-      for cell, j in rowCells
-        if cell.qCellId? && cell.isObject
-          # dataRow is user-facing row number, one-based.
-          # row/col: Account for header rows and caption column.  We could
-          # compute these later but this is easier for now.
-          @qCellIdToGridCoords.set(cell.qCellId, {row: headerHeight + i, col: j+1, dataRow: i+1})
-    for row in gridData
-      for cell in row
-        if cell.value instanceof CellReference
-          cell.referent = cell.value.qCellId
-          cell.display = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
     gridVertExtend(grid, gridData)
 
     gridCaption = []
@@ -517,6 +502,20 @@ class ClientView
                    ([new ViewCell(i+1, 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
+
+    # Resolve cell cross-references.
+    @qCellIdToGridCoords = new EJSONKeyedMap()
+    for rowCells, i in grid
+      for cell, j in rowCells
+        if cell.qCellId? && cell.isObject
+          # dataRow is user-facing row number, one-based.
+          @qCellIdToGridCoords.set(cell.qCellId, {row: i, col: j, dataRow: i - headerHeight + 1})
+    for row in grid
+      for cell in row
+        if cell.value instanceof CellReference
+          cell.referent = cell.value.qCellId
+          cell.display = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
+
     @grid = grid
 
     separatorColumns = (i for cell,i in grid[headerHeight - 1] when i != 0 && !cell.columnId)
