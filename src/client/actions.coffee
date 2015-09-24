@@ -68,7 +68,19 @@ newDisplayStr.initial = new ReactiveVar(null)
 Template.changeColumn.rendered = () ->
   formula = origFormulaStrForColumnId(Template.currentData().columnId)
   newFormulaStr.set(formula)
-  @find('input[name=formula]')?.value = formula
+  formulaDiv = @find('#changeFormula-formula')
+  if formulaDiv
+    @codeMirror = CodeMirror(formulaDiv, {
+      value: formula
+      extraKeys: {
+        Enter: (cm) => changeColumnSubmit(this)
+      }
+      })
+    # http://stackoverflow.com/a/15256593
+    @codeMirror.setSize('100%', @codeMirror.defaultTextHeight() + 2 * 4)
+    console.log("create CodeMirror", this, @codeMirror)
+    @codeMirror.on('changes', (cm) ->
+      newFormulaStr.set(cm.getDoc().getValue()))
   display = origDisplayStrForColumnId(Template.currentData().columnId)
   newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
   @find('input[name=display]')?.value = display
@@ -101,76 +113,77 @@ Template.changeColumn.helpers
       colorIndexForDepth(columnDepth(col.parent))
     else null
 
+changeColumnSubmit = (template) ->
+  try
+    # Set the type
+    newVal = template.find('input[name=type]').value
+    parsed = false
+    try
+      type = if newVal == '' then null else parseTypeStr(newVal)
+      parsed = true
+    catch e
+      alert("Invalid type '#{newVal}'.")
+      return false
+    if parsed
+      Meteor.call 'changeColumnSpecifiedType', $$, template.data.columnId, type,
+                  standardServerCallback
+    # Set the formula
+    formulaStr = newFormulaStr.get()
+    if formulaStr?
+      if formulaStr == ''
+        formula = null   # remove formula
+      else
+        try
+          formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
+        catch e
+          unless e instanceof FormulaValidationError
+            throw e
+          alert('Failed to parse formula: ' + e.message)
+          return false
+        # Canonicalize the string in the field, otherwise the field might stay
+        # yellow after successful submission.
+        formulaStr = stringifyFormula(getColumn(template.data.columnId).parent, formula)
+        template.codeMirror?.getDoc().setValue(formulaStr)
+        newFormulaStr.set(formulaStr)
+      Meteor.call('changeColumnFormula', $$,
+                  template.data.columnId,
+                  formula,
+                  standardServerCallback)
+    # Set the display
+    displayStr = newDisplayStr.get()
+    if displayStr? && displayStr != newDisplayStr.initial.get()
+      if displayStr == ''
+        display = null   # revert to default
+      else
+        try
+          display = parseFormula(getColumn(template.data.columnId).type, displayStr)
+        catch e
+          unless e instanceof FormulaValidationError
+            throw e
+          alert('Failed to parse display formula: ' + e.message)
+          return false
+        # Canonicalize the string in the field, otherwise the field might stay
+        # yellow after successful submission.
+        displayStr = stringifyFormula(getColumn(template.data.columnId), display)
+        template.find('input[name=display]').value = displayStr
+        newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
+      Meteor.call('changeColumnDisplay', $$,
+                  template.data.columnId,
+                  display,
+                  standardServerCallback)
+  catch e
+    console.error e
+
 Template.changeColumn.events
-  'input .formula': (event, template) ->
-    newFormulaStr.set(event.target.value) #template.find('input[name=formula]').value)
   'input .display': (event, template) ->
     newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
   'submit form': (event, template) ->
-    try
-      # Set the type
-      newVal = template.find('input[name=type]').value
-      parsed = false
-      try
-        type = if newVal == '' then null else parseTypeStr(newVal)
-        parsed = true
-      catch e
-        alert("Invalid type '#{newVal}'.")
-        return false
-      if parsed
-        Meteor.call 'changeColumnSpecifiedType', $$, @columnId, type,
-                    standardServerCallback
-      # Set the formula
-      formulaStr = newFormulaStr.get()
-      if formulaStr?
-        if formulaStr == ''
-          formula = null   # remove formula
-        else
-          try
-            formula = parseFormula(getColumn(@columnId).parent, formulaStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          formulaStr = stringifyFormula(getColumn(@columnId).parent, formula)
-          template.find('input[name=formula]').value = formulaStr
-          newFormulaStr.set(formulaStr)
-        Meteor.call('changeColumnFormula', $$,
-                    @columnId,
-                    formula,
-                    standardServerCallback)
-      # Set the display
-      displayStr = newDisplayStr.get()
-      if displayStr? && displayStr != newDisplayStr.initial.get()
-        if displayStr == ''
-          display = null   # revert to default
-        else
-          try
-            display = parseFormula(getColumn(@columnId).type, displayStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse display formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          displayStr = stringifyFormula(getColumn(@columnId), display)
-          template.find('input[name=display]').value = displayStr
-          newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
-        Meteor.call('changeColumnDisplay', $$,
-                    @columnId,
-                    display,
-                    standardServerCallback)
-    catch e
-      console.error e
+    changeColumnSubmit(template)
     false # prevent refresh
   'click [type=reset]': (event, template) ->
     orig = origFormulaStrForColumnId(@columnId)
     newFormulaStr.set(orig)
-    template.find('input[name=formula]')?.value = orig
+    template.codeMirror?.getDoc().setValue(orig)
     newDisplayStr.set(newDisplayStr.initial.get())
     template.find('input[name=display]')?.value = newDisplayStr.initial.get()
     false # prevent clear

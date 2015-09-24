@@ -1,7 +1,9 @@
 <head>
   <script src="/jquery/jquery-1.11.1.min.js"></script>
   <script src="/handsontable/handsontable.full.js"></script>
+  <script src="/codemirror/codemirror.js"></script>
   <link rel="stylesheet" type="text/css" href="/handsontable/handsontable.full.css">
+  <link rel="stylesheet" type="text/css" href="/codemirror/codemirror.css">
 </head>
 <body>
 </body>
@@ -66,8 +68,7 @@
       {{#if formula}}
       <th class="labelBox"><label for="changeFormula-formula">=</label></th>
       <td>
-      <input id="changeFormula-formula" type="text" name="formula"
-             style="width: 100%" class="formula {{formulaClass}}"/>
+        <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%;"></div>
       </td>
       {{else}}
       <td><button type="button" class="create">Create formula</button></td>
@@ -78,6 +79,8 @@
       </td>
       </tr>
       <tr>
+        <!-- TODO: This should be consistent with the UI for column formulas,
+             but it's going to be redesigned anyway. -->
         <td class="labelBox" colspan="3">Display
           <input id="changeColumn-display" type="text" name="display" placeholder="(default)"
                  class="display {{displayClass}}"/></td>
