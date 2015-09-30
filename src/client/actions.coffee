@@ -68,19 +68,8 @@ newDisplayStr.initial = new ReactiveVar(null)
 Template.changeColumn.rendered = () ->
   formula = origFormulaStrForColumnId(Template.currentData().columnId)
   newFormulaStr.set(formula)
-  formulaDiv = @find('#changeFormula-formula')
-  if formulaDiv
-    @codeMirror = CodeMirror(formulaDiv, {
-      value: formula
-      extraKeys: {
-        Enter: (cm) => changeColumnSubmit(this)
-      }
-      })
-    # http://stackoverflow.com/a/15256593
-    @codeMirror.setSize('100%', @codeMirror.defaultTextHeight() + 2 * 4)
-    console.log("create CodeMirror", this, @codeMirror)
-    @codeMirror.on('changes', (cm) ->
-      newFormulaStr.set(cm.getDoc().getValue()))
+  if formula?
+    changeColumnInitFormulaBar(this)
   display = origDisplayStrForColumnId(Template.currentData().columnId)
   newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
   @find('input[name=display]')?.value = display
@@ -112,6 +101,19 @@ Template.changeColumn.helpers
     if col.isObject
       colorIndexForDepth(columnDepth(col.parent))
     else null
+
+changeColumnInitFormulaBar = (template) ->
+  formula = origFormulaStrForColumnId(template.data.columnId)
+  template.codeMirror = CodeMirror(template.find('#changeFormula-formula'), {
+    value: formula
+    extraKeys: {
+      Enter: (cm) => changeColumnSubmit(template)
+    }
+    })
+  # http://stackoverflow.com/a/15256593
+  template.codeMirror.setSize('100%', template.codeMirror.defaultTextHeight() + 2 * 4)
+  template.codeMirror.on('changes', (cm) ->
+    newFormulaStr.set(cm.getDoc().getValue()))
 
 changeColumnSubmit = (template) ->
   try
@@ -194,9 +196,21 @@ Template.changeColumn.events
     Meteor.call 'changeColumnFormula', $$, @columnId, formula,
                 standardServerCallback
     # TODO warn user if column has data!!
+    # It's ugly to code this state transition manually.  I considered
+    # introducing a child template, but it's unclear how the parent and child
+    # templates can reference each other. ~ Matt 2015-09-30
+    newFormulaStr.set(origFormulaStrForColumnId(@columnId))
+    # Have to wait for the template to re-render with the new div.
+    Tracker.afterFlush(() -> changeColumnInitFormulaBar(template))
   'keydown form': (event, template) ->
     if (event.which == 27) then template.find("[type=reset]")?.click()
 
+# Needed for the formula div to get added during the "Create formula" handler,
+# rather than sometime later when we get the update from the server.
+Meteor.methods({
+  changeColumnFormula: (cc, columnId, formula) ->
+    Columns.update(columnId, {$set: {formula: formula}})
+})
 
 
 
