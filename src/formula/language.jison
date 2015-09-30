@@ -233,8 +233,13 @@ familySliceReference
     ;
 
 expression
+    : expression1
+        { $$ = $1; $$.loc = @$; }  /* hack expando property */
+    ;
+
+expression1
     : '(' expression ')'
-        { $$ = $2; }
+        { $$ = $2; }  /* Note: outer expression will overwrite loc!  Desired? */
     | '{' '}'
         { $$ = ['union', []]; }
     | '{' commaSeparatedExpressions optComma '}'

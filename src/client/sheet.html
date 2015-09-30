@@ -68,7 +68,11 @@
       {{#if formula}}
       <th class="labelBox"><label for="changeFormula-formula">=</label></th>
       <td>
-        <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%;"></div>
+        <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%; position: relative;">
+          {{#each newFormulaBands}}
+            <div class="formulaBand" style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
+          {{/each}}
+        </div>
       </td>
       {{else}}
       <td><button type="button" class="create">Create formula</button></td>

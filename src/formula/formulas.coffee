@@ -86,6 +86,7 @@ EagerSubformula = {
     evaluateFormula(model, vars, arg)
   stringify: (model, vars, arg) ->
     stringifySubformula(model, vars, arg)
+  getSubformulas: (arg) -> [arg]
 }
 OptionalEagerSubformula = {
   validate: (vars, arg) ->
@@ -96,6 +97,7 @@ OptionalEagerSubformula = {
     if arg? then evaluateFormula(model, vars, arg) else null
   stringify: (model, vars, arg) ->
     if arg? then stringifySubformula(model, vars, arg) else null
+  getSubformulas: (arg) -> if arg? then [arg] else []
 }
 EagerSubformulaCells = {
   validate: EagerSubformula.validate
@@ -105,6 +107,7 @@ EagerSubformulaCells = {
     type
   evaluate: EagerSubformula.evaluate
   stringify: EagerSubformula.stringify
+  getSubformulas: EagerSubformula.getSubformulas
 }
 HomogeneousEagerSubformulaList = {
   validate: (vars, arg) ->
@@ -125,12 +128,14 @@ HomogeneousEagerSubformulaList = {
     (evaluateFormula(model, vars, fmla) for fmla in termFmlas)
   stringify: (model, vars, termFmlas) ->
     (stringifySubformula(model, vars, fmla) for fmla in termFmlas)
+  getSubformulas: (termFmlas) -> termFmlas
 }
 LazySubformula = {
   validate: EagerSubformula.validate
   typecheck: EagerSubformula.typecheck
   # No evaluate.
   stringify: EagerSubformula.stringify
+  getSubformulas: EagerSubformula.getSubformulas
 }
 # It might be nicer on the users to not require the extra 2-element array in the
 # input, but for now this goes with our framework.
@@ -163,6 +168,7 @@ Lambda = {
       newVars = vars.shallowClone()
       newVars.set(varName, argType)
       [varName, stringifySubformula(model, newVars, body)]
+  getSubformulas: ([varName, body]) -> [body]
 }
 ColumnId = {
   validate: (vars, arg) ->
@@ -832,5 +838,16 @@ stringifySubformula = (model, vars, formula) ->
   stringifySubformula(
     liteModel, new EJSONKeyedMap([['this', thisType]]), formula).strFor(PRECEDENCE_LOWEST)
 
+@getSubformulaTree = (formula) ->
+  d = dispatch[formula[0]]
+  args = formula[1..]
+  children = []
+  for adapter, i in d.argAdapters
+    if adapter.getSubformulas?
+      children.push(adapter.getSubformulas(args[i])...)
+  {
+    formula: formula
+    children: getSubformulaTree(f) for f in children
+  }
 
 exported {FormulaEngine}

@@ -222,6 +222,17 @@ right and a bottom border:
   background-color: #FF0;
 }
 
+.formulaBand {
+  position: absolute;
+  background-color: #AAF;
+  z-index: 1;
+}
+
+/* Real selectability will come later. */
+.formulaBand:hover {
+  background-color: #00F;
+}
+
 #ActionBar {
   box-sizing: border-box;
   height: 70px;

@@ -54,17 +54,23 @@ stringifyType = (type) ->
       prefix + c.objectName
     else
       "?<#{type}>"
-    
+
+NESTED_UNDERLINING_PX_PER_LEVEL = 4
+NESTED_UNDERLINING_MAX_DEPTH = 5
+
 # We mainly care that this doesn't crash.
 origFormulaStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.formula
   formula && stringifyFormula(getColumn(columnId).parent, formula)
 newFormulaStr = new ReactiveVar(null)
+newFormulaBands = new ReactiveVar(null)
+
 origDisplayStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.display
   formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
 newDisplayStr = new ReactiveVar(null)
 newDisplayStr.initial = new ReactiveVar(null)
+
 Template.changeColumn.rendered = () ->
   formula = origFormulaStrForColumnId(Template.currentData().columnId)
   newFormulaStr.set(formula)
@@ -89,6 +95,8 @@ Template.changeColumn.helpers
     origFormulaStrForColumnId(@columnId)
   formulaClass: ->
     if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
+  newFormulaBands: ->
+    newFormulaBands.get()
   displayClass: ->
     if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
   contextText: ->
@@ -111,9 +119,53 @@ changeColumnInitFormulaBar = (template) ->
     }
     })
   # http://stackoverflow.com/a/15256593
-  template.codeMirror.setSize('100%', template.codeMirror.defaultTextHeight() + 2 * 4)
+  template.codeMirror.setSize('100%', template.codeMirror.defaultTextHeight() + 2 * 4 +
+                              NESTED_UNDERLINING_PX_PER_LEVEL * NESTED_UNDERLINING_MAX_DEPTH)
+  template.codeMirror.on('beforeChange', (cm, change) ->
+    newtext = change.text.join('').replace(/\n/g, '')
+    change.update(null, null, [newtext])
+    true)
   template.codeMirror.on('changes', (cm) ->
-    newFormulaStr.set(cm.getDoc().getValue()))
+    newFormulaStr.set(cm.getDoc().getValue())
+    updateFormulaView(template))
+  updateFormulaView(template)
+
+updateFormulaView = (template) ->
+  formulaStr = newFormulaStr.get()
+  try
+    formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
+  catch e
+    unless e instanceof FormulaValidationError
+      throw e
+    # TODO: More graceful error handling
+    newFormulaBands.set([])
+    return
+  root = getSubformulaTree(formula)
+  bands = []
+  layoutSubtree = (node) ->
+    node.ch1 = node.formula.loc.first_column
+    node.ch2 = node.formula.loc.last_column
+    node.height = 0
+    for child, i in node.children
+      # loc missing for implicit "this" inserted by resolveNavigation; other cases?
+      if child.formula.loc?
+        layoutSubtree(child)
+        isNavigationLhs = (node.formula[0] in ['up', 'down'] && i == 0)
+        if isNavigationLhs
+          node.ch1 = child.ch2
+        node.height = Math.max(node.height, child.height + !isNavigationLhs)
+    top = 4 + template.codeMirror.defaultTextHeight() + 1 + NESTED_UNDERLINING_PX_PER_LEVEL * node.height
+    # Tweak for gaps in navigation chains.
+    x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left + 1
+    x2 = template.codeMirror.cursorCoords({line: 0, ch: node.ch2}, 'local').left - 1
+    bands.push({
+      left: x1
+      width: x2 - x1
+      top: top
+      height: 2
+      })
+  layoutSubtree(root)
+  newFormulaBands.set(bands)
 
 changeColumnSubmit = (template) ->
   try
