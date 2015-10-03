@@ -917,6 +917,11 @@ Template.Spreadsheet.rendered = ->
   Relsheets.open(sheet)
   Tracker.autorun(guarded -> rebuildView viewId)
 
+Template.Spreadsheet.helpers({
+  # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
+  actionBarClass: -> if ActionBar.isExpanded() then 'expanded' else ''
+})
+
 
 $ ->
   exported {ClientView, StateEdit, rebuildView, guarded}

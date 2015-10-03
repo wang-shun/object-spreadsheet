@@ -32,6 +32,24 @@ readFamilyForFormula = (model, qFamilyId) ->
     # Future: Specifically state that there was a cycle.
     throw new EvaluationError("Reference to column #{qFamilyId.columnId} family #{JSON.stringify(qFamilyId.cellId)}, which failed to evaluate")
 
+# Based on model.evaluateFamily{,1}.
+# TODO: Assuming we do want the client to be able to evaluate formulas (for now
+# at least), factor out that code so the client can use it in read-only mode.
+evaluateFamilyReadOnly = (qFamilyId) ->
+  keyFields = {column: qFamilyId.columnId, key: qFamilyId.cellId}
+  ce = Cells.findOne(keyFields)
+  unless ce?
+    col = @getColumn(qFamilyId.columnId)
+    if col.formula?
+      throw new Error("Computed family #{qFamilyId} missing from database")
+    else
+      return new TypedSet(col.type)
+  if ce.values?
+    return new TypedSet(@getColumn(qFamilyId.columnId).type,
+                        new EJSONKeyedSet(ce.values))
+  else
+    return null
+
 readColumnTypeForFormula = (model, columnId) ->
   type = model.typecheckColumn(columnId)
   valAssert(type?, "column '${columnId}': type missing")
@@ -701,12 +719,49 @@ dispatchFormula = (action, formula, contextArgs...) ->
 # vars: EJSONKeyedMap<string, type (nullable string)>
 # Returns type (nullable string).
 @typecheckFormula = (model, vars, formula) ->
+  formula.vars = vars
   formula.type = dispatchFormula('typecheck', formula, model, vars)
 
 # Assumes formula has passed typechecking.
 # vars: EJSONKeyedMap<string, TypedSet>
 @evaluateFormula = (model, vars, formula) ->
-  dispatchFormula('evaluate', formula, model, vars)
+  try
+    result = dispatchFormula('evaluate', formula, model, vars)
+  catch e
+    if e instanceof EvaluationError && model.isTracing
+      formula.traces ?= new EJSONKeyedMap()
+      formula.traces.set(vars, {error: e.message})
+    throw e
+  if model.isTracing
+    formula.traces ?= new EJSONKeyedMap()
+    formula.traces.set(vars, {result: result})
+  result
+
+@traceFormula = (formula, columnId) ->
+  tracingModel = {
+    getColumn: (columnId) -> getColumn(columnId)
+    evaluateFamily: (qFamilyId) -> evaluateFamilyReadOnly(qFamilyId)
+    typecheckColumn: (columnId) -> getColumn(columnId).type
+    isTracing: true
+  }
+  # Find all cells in parent column
+  parentColumnId = getColumn(columnId).parent
+  parentColumnCellIds = []
+  # Here we really do want to ignore erroneous families in the parent column
+  # because there is nothing to trace for them.
+  for family in Cells.find({column: parentColumnId}).fetch() when family.values?
+    for v in family.values
+      parentColumnCellIds.push(cellIdChild(family.key, v))
+  for cellId in parentColumnCellIds
+    try
+      vars = new EJSONKeyedMap(
+        [['this', new TypedSet(parentColumnId, new EJSONKeyedSet([cellId]))]])
+      evaluateFormula(tracingModel, vars, formula)
+    catch e
+      if e instanceof EvaluationError
+        # Ignore; already traced.
+      else
+        throw e
 
 @DUMMY_FORMULA = ['union', []]
 

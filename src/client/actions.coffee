@@ -63,7 +63,7 @@ origFormulaStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.formula
   formula && stringifyFormula(getColumn(columnId).parent, formula)
 newFormulaStr = new ReactiveVar(null)
-newFormulaBands = new ReactiveVar(null)
+newFormulaInfo = new ReactiveVar(null)
 
 origDisplayStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.display
@@ -79,6 +79,14 @@ Template.changeColumn.rendered = () ->
   display = origDisplayStrForColumnId(Template.currentData().columnId)
   newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
   @find('input[name=display]')?.value = display
+
+Template.changeColumn.destroyed = () ->
+  # Try to avoid holding on to data that's no longer relevant.
+  newFormulaStr.set(null)
+  newFormulaInfo.set(null)
+  newDisplayStr.set(null)
+  newDisplayStr.initial.set(null)
+
 Template.changeColumn.helpers
   columnName: ->
     c = getColumn(@columnId)
@@ -95,8 +103,8 @@ Template.changeColumn.helpers
     origFormulaStrForColumnId(@columnId)
   formulaClass: ->
     if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
-  newFormulaBands: ->
-    newFormulaBands.get()
+  newFormulaInfo: ->
+    newFormulaInfo.get()
   displayClass: ->
     if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
   contextText: ->
@@ -138,7 +146,7 @@ updateFormulaView = (template) ->
     unless e instanceof FormulaValidationError
       throw e
     # TODO: More graceful error handling
-    newFormulaBands.set([])
+    newFormulaInfo.set(null)
     return
   root = getSubformulaTree(formula)
   bands = []
@@ -159,13 +167,25 @@ updateFormulaView = (template) ->
     x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left + 1
     x2 = template.codeMirror.cursorCoords({line: 0, ch: node.ch2}, 'local').left - 1
     bands.push({
+      node: node
+      selected: false
       left: x1
       width: x2 - x1
       top: top
       height: 2
       })
   layoutSubtree(root)
-  newFormulaBands.set(bands)
+  newFormulaInfo.set({root: root, bands: bands, selectedBand: null, haveTraced: false})
+
+updateTracingView = () ->
+  formulaInfo = newFormulaInfo.get()
+  unless formulaInfo.haveTraced
+    traceFormula(formulaInfo.root.formula, changeColumnArgs.get()[0].columnId)
+    formulaInfo.haveTraced = true
+  formulaInfo.traceInfoStr = EJSON.stringify(formulaInfo.selectedBand.node.formula.traces)
+
+isExpanded = () ->
+  newFormulaInfo.get()?.selectedBand?
 
 changeColumnSubmit = (template) ->
   try
@@ -256,6 +276,16 @@ Template.changeColumn.events
     Tracker.afterFlush(() -> changeColumnInitFormulaBar(template))
   'keydown form': (event, template) ->
     if (event.which == 27) then template.find("[type=reset]")?.click()
+  'click .formulaBand': (event, template) ->
+    # Update selection.
+    formulaInfo = newFormulaInfo.get()
+    formulaInfo.selectedBand?.selected = false
+    formulaInfo.selectedBand = this
+    @selected = true
+
+    updateTracingView()
+    # Force the bands to re-render.
+    newFormulaInfo.set(formulaInfo)
 
 # Needed for the formula div to get added during the "Create formula" handler,
 # rather than sometime later when we get the update from the server.
@@ -266,4 +296,4 @@ Meteor.methods({
 
 
 
-exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs}, standardServerCallback, andThen}
+exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs, isExpanded}, standardServerCallback, andThen}

@@ -228,14 +228,13 @@ right and a bottom border:
   z-index: 1;
 }
 
-/* Real selectability will come later. */
-.formulaBand:hover {
+.formulaBand:hover, .formulaBandSelected {
   background-color: #00F;
 }
 
 #ActionBar {
   box-sizing: border-box;
-  height: 70px;
+  height: 90px;
   padding: 9px;
   font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
   font-size: 10pt;
@@ -243,6 +242,10 @@ right and a bottom border:
   background: -moz-linear-gradient(top, rgba(133,178,211,1) 0%, rgba(167,199,220,1) 100%); /* FF3.6+ */
   background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(133,178,211,1)), color-stop(100%,rgba(167,199,220,1))); /* Chrome,Safari4+ */
   background: -webkit-linear-gradient(top, rgba(133,178,211,1) 0%,rgba(167,199,220,1) 100%); /* Chrome10+,Safari5.1+ */
+}
+
+#ActionBar.expanded {
+  height: 290px;
 }
 
 #ActionBar label { color: #006; }

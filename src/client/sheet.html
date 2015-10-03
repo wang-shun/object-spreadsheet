@@ -9,7 +9,7 @@
 </body>
 
 <template name="Spreadsheet">
-  <div id="ActionBar">
+  <div id="ActionBar" class="{{actionBarClass}}">
     {{> formulaValueBar}}
   </div>
   <div id="ViewWrapper">
@@ -69,8 +69,10 @@
       <th class="labelBox"><label for="changeFormula-formula">=</label></th>
       <td>
         <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%; position: relative;">
-          {{#each newFormulaBands}}
-            <div class="formulaBand" style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
+          <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
+          {{#each newFormulaInfo.bands}}
+            <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
+                 style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
           {{/each}}
         </div>
       </td>
@@ -89,6 +91,13 @@
           <input id="changeColumn-display" type="text" name="display" placeholder="(default)"
                  class="display {{displayClass}}"/></td>
       </tr>
+      {{#if newFormulaInfo.selectedBand}}
+      <tr>
+        <td colspan="3">
+          <textarea cols="100" rows="8" readonly="true">{{newFormulaInfo.traceInfoStr}}</textarea>
+        </td>
+      </tr>
+      {{/if}}
     </table>
   </form>
 </template>

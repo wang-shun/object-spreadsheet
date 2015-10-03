@@ -1,11 +1,3 @@
-# Careful: with "class EvaluationError", the original class gets assigned to a
-# file-scope variable that shadows the exported wrapped class seen by the rest
-# of the application, and instanceof breaks.
-@EvaluationError = Meteor.makeErrorType('EvaluationError',
-  class @EvaluationError
-    constructor: (@message) ->
-)
-
 class CannedTransaction
   # @params: EJSONKeyedMap of name to type
   constructor: (@params, @body) ->

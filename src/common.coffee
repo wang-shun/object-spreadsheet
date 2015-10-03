@@ -17,6 +17,14 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
 # N.B. Meteor.makeErrorType is the way to make a subclass of Error so that both
 # instanceof and stack traces work.
 
+# Careful: with "class EvaluationError", the original class gets assigned to a
+# file-scope variable that shadows the exported wrapped class seen by the rest
+# of the application, and instanceof breaks.
+@EvaluationError = Meteor.makeErrorType('EvaluationError',
+  class @EvaluationError
+    constructor: (@message) ->
+)
+
 # Used also for typechecking.
 @FormulaValidationError = Meteor.makeErrorType('FormulaValidationError',
   class @FormulaValidationError
