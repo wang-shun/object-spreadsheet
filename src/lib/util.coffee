@@ -22,10 +22,10 @@ class @EJSONKeyedMap
   shallowClone: -> new EJSONKeyedMap(@entries())
   typeName: -> 'EJSONKeyedMap'
   # Note, this only works if the values are EJSON-compatible.
-  toJSONValue: -> @obj
+  toJSONValue: -> EJSON.toJSONValue(@obj)
   @fromJSONValue: (json) ->
     m = new EJSONKeyedMap()
-    m.obj = json
+    m.obj = EJSON.fromJSONValue(json)
     m
 EJSON.addType('EJSONKeyedMap', EJSONKeyedMap.fromJSONValue)
 
