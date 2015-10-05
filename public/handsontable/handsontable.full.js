@@ -8682,11 +8682,13 @@ Handsontable.PluginHooks = Handsontable.hooks; //in future move this line to leg
       var maxLen = 0;
       for (var r = 0; r < rows; r++) {
         var spanFromCol = col;
-        var mergeInfo = instance.mergeCells.mergedCellInfoCollection.getInfo(r, col);
-        if (mergeInfo) {
-          if (mergeInfo.col + mergeInfo.colspan - 1 != col)
-            continue;
-          spanFromCol = mergeInfo.col;
+        if (instance.mergeCells) {
+          var mergeInfo = instance.mergeCells.mergedCellInfoCollection.getInfo(r, col);
+          if (mergeInfo) {
+            if (mergeInfo.col + mergeInfo.colspan - 1 != col)
+              continue;
+            spanFromCol = mergeInfo.col;
+          }
         }
         var value = Handsontable.helper.stringify(instance.getDataAtCell(r, spanFromCol));
         var len = value.length;
