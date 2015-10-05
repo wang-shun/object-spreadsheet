@@ -80,12 +80,16 @@ Template.changeColumn.rendered = () ->
   newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
   @find('input[name=display]')?.value = display
 
+tracingView = null
+
 Template.changeColumn.destroyed = () ->
   # Try to avoid holding on to data that's no longer relevant.
   newFormulaStr.set(null)
   newFormulaInfo.set(null)
   newDisplayStr.set(null)
   newDisplayStr.initial.set(null)
+  tracingView?.destroy()
+  tracingView = null
 
 Template.changeColumn.helpers
   columnName: ->
@@ -140,8 +144,13 @@ changeColumnInitFormulaBar = (template) ->
 
 updateFormulaView = (template) ->
   formulaStr = newFormulaStr.get()
+  parentColumnId = getColumn(template.data.columnId).parent
   try
-    formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
+    formula = parseFormula(parentColumnId, formulaStr)
+    # Fill in vars expando field on all subformulas.  Obviously in the future
+    # we want to be able to help troubleshoot ill-typed formulas, but we punt
+    # all error tolerance until later rather than fight that complexity now.
+    typecheckFormula(liteModel, new EJSONKeyedMap([['this', parentColumnId]]), formula)
   catch e
     unless e instanceof FormulaValidationError
       throw e
@@ -177,12 +186,40 @@ updateFormulaView = (template) ->
   layoutSubtree(root)
   newFormulaInfo.set({root: root, bands: bands, selectedBand: null, haveTraced: false})
 
-updateTracingView = () ->
+class TracingView
+  constructor: (domElement) ->
+    @hot = new Handsontable(domElement, {})  # Needs a lot of work
+  show: (formula) ->
+    # TODO: Enforce outside-to-inside order ourselves rather than relying on it
+    # as a side effect of object iteration order and the way we typecheck
+    # formulas.
+    varsAndTypesList = formula.vars.entries()
+    grid = [(new ViewCell(name) for [name, _] in varsAndTypesList)]
+    grid[0].push(new ViewCell('Result'))
+    for [varValues, outcome] in formula.traces.entries()
+      line = (new ViewCell(varValues.get(name).elements()[0]) for [name, _] in varsAndTypesList)
+      resultShow =
+        if outcome.result?
+        then outcome.result.elements()[0] ? '(empty)'  # FIXME: display all elements
+        else outcome.error
+      line.push(new ViewCell(resultShow))
+      grid.push(line)
+    data = ((cell.value for cell in row) for row in grid)
+    @hot.loadData(data)
+  destroy: () ->
+    @hot.destroy()
+
+updateTracingView = (template) ->
   formulaInfo = newFormulaInfo.get()
+  columnId = changeColumnArgs.get()[0].columnId
+  # Tracing can be slow, so do it only on first demand.  (Longer term, we should
+  # optimize it!)
   unless formulaInfo.haveTraced
-    traceFormula(formulaInfo.root.formula, changeColumnArgs.get()[0].columnId)
+    traceColumnFormula(formulaInfo.root.formula, columnId)
     formulaInfo.haveTraced = true
-  formulaInfo.traceInfoStr = EJSON.stringify(formulaInfo.selectedBand.node.formula.traces)
+  unless tracingView?
+    tracingView = new TracingView(template.find('#TracingView'))
+  tracingView.show(formulaInfo.selectedBand.node.formula)
 
 isExpanded = () ->
   newFormulaInfo.get()?.selectedBand?
@@ -282,10 +319,10 @@ Template.changeColumn.events
     formulaInfo.selectedBand?.selected = false
     formulaInfo.selectedBand = this
     @selected = true
+    newFormulaInfo.set(formulaInfo)  # Trigger reactive dependents
 
-    updateTracingView()
-    # Force the bands to re-render.
-    newFormulaInfo.set(formulaInfo)
+    # Make sure tracing area has become visible, if necessary.
+    Tracker.afterFlush(() -> updateTracingView(template))
 
 # Needed for the formula div to get added during the "Create formula" handler,
 # rather than sometime later when we get the update from the server.

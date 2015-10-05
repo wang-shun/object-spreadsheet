@@ -737,7 +737,9 @@ dispatchFormula = (action, formula, contextArgs...) ->
     formula.traces.set(vars, {result: result})
   result
 
-@traceFormula = (formula, columnId) ->
+# TODO: Separate out the determination of the initial variable values so we can
+# reuse the rest for formulas in procedures, etc.
+@traceColumnFormula = (formula, columnId) ->
   tracingModel = {
     getColumn: (columnId) -> getColumn(columnId)
     evaluateFamily: (qFamilyId) -> evaluateFamilyReadOnly(qFamilyId)
@@ -835,7 +837,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 
   return formula
 
-liteModel = {
+@liteModel = {
   # Eta-expand to avoid load-order dependency.
   getColumn: (columnId) -> getColumn(columnId)
   typecheckColumn: (columnId) -> getColumn(columnId).type || throw new Error("Not ready")
