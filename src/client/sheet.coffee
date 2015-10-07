@@ -19,7 +19,7 @@ class NotReadyError
 # Object that can be used as ViewCell.value or ViewHlist.value to defer the
 # resolution of the target cell ID to a row number.  I'm a terrible person for
 # taking advantage of heterogeneous fields in JavaScript... ~ Matt
-class CellReference
+class @CellReference
   constructor: (@qCellId, @display) ->
 
 class ViewVlist
@@ -273,7 +273,8 @@ class ViewSection
   colorIndexForDepth: (depth) -> depth % 6
 
 
-class ValueFormat
+# Used also by tracing table in actions.coffee
+class @ValueFormat
   
   constructor: ->
     @tinyModel =
@@ -281,10 +282,10 @@ class ValueFormat
       evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
       typecheckColumn: (columnId) -> getColumn(columnId).type
   
-  asText: (value, col) ->
+  asText: (value, col, type) ->
     try
-      type = col.type
-      if col.display? 
+      type ?= col.type
+      if col?.display?
         vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
         fmtd = evaluateFormula(@tinyModel, vars, col.display)
         type = fmtd.type
@@ -314,6 +315,7 @@ class ValueFormat
       # Reasonable fallback
       else JSON.stringify(value)
     catch e
+      console.log(e)
       e.message
 
         

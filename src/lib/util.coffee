@@ -38,6 +38,7 @@ class @EJSONKeyedSet
   hasAll: (s) -> forall s.elements(), (x) => @has x
   add: (x) -> @map.set(x, true)
   delete: (x) -> @map.delete(x)
+  size: -> @map.size()
   elements: -> @map.keys()
   shallowClone: -> new EJSONKeyedSet(@elements())
   typeName: 'EJSONKeyedSet'

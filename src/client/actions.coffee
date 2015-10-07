@@ -206,14 +206,29 @@ class TracingView
     # TODO: Enforce outside-to-inside order ourselves rather than relying on it
     # as a side effect of object iteration order and the way we typecheck
     # formulas.
+    formatOne = (val, type) ->
+      fmtd = new ValueFormat().asText(val, null, type)
+      # TODO: Lookup @ references from main table.
+      # TODO (later): highlighting, jump to referent
+      if fmtd instanceof CellReference then fmtd.display ? '@?' else fmtd
     varsAndTypesList = formula.vars.entries()
     grid = [(new ViewCell(name) for [name, _] in varsAndTypesList)]
     grid[0].push(new ViewCell('Result'))
     for [varValues, outcome] in formula.traces.entries()
-      line = (new ViewCell(varValues.get(name).elements()[0]) for [name, _] in varsAndTypesList)
+      line =
+        for [name, _] in varsAndTypesList
+          val = varValues.get(name).elements()[0]
+          new ViewCell(formatOne(val, varValues.get(name).type))
       resultShow =
         if outcome.result?
-        then outcome.result.elements()[0] ? '(empty)'  # FIXME: display all elements
+          if outcome.result.set.size() == 1
+            formatOne(outcome.result.elements()[0], outcome.result.type)
+          else
+            # TODO: Display in individual cells so we can support the
+            # referent-related features.  Or do we like this better?
+            # We could at least base the curly braces on
+            # type-checking-level singular-ness once we have it.
+            '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(',') + '}'
         else outcome.error
       line.push(new ViewCell(resultShow))
       grid.push(line)
