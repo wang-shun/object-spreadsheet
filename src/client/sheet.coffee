@@ -300,7 +300,7 @@ class @ValueFormat
           if targetCol.referenceDisplay?
             vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
             fmtd = evaluateFormula(@tinyModel, vars, targetCol.referenceDisplay)
-            if fmtd.type != '_string'
+            if fmtd.type != 'text'
               # For now.  Better ideas?
               throw Error("reference display formula must return a string")
             elems = fmtd.elements()
