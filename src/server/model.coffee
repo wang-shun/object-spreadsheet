@@ -226,6 +226,14 @@ class Model
       validateFormula(display)
     Columns.update(columnId, {$set: {display}})
     
+  changeColumnReferenceDisplay: (columnId, referenceDisplay) ->
+    if columnId == rootColumnId
+      throw new Meteor.Error('modify-root-column',
+                             'Cannot modify the root column.')
+    if referenceDisplay?
+      validateFormula(referenceDisplay)
+    Columns.update(columnId, {$set: {referenceDisplay}})
+
   reorderColumn: (columnId, newIndex) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
@@ -477,6 +485,9 @@ Meteor.methods
   changeColumnDisplay: (cc, columnId, display) ->
     cc.run ->
       @model.changeColumnDisplay(columnId, display)
+  changeColumnReferenceDisplay: (cc, columnId, referenceDisplay) ->
+    cc.run ->
+      @model.changeColumnReferenceDisplay(columnId, referenceDisplay)
   reorderColumn: (cc, columnId, newIndex) ->
     cc.run -> @model.reorderColumn(columnId, newIndex)
   deleteColumn: (cc, columnId) ->

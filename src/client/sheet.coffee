@@ -20,7 +20,7 @@ class NotReadyError
 # resolution of the target cell ID to a row number.  I'm a terrible person for
 # taking advantage of heterogeneous fields in JavaScript... ~ Matt
 class CellReference
-  constructor: (@qCellId) ->
+  constructor: (@qCellId, @display) ->
 
 class ViewVlist
   constructor: (@parentCellId, @minHeight, @hlists, @error) ->
@@ -277,6 +277,7 @@ class ValueFormat
   
   constructor: ->
     @tinyModel =
+      # FIXME: propagate errors
       evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
       typecheckColumn: (columnId) -> getColumn(columnId).type
   
@@ -284,16 +285,30 @@ class ValueFormat
     try
       type = col.type
       if col.display? 
-        vars = new EJSONKeyedMap([['this', new TypedSet(col.type, set([value]))]])
+        vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
         fmtd = evaluateFormula(@tinyModel, vars, col.display)
         type = fmtd.type
         elems = fmtd.elements()
-        if elems.length > 1
+        if elems.length != 1
           throw Error("display function returned #{elems.length} elements (#{JSON.stringify elems})")
         value = elems[0]
       # TODO: More type-specific rendering?
-      if !typeIsPrimitive(type) then new CellReference({columnId: type, cellId: value})
-      # Should be OK if the user knows which columns are string-typed.
+      if !typeIsPrimitive(type)
+        targetCol = getColumn(type)
+        display =
+          if targetCol.referenceDisplay?
+            vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
+            fmtd = evaluateFormula(@tinyModel, vars, targetCol.referenceDisplay)
+            if fmtd.type != '_string'
+              # For now.  Better ideas?
+              throw Error("reference display formula must return a string")
+            elems = fmtd.elements()
+            if elems.length != 1
+              throw Error("reference display function returned #{elems.length} elements (#{JSON.stringify elems})")
+            elems[0]
+          else null
+        new CellReference({columnId: type, cellId: value}, display)
+      # Should be unambiguous if the user knows which columns are string-typed.
       else if typeof value == 'string' then value
       else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
       # Reasonable fallback
@@ -459,7 +474,7 @@ class ClientView
       for cell in row
         if cell.value instanceof CellReference
           cell.referent = cell.value.qCellId
-          cell.display = '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
+          cell.display = cell.value.display ? '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
 
     @grid = grid
 
@@ -747,7 +762,7 @@ class ClientView
     ActionBar.changeColumnArgs.set(
       if selectedCell? &&
          (ci = selectedCell.columnId)? && ci != rootColumnId
-        [{_id: ci, columnId: ci}]
+        [{_id: ci, columnId: ci, isObject: selectedCell.isObject}]
       else
         []
     )

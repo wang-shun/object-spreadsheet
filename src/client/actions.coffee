@@ -69,16 +69,24 @@ origDisplayStrForColumnId = (columnId) ->
   formula = getColumn(columnId)?.display
   formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
 newDisplayStr = new ReactiveVar(null)
-newDisplayStr.initial = new ReactiveVar(null)
+
+origReferenceDisplayStrForColumnId = (columnId) ->
+  formula = getColumn(columnId)?.referenceDisplay
+  # Note!  "this" type is the column itself, not its (key) type.
+  formula && stringifyFormula(columnId, formula) ? ''
+newReferenceDisplayStr = new ReactiveVar(null)
 
 Template.changeColumn.rendered = () ->
-  formula = origFormulaStrForColumnId(Template.currentData().columnId)
-  newFormulaStr.set(formula)
-  if formula?
+  formulaStr = origFormulaStrForColumnId(Template.currentData().columnId)
+  newFormulaStr.set(formulaStr)
+  if formulaStr?
     changeColumnInitFormulaBar(this)
-  display = origDisplayStrForColumnId(Template.currentData().columnId)
-  newDisplayStr.set(display) ; newDisplayStr.initial.set(display)
-  @find('input[name=display]')?.value = display
+  displayStr = origDisplayStrForColumnId(Template.currentData().columnId)
+  newDisplayStr.set(displayStr)
+  @find('input[name=display]')?.value = displayStr
+  referenceDisplayStr = origReferenceDisplayStrForColumnId(Template.currentData().columnId)
+  newReferenceDisplayStr.set(referenceDisplayStr)
+  @find('input[name=referenceDisplay]')?.value = referenceDisplayStr
 
 tracingView = null
 
@@ -87,30 +95,35 @@ Template.changeColumn.destroyed = () ->
   newFormulaStr.set(null)
   newFormulaInfo.set(null)
   newDisplayStr.set(null)
-  newDisplayStr.initial.set(null)
+  newReferenceDisplayStr.set(null)
   tracingView?.destroy()
   tracingView = null
 
 Template.changeColumn.helpers
   columnName: ->
     c = getColumn(@columnId)
-    objName = if c.parent then getColumn(c.parent).objectName else ""
+    objName =
+      if !@isObject && c.isObject then objectNameWithFallback(c)
+      else if c.parent then objectNameWithFallback(getColumn(c.parent))
+      else ''
     prefix = if objName? then "#{objName}:" else ""
-    prefix + (c?.objectName ? c?.fieldName ? '<unnamed>')
+    prefix + ((if @isObject then c.objectName else c.fieldName) ? '<unnamed>')
   columnType: ->
     c = getColumn(@columnId)
     if c?.type then stringifyType(c.type) else ''
   columnSpecifiedType: ->
     c = getColumn(@columnId)
     if c?.specifiedType then stringifyType(c.specifiedType) else ''
-  formula: ->
+  formula: ->  # Used to test whether the formula box should appear.
     origFormulaStrForColumnId(@columnId)
   formulaClass: ->
     if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
   newFormulaInfo: ->
     newFormulaInfo.get()
   displayClass: ->
-    if newDisplayStr.get() != newDisplayStr.initial.get() then 'formulaModified'
+    if newDisplayStr.get() != origDisplayStrForColumnId(@columnId) then 'formulaModified'
+  referenceDisplayClass: ->
+    if newReferenceDisplayStr.get() != origReferenceDisplayStrForColumnId(@columnId) then 'formulaModified'
   contextText: ->
     col = getColumn(@columnId)
     if col.isObject
@@ -226,68 +239,94 @@ isExpanded = () ->
 
 changeColumnSubmit = (template) ->
   try
-    # Set the type
-    newVal = template.find('input[name=type]').value
-    parsed = false
-    try
-      type = if newVal == '' then null else parseTypeStr(newVal)
-      parsed = true
-    catch e
-      alert("Invalid type '#{newVal}'.")
-      return false
-    if parsed
-      Meteor.call 'changeColumnSpecifiedType', $$, template.data.columnId, type,
-                  standardServerCallback
-    # Set the formula
-    formulaStr = newFormulaStr.get()
-    if formulaStr?
-      if formulaStr == ''
-        formula = null   # remove formula
-      else
-        try
-          formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
-        catch e
-          unless e instanceof FormulaValidationError
-            throw e
-          alert('Failed to parse formula: ' + e.message)
-          return false
-        # Canonicalize the string in the field, otherwise the field might stay
-        # yellow after successful submission.
-        formulaStr = stringifyFormula(getColumn(template.data.columnId).parent, formula)
-        template.codeMirror?.getDoc().setValue(formulaStr)
-        newFormulaStr.set(formulaStr)
-      Meteor.call('changeColumnFormula', $$,
-                  template.data.columnId,
-                  formula,
-                  standardServerCallback)
-    # Set the display
-    displayStr = newDisplayStr.get()
-    if displayStr? && displayStr != newDisplayStr.initial.get()
-      if displayStr == ''
-        display = null   # revert to default
-      else
-        try
-          display = parseFormula(getColumn(template.data.columnId).type, displayStr)
-        catch e
-          unless e instanceof FormulaValidationError
-            throw e
-          alert('Failed to parse display formula: ' + e.message)
-          return false
-        # Canonicalize the string in the field, otherwise the field might stay
-        # yellow after successful submission.
-        displayStr = stringifyFormula(getColumn(template.data.columnId), display)
-        template.find('input[name=display]').value = displayStr
-        newDisplayStr.set(displayStr) ; newDisplayStr.initial.set(displayStr)
-      Meteor.call('changeColumnDisplay', $$,
-                  template.data.columnId,
-                  display,
-                  standardServerCallback)
+    if template.data.isObject
+      # Set the reference display formula.
+      referenceDisplayStr = newReferenceDisplayStr.get()
+      if referenceDisplayStr?
+        if referenceDisplayStr == ''
+          referenceDisplay = null   # revert to default
+        else
+          try
+            referenceDisplay = parseFormula(template.data.columnId, referenceDisplayStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse reference display formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          referenceDisplayStr = stringifyFormula(template.data.columnId, referenceDisplay)
+          template.find('input[name=referenceDisplay]').value = referenceDisplayStr
+          newReferenceDisplayStr.set(referenceDisplayStr)
+        Meteor.call('changeColumnReferenceDisplay', $$,
+                    template.data.columnId,
+                    referenceDisplay,
+                    standardServerCallback)
+    else
+      # Set the type
+      newVal = template.find('input[name=type]').value
+      parsed = false
+      try
+        type = if newVal == '' then null else parseTypeStr(newVal)
+        parsed = true
+      catch e
+        alert("Invalid type '#{newVal}'.")
+        return false
+      if parsed
+        Meteor.call 'changeColumnSpecifiedType', $$, template.data.columnId, type,
+                    standardServerCallback
+      # Set the formula
+      formulaStr = newFormulaStr.get()
+      if formulaStr?
+        if formulaStr == ''
+          formula = null   # remove formula
+        else
+          try
+            formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          formulaStr = stringifyFormula(getColumn(template.data.columnId).parent, formula)
+          template.codeMirror?.getDoc().setValue(formulaStr)
+          newFormulaStr.set(formulaStr)
+        Meteor.call('changeColumnFormula', $$,
+                    template.data.columnId,
+                    formula,
+                    standardServerCallback)
+      # Set the display
+      displayStr = newDisplayStr.get()
+      if displayStr?
+        if displayStr == ''
+          display = null   # revert to default
+        else
+          try
+            display = parseFormula(getColumn(template.data.columnId).type, displayStr)
+          catch e
+            unless e instanceof FormulaValidationError
+              throw e
+            alert('Failed to parse display formula: ' + e.message)
+            return false
+          # Canonicalize the string in the field, otherwise the field might stay
+          # yellow after successful submission.
+          displayStr = stringifyFormula(getColumn(template.data.columnId).type, display)
+          template.find('input[name=display]').value = displayStr
+          newDisplayStr.set(displayStr)
+        Meteor.call('changeColumnDisplay', $$,
+                    template.data.columnId,
+                    display,
+                    standardServerCallback)
   catch e
     console.error e
 
 Template.changeColumn.events
   'input .display': (event, template) ->
     newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
+  'input .referenceDisplay': (event, template) ->
+    newReferenceDisplayStr.set(event.target.value)
   'submit form': (event, template) ->
     changeColumnSubmit(template)
     false # prevent refresh
@@ -295,8 +334,9 @@ Template.changeColumn.events
     orig = origFormulaStrForColumnId(@columnId)
     newFormulaStr.set(orig)
     template.codeMirror?.getDoc().setValue(orig)
-    newDisplayStr.set(newDisplayStr.initial.get())
-    template.find('input[name=display]')?.value = newDisplayStr.initial.get()
+    orig = origDisplayStrForColumnId(@columnId)
+    newDisplayStr.set(orig)
+    template.find('input[name=display]')?.value = orig
     false # prevent clear
   'click .create': (event, template) ->
     # Default formula to get the new column created ASAP.

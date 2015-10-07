@@ -63,21 +63,28 @@
     <table style="width: 100%">
       <tr>
       <td class="labelBox">
-        {{columnName}} :: <input name="type" value="{{columnSpecifiedType}}" placeholder="{{columnType}}">
+        {{columnName}}
+        {{#unless isObject}}
+        :: <input name="type" value="{{columnSpecifiedType}}" placeholder="{{columnType}}">
+        {{/unless}}
       </td>
-      {{#if formula}}
-      <th class="labelBox"><label for="changeFormula-formula">=</label></th>
-      <td>
-        <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%; position: relative;">
-          <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
-          {{#each newFormulaInfo.bands}}
-            <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
-                 style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
-          {{/each}}
-        </div>
-      </td>
+      {{#if isObject}}
+        <td colspan="2"></td>
       {{else}}
-      <td><button type="button" class="create">Create formula</button></td>
+        {{#if formula}}
+        <th class="labelBox"><label for="changeFormula-formula">=</label></th>
+        <td>
+          <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%; position: relative;">
+            <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
+            {{#each newFormulaInfo.bands}}
+              <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
+                   style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
+            {{/each}}
+          </div>
+        </td>
+        {{else}}
+        <td colspan="2"><button type="button" class="create">Create formula</button></td>
+        {{/if}}
       {{/if}}
       <td class="buttonBox">
         <input type="submit" value="Save"/>
@@ -85,11 +92,16 @@
       </td>
       </tr>
       <tr>
-        <!-- TODO: This should be consistent with the UI for column formulas,
-             but it's going to be redesigned anyway. -->
-        <td class="labelBox" colspan="3">Display
-          <input id="changeColumn-display" type="text" name="display" placeholder="(default)"
-                 class="display {{displayClass}}"/></td>
+        {{#if isObject}}
+          <td class="labelBox" colspan="3">Reference display format:
+            <input id="changeColumn-referenceDisplay" type="text" name="referenceDisplay" placeholder="@n"
+                   class="referenceDisplay {{referenceDisplayClass}}"/></td>
+        {{else}}
+          <!-- I'm not sold on this feature, but keeping it until it causes a problem. ~ Matt 2015-10-06 -->
+          <td class="labelBox" colspan="3">Display format:
+            <input id="changeColumn-display" type="text" name="display" placeholder="(default)"
+                   class="display {{displayClass}}"/></td>
+        {{/if}}
       </tr>
       {{#if newFormulaInfo.selectedBand}}
       <tr>

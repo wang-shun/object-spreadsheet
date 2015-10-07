@@ -59,9 +59,6 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
 #@objectName: string or null
 #@formula: some JSON data structure, or null for a state column
 
-@objectNameWithFallback = (col) ->
-  col.objectName ? (if col.fieldName? then "[#{col.fieldName}]" else null)
-
 @getColumn = (id) -> Columns.findOne(id)
 
 @columnIsState = (col) -> col._id != rootColumnId && !col.formula?
