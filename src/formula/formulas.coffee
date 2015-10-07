@@ -360,7 +360,8 @@ binaryOperationStringify = (symbol, precedence, associativity) ->
     outerPrecedence: precedence
 
 singletonInfixOperator = (symbol, precedence, associativity,
-                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn) ->
+                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
+  paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
     valExpectType("Left operand of '#{symbol}'", lhsType, lhsExpectedType)
@@ -370,7 +371,8 @@ singletonInfixOperator = (symbol, precedence, associativity,
     new TypedSet(resultType, set([evaluateFn(singleElement(lhs.set), singleElement(rhs.set))]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
-sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn) ->
+sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, paramNames) ->
+  paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
     valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
@@ -387,11 +389,14 @@ overloaded = (alternatives...) ->
   arities = (a[0].length for a in alternatives)
   minArity = Math.min(arities...)
   maxArity = Math.max(arities...)
+  if minArity != 2 || maxArity != 2
+    throw new Error("Please update overloaded.paramNames")
   getHandler = (argtypes) ->
     for [decltypes, handler] in alternatives
       if decltypes.length == argtypes.length && 
          forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) != TYPE_ERROR)
         return handler
+  paramNames: ['left', 'right']
   argAdapters: (EagerSubformula for i in [0...minArity]).concat(OptionalEagerSubformula for i in [minArity...maxArity])
   typecheck: (model, vars, argtypes...) ->
     handler = getHandler(argtypes)
@@ -491,6 +496,7 @@ dispatch = {
   # ["up", startCells, targetColumnId, wantValues (bool)]
   # Concrete syntax: foo, FooCell, (expression).foo, etc.
   up:
+    paramNames: ['start', null, null]
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
     validate: (vars, startCellsFmla, targetColumnId, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
@@ -508,6 +514,7 @@ dispatch = {
   # because it is reading from another column whose formula changed.
   # Concrete syntax: foo, FooCell, (expression).foo, ::Bar, etc.
   down:
+    paramNames: ['start', null, null]
     argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}]
     validate: (vars, startCellsFmla, targetColumnId, keysFmla, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
@@ -520,6 +527,7 @@ dispatch = {
   # Concrete syntax: if(condition, thenFmla, elseFmla)
   # (Can we think of a better concrete syntax?)
   if:
+    paramNames: ['condition', 'thenExpr', 'elseExpr']
     argAdapters: [EagerSubformula, LazySubformula, LazySubformula]
     typecheck: (model, vars, conditionType, thenType, elseType) ->
       type = mergeTypes(thenType, elseType)
@@ -534,6 +542,7 @@ dispatch = {
       outerPrecedence: PRECEDENCE_ATOMIC
 
   count:
+    paramNames: ['set']
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, domainType) -> 'number'
     evaluate: (model, vars, domainTset) ->
@@ -544,6 +553,7 @@ dispatch = {
       outerPrecedence: PRECEDENCE_ATOMIC
 
   oneOf:
+    paramNames: ['set']
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, domainType) -> domainType
     evaluate: (model, vars, domainTset) ->
@@ -563,6 +573,7 @@ dispatch = {
   # actually like to have both {x in foo | bar} and {x in foo, bar} or this is
   # confusing to users too.  Find a different compromise?
   filter:
+    paramNames: ['set', 'predicate']
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, predicateLambda) ->
       predicateType = predicateLambda(domainType)
@@ -595,6 +606,7 @@ dispatch = {
       }
 
   sum:
+    paramNames: ['domain', 'function']
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, addendLambda) ->
       addendLambda(domainType)
@@ -622,10 +634,11 @@ dispatch = {
   # Predicates on two sets of the same type.
   '=' : sameTypeSetsInfixPredicate('=' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, EJSON.equals)
   '!=': sameTypeSetsInfixPredicate('!=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> !EJSON.equals(x, y))
-  'in': sameTypeSetsInfixPredicate('in', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> y.hasAll(x))
+  'in': sameTypeSetsInfixPredicate('in', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, ((x, y) -> y.hasAll(x)), ['needle', 'haystack'])
 
   # Unary minus.
   'neg':
+    paramNames: ['expr']
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, argType) ->
       valExpectType("Operand of unary '-'", argType, 'number')
@@ -640,7 +653,7 @@ dispatch = {
   '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x -  y)
   '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x *  y)
   '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x /  y)
-  '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'number', 'number', 'number', Math.pow)
+  '^' : singletonInfixOperator('^' , PRECEDENCE_POW    , ASSOCIATIVITY_RIGHT,'number', 'number', 'number', Math.pow, ['base', 'exponent'])
   
   '<' : compareInfixOperator(  '<' , PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x <  y)
   '<=': compareInfixOperator(  '<=', PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) -> x <= y)
@@ -651,6 +664,7 @@ dispatch = {
   '&&': singletonInfixOperator('&&', PRECEDENCE_AND, ASSOCIATIVITY_LEFT, 'bool', 'bool', 'bool', (x, y) -> x && y)
   '||': singletonInfixOperator('||', PRECEDENCE_OR, ASSOCIATIVITY_LEFT, 'bool', 'bool', 'bool', (x, y) -> x || y)
   '!':
+    paramNames: ['condition']
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, argType) ->
       valExpectType("Operand of '!'", argType, 'bool')
@@ -664,6 +678,7 @@ dispatch = {
   # ["union", list of subformulas]
   # Union of a fixed number of sets.
   union:
+    paramNames: ['part']  # Will be expanded by getSubformulaTree
     argAdapters: [HomogeneousEagerSubformulaList]
     typecheck: (model, vars, termsType) -> termsType
     evaluate: (model, vars, terms) ->
@@ -901,10 +916,16 @@ stringifySubformula = (model, vars, formula) ->
   children = []
   for adapter, i in d.argAdapters
     if adapter.getSubformulas?
-      children.push(adapter.getSubformulas(args[i])...)
+      paramName = d.paramNames[i]
+      childNodes = (getSubformulaTree(f) for f in adapter.getSubformulas(args[i]))
+      children.push(
+        (if childNodes.length != 1  # union, others?
+          ({paramName: "paramName#{j+1}", node: n} for n, j in childNodes)
+        else
+          [{paramName: paramName, node: childNodes[0]}])...)
   {
     formula: formula
-    children: getSubformulaTree(f) for f in children
+    children: children
   }
 
 exported {FormulaEngine}

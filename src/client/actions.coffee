@@ -173,17 +173,22 @@ updateFormulaView = (template) ->
   root = getSubformulaTree(formula)
   bands = []
   layoutSubtree = (node) ->
+    # It looks silly to offer to debug a literal, though it's not harmful.  Open
+    # to counterarguments. ~ Matt
+    if node.formula[0] == 'lit'
+      node.height = -1
+      return
     node.ch1 = node.formula.loc.first_column
     node.ch2 = node.formula.loc.last_column
     node.height = 0
-    for child, i in node.children
+    for childInfo in node.children
       # loc missing for implicit "this" inserted by resolveNavigation; other cases?
-      if child.formula.loc?
-        layoutSubtree(child)
-        isNavigationLhs = (node.formula[0] in ['up', 'down'] && i == 0)
+      if childInfo.node.formula.loc?
+        layoutSubtree(childInfo.node)
+        isNavigationLhs = (node.formula[0] in ['up', 'down'] && childInfo.paramName == 'start')
         if isNavigationLhs
-          node.ch1 = child.ch2
-        node.height = Math.max(node.height, child.height + !isNavigationLhs)
+          node.ch1 = childInfo.node.ch2
+        node.height = Math.max(node.height, childInfo.node.height + !isNavigationLhs)
     top = 4 + template.codeMirror.defaultTextHeight() + 1 + NESTED_UNDERLINING_PX_PER_LEVEL * node.height
     # Tweak for gaps in navigation chains.
     x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left + 1
@@ -202,35 +207,50 @@ updateFormulaView = (template) ->
 class TracingView
   constructor: (domElement) ->
     @hot = new Handsontable(domElement, {})  # Needs a lot of work
-  show: (formula) ->
-    # TODO: Enforce outside-to-inside order ourselves rather than relying on it
-    # as a side effect of object iteration order and the way we typecheck
-    # formulas.
+  show: (node) ->
+    formula = node.formula
     formatOne = (val, type) ->
       fmtd = new ValueFormat().asText(val, null, type)
       # TODO: Lookup @ references from main table.
       # TODO (later): highlighting, jump to referent
       if fmtd instanceof CellReference then fmtd.display ? '@?' else fmtd
+    formatOutcome = (outcome) ->
+      if outcome.result?
+        if outcome.result.set.size() == 1
+          formatOne(outcome.result.elements()[0], outcome.result.type)
+        else
+          # TODO: Display in individual cells so we can support the
+          # referent-related features.  Or do we like this better?
+          # We could at least base the curly braces on
+          # type-checking-level singular-ness once we have it.
+          '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(',') + '}'
+      else outcome.error
+    # Exclude subformulas with additional bound variables, e.g., filter
+    # predicate.  Currently, the only way to debug them is to select them
+    # directly.  If we add support for a persistent set of test cases that are
+    # heterogeneous in the local variables they define, we can probably remove
+    # this restriction.
+    #
+    # Also throw out implicit "this" again. :/
+    childrenToShow = (childInfo for childInfo in node.children when (
+        childInfo.node.formula.loc? && EJSON.equals(childInfo.node.formula.vars, formula.vars)))
+    # TODO: Enforce outside-to-inside order ourselves rather than relying on it
+    # as a side effect of object iteration order and the way we typecheck
+    # formulas.
     varsAndTypesList = formula.vars.entries()
     grid = [(new ViewCell(name) for [name, _] in varsAndTypesList)]
+    grid[0].push((new ViewCell(childInfo.paramName) for childInfo in childrenToShow)...)
     grid[0].push(new ViewCell('Result'))
     for [varValues, outcome] in formula.traces.entries()
       line =
         for [name, _] in varsAndTypesList
           val = varValues.get(name).elements()[0]
           new ViewCell(formatOne(val, varValues.get(name).type))
-      resultShow =
-        if outcome.result?
-          if outcome.result.set.size() == 1
-            formatOne(outcome.result.elements()[0], outcome.result.type)
-          else
-            # TODO: Display in individual cells so we can support the
-            # referent-related features.  Or do we like this better?
-            # We could at least base the curly braces on
-            # type-checking-level singular-ness once we have it.
-            '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(',') + '}'
-        else outcome.error
-      line.push(new ViewCell(resultShow))
+      for childInfo in childrenToShow
+        childOutcome = childInfo.node.formula.traces.get(varValues)
+        # XXX Would we rather just evaluate cases that weren't originally reached?
+        line.push(new ViewCell(if childOutcome? then formatOutcome(childOutcome) else '(not reached)'))
+      line.push(new ViewCell(formatOutcome(outcome)))
       grid.push(line)
     data = ((cell.value for cell in row) for row in grid)
     @hot.loadData(data)
@@ -247,7 +267,7 @@ updateTracingView = (template) ->
     formulaInfo.haveTraced = true
   unless tracingView?
     tracingView = new TracingView(template.find('#TracingView'))
-  tracingView.show(formulaInfo.selectedBand.node.formula)
+  tracingView.show(formulaInfo.selectedBand.node)
 
 isExpanded = () ->
   newFormulaInfo.get()?.selectedBand?
