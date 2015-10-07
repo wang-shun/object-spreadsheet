@@ -206,7 +206,18 @@ updateFormulaView = (template) ->
 
 class TracingView
   constructor: (domElement) ->
-    @hot = new Handsontable(domElement, {})  # Needs a lot of work
+    # TODO: Add a bunch more settings?
+    @grid = []
+    @hot = new Handsontable(domElement, {
+      readOnly: true
+      readOnlyCellClassName: ''  # Not useful to dim everything.
+      cells: (row, col, prop) =>
+        cell = @grid[row]?[col]
+        if !cell then return {}  # Would like to understand why this is needed...
+        {
+          className: cell.cssClasses.join(' ')
+        }
+      })
   show: (node) ->
     formula = node.formula
     formatOne = (val, type) ->
@@ -238,9 +249,16 @@ class TracingView
     # as a side effect of object iteration order and the way we typecheck
     # formulas.
     varsAndTypesList = formula.vars.entries()
-    grid = [(new ViewCell(name) for [name, _] in varsAndTypesList)]
-    grid[0].push((new ViewCell(childInfo.paramName) for childInfo in childrenToShow)...)
-    grid[0].push(new ViewCell('Result'))
+    @grid = [[], []]
+    typeCell = (type) -> new ViewCell(stringifyTypeForSheet(type), 1, 1, ['rsHeader', markDisplayClassesForType(type)...])
+    for [name, type] in varsAndTypesList
+      @grid[0].push(new ViewCell(name, 1, 1, ['rsHeader']))
+      @grid[1].push(typeCell(type))
+    for childInfo in childrenToShow
+      @grid[0].push(new ViewCell(childInfo.paramName, 1, 1, ['rsHeader']))
+      @grid[1].push(typeCell(childInfo.node.formula.type))
+    @grid[0].push(new ViewCell('Result', 1, 1, ['rsHeader']))
+    @grid[1].push(typeCell(formula.type))
     for [varValues, outcome] in formula.traces.entries()
       line =
         for [name, _] in varsAndTypesList
@@ -251,8 +269,8 @@ class TracingView
         # XXX Would we rather just evaluate cases that weren't originally reached?
         line.push(new ViewCell(if childOutcome? then formatOutcome(childOutcome) else '(not reached)'))
       line.push(new ViewCell(formatOutcome(outcome)))
-      grid.push(line)
-    data = ((cell.value for cell in row) for row in grid)
+      @grid.push(line)
+    data = ((cell.value for cell in row) for row in @grid)
     @hot.loadData(data)
   destroy: () ->
     @hot.destroy()

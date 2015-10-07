@@ -22,6 +22,14 @@ class NotReadyError
 class @CellReference
   constructor: (@qCellId, @display) ->
 
+@stringifyTypeForSheet = (type) ->
+  if type == '_unit' then 'X'
+  else if typeIsPrimitive(type) then type
+  else Columns.findOne(type)?.objectName ? (""+type)[...4]
+
+@markDisplayClassesForType = (type) ->
+  if type == '_unit' then ['centered'] else []
+
 class ViewVlist
   constructor: (@parentCellId, @minHeight, @hlists, @error) ->
 
@@ -124,7 +132,7 @@ class ViewSection
     grid
 
   markDisplayClasses: ->
-    if @col.type == '_unit' then ['centered'] else []
+    markDisplayClassesForType(@col.type)
       
   valueDisplayClasses: ->
     if @subsections.length == 0 then ['leaf'] else []
@@ -207,10 +215,7 @@ class ViewSection
           myColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
-      typeName =
-        if @col.type == '_unit' then 'X'
-        else if typeIsPrimitive(@col.type) then @col.type
-        else Columns.findOne(@col.type)?.objectName ? (""+@col.type)[...4]
+      typeName = stringifyTypeForSheet(@col.type)
       # XXX: The value in the cell is not consistent with what we allow the user
       # to type in the cell!
       typeCell = new ViewCell(
