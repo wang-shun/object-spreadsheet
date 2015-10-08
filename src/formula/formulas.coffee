@@ -609,7 +609,9 @@ dispatch = {
     paramNames: ['domain', 'function']
     argAdapters: [EagerSubformula, Lambda]
     typecheck: (model, vars, domainType, addendLambda) ->
-      addendLambda(domainType)
+      addendType = addendLambda(domainType)
+      valExpectType("Element of 'sum'", addendType, 'number')
+      'number'
     evaluate: (model, vars, domainTset, addendLambda) ->
       res = 0
       for x in domainTset.elements()

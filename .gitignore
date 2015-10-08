@@ -1,3 +1,6 @@
 .DS_Store
 dump/meteor/ptc:*
 dump/meteor/system*
+*.coffee.js
+*.ls.js
+
