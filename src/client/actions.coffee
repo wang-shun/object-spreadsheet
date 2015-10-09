@@ -156,6 +156,8 @@ changeColumnInitFormulaBar = (template) ->
   updateFormulaView(template)
 
 updateFormulaView = (template) ->
+  tracingView?.destroy()
+  tracingView = null
   formulaStr = newFormulaStr.get()
   parentColumnId = getColumn(template.data.columnId).parent
   try
