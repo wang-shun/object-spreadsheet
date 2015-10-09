@@ -140,7 +140,7 @@ class Model
       if !col.formula?
         @invalidateSchemaCache()
         Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: col.fieldName, fieldName: null}})
-        childId = @defineColumn(columnId, 0, "*", col.specifiedType, false, null, null, {})
+        childId = @defineColumn(columnId, 0, "field1", col.specifiedType, false, null, null, {})
         Cells.find({column: columnId}).forEach (family) ->
           tokens = (Random.id() for value in family.values)
           Cells.update(family._id, {$set: {values: tokens}})
