@@ -69,6 +69,12 @@ will always match, just to get higher priority.
   */
   border-collapse: collapse;
 }
+.handsontable table.htCore {
+  /* Adding div.htContainer to the above selector results in incorrect column widths
+     (Handsontable uses a ghost element to compute the width). */
+  font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
+  font-size: 12px;
+}
 
 /*
 Deviations in the header from the Handsontable standard of each cell having a
@@ -132,11 +138,6 @@ right and a bottom border:
 
 .handsontable td.rsKeyedObject {
   border-right: 1px dashed #CCC;
-}
-
-.handsontable {
-  font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
-  font-size: 12px;
 }
 
 .handsontable td.rsHeader {

@@ -217,4 +217,4 @@ zip = () ->
 set = (x) -> new EJSONKeyedSet(x)
 T = -> new Tree(arguments...)
 
-exported {exported, set, Tree, T, Digraph, Memo, forall, exists, without, zip}
+exported {set, Tree, T, Digraph, Memo, forall, exists, without, zip}

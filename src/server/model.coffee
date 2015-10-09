@@ -448,8 +448,9 @@ Meteor.startup () ->
           # ./private/scripts/mkdump APPNAME
       @model.evaluateAll()
 
-  Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
-  tspace.run()
+  if Meteor.isServer
+    Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
+    tspace.run()
 
 
 Meteor.methods
