@@ -248,7 +248,8 @@ class TracingView
     # TODO: Enforce outside-to-inside order ourselves rather than relying on it
     # as a side effect of object iteration order and the way we typecheck
     # formulas.
-    varsAndTypesList = formula.vars.entries()
+    varsAndTypesList =
+      (e for e in formula.vars.entries() when e[1] != rootColumnId)
     @grid = [[], []]
     typeCell = (type) -> new ViewCell(stringifyTypeForSheet(type), 1, 1, ['rsHeader', markDisplayClassesForType(type)...])
     for [name, type] in varsAndTypesList
@@ -259,7 +260,10 @@ class TracingView
       @grid[1].push(typeCell(childInfo.node.formula.type))
     @grid[0].push(new ViewCell('Result', 1, 1, ['rsHeader']))
     @grid[1].push(typeCell(formula.type))
-    for [varValues, outcome] in formula.traces.entries()
+    # XXX It would be cleaner for traceColumnFormula to ensure "traces" was
+    # created at least as an empty list on all subformulas, but more work to
+    # implement.
+    for [varValues, outcome] in formula.traces?.entries()
       line =
         for [name, _] in varsAndTypesList
           val = varValues.get(name).elements()[0]

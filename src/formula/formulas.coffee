@@ -764,11 +764,14 @@ dispatchFormula = (action, formula, contextArgs...) ->
   # Find all cells in parent column
   parentColumnId = getColumn(columnId).parent
   parentColumnCellIds = []
-  # Here we really do want to ignore erroneous families in the parent column
-  # because there is nothing to trace for them.
-  for family in Cells.find({column: parentColumnId}).fetch() when family.values?
-    for v in family.values
-      parentColumnCellIds.push(cellIdChild(family.key, v))
+  if parentColumnId == rootColumnId
+    parentColumnCellIds.push(rootCellId)
+  else
+    # Here we really do want to ignore erroneous families in the parent column
+    # because there is nothing to trace for them.
+    for family in Cells.find({column: parentColumnId}).fetch() when family.values?
+      for v in family.values
+        parentColumnCellIds.push(cellIdChild(family.key, v))
   for cellId in parentColumnCellIds
     try
       vars = new EJSONKeyedMap(
