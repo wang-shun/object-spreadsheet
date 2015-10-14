@@ -763,18 +763,9 @@ dispatchFormula = (action, formula, contextArgs...) ->
     typecheckColumn: (columnId) -> getColumn(columnId).type
     isTracing: true
   }
-  # Find all cells in parent column
-  parentColumnId = getColumn(columnId).parent
-  parentColumnCellIds = []
-  if parentColumnId == rootColumnId
-    parentColumnCellIds.push(rootCellId)
-  else
-    # Here we really do want to ignore erroneous families in the parent column
-    # because there is nothing to trace for them.
-    for family in Cells.find({column: parentColumnId}).fetch() when family.values?
-      for v in family.values
-        parentColumnCellIds.push(cellIdChild(family.key, v))
-  for cellId in parentColumnCellIds
+  # Here we really do want to ignore erroneous families in the parent column
+  # because there is nothing to trace for them.
+  for cellId in allCellIdsInColumnIgnoreErrors(getColumn(columnId).parent)
     try
       vars = new EJSONKeyedMap(
         [['this', new TypedSet(parentColumnId, new EJSONKeyedSet([cellId]))]])

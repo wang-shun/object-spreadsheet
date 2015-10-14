@@ -122,7 +122,9 @@ class FamilyId
     
   read: -> Cells.findOne({column: @columnId, key: @cellId})
   
-  values: -> @read()?.values ? []  # note: ignores errorneous families  
+  # Ignores erroneous families.
+  # FIXME: Review all callers and implement error propagation where appropriate.
+  values: -> @read()?.values ? []
   
   type: -> Columns.find(@columnId).type
   
@@ -142,6 +144,15 @@ class FamilyId
         
 
 rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
+
+allCellIdsInColumnIgnoreErrors = (columnId) ->
+  if columnId == rootColumnId
+    return [rootCellId]
+  cellIds = []
+  for family in Cells.find({column: columnId}).fetch() when family.values?
+    for v in family.values
+      cellIds.push(cellIdChild(family.key, v))
+  return cellIds
 
 
 updateOne = (collection, selector, modifier, callback) ->
@@ -334,4 +345,4 @@ class Transaction
 
         
 
-exported {Tablespace, CellId, FamilyId, rootCell, Transaction, CellsInMemory}
+exported {Tablespace, CellId, FamilyId, rootCell, allCellIdsInColumnIgnoreErrors, Transaction, CellsInMemory}

@@ -342,6 +342,18 @@ class StateEdit
           if qCellId.columnId == type && coords.dataRow == wantRowNum
             return qCellId.cellId
         throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
+      else if getColumn(type).referenceDisplay?
+        # XXX: Don't match against error messages returned by ValueFormat.asText.
+        # Ignore errors: erroneous families are not candidates to match against.
+        matchingCells = (cellId for cellId in allCellIdsInColumnIgnoreErrors(type) when (
+            text == new ValueFormat().asText(cellId, null, type).display))
+        if matchingCells.length == 1
+          return matchingCells[0]
+        else if matchingCells.length > 1
+          throw new Error('The given reference display string matches ' + matchingCells.length + ' cells.  ' +
+                          'Fix the reference display strings to be unique or enter the @n notation instead.')
+        else
+          throw new Error('The given reference display string does not match any cells.')
       else
         throw new Error('Malformed cell reference.')
     else if type == '_unit'
