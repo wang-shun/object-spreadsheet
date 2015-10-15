@@ -22,6 +22,8 @@ class Tablespace extends ControlContext
     if Meteor.isClient
       # This is safe, and the client does not activate control contexts.
       @setupCollections()
+      # Better ideas where to put this?  On the server, it's done in model.coffee.
+      @formulaEngine = new FormulaEngine()
 
   setupCollections: () ->
     console.log "created Tablespace[#{@id}]"

@@ -75,7 +75,8 @@ class FormulaEngine
     @compiled = {}
 
   readFamily: (column, key) ->
-    # TODO move functionality from model.evaluateFamily here
+    # FIXME propagate errors
+    # TODO merge with readFamilyForFormula
     Cells.findOne({column, key})?.values || []
 
   calcLevelsUp: (sourceColId, targetColId) ->
