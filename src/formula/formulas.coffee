@@ -515,7 +515,7 @@ dispatch = {
   # because it is reading from another column whose formula changed.
   # Concrete syntax: foo, FooCell, (expression).foo, ::Bar, etc.
   down:
-    paramNames: ['start', null, null]
+    paramNames: ['start', null, 'keys', null]
     argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}]
     validate: (vars, startCellsFmla, targetColumnId, keysFmla, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
