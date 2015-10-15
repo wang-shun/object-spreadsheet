@@ -765,7 +765,8 @@ dispatchFormula = (action, formula, contextArgs...) ->
   }
   # Here we really do want to ignore erroneous families in the parent column
   # because there is nothing to trace for them.
-  for cellId in allCellIdsInColumnIgnoreErrors(getColumn(columnId).parent)
+  parentColumnId = getColumn(columnId).parent
+  for cellId in allCellIdsInColumnIgnoreErrors(parentColumnId)
     try
       vars = new EJSONKeyedMap(
         [['this', new TypedSet(parentColumnId, new EJSONKeyedSet([cellId]))]])
