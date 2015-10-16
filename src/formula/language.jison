@@ -69,6 +69,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 "set" return 'SET'
 "sum" return 'SUM'
 "to" return 'TO'
+"toText" return 'TOTEXT'
 
 /* Identifiers */
 /* XXX: Allow non-Latin word characters? */
@@ -295,6 +296,8 @@ expression1
         { $$ = ['count', $3]; }
     | ONEOF '(' expression ')'
         { $$ = ['oneOf', $3]; }
+    | TOTEXT '(' expression ')'
+        { $$ = ['toText', $3]; }
     | IF '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
     | '!' expression

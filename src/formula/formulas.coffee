@@ -384,41 +384,42 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, par
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 # Usage:
-#   overloaded([[argument-types...], handler],
+#   overloaded(paramNames,
+#              [[argument-types...], handler],
 #              [[argument-types...], handler], ...)
-overloaded = (alternatives...) ->
+overloaded = (paramNames, alternatives...) ->
   arities = (a[0].length for a in alternatives)
   minArity = Math.min(arities...)
   maxArity = Math.max(arities...)
-  if minArity != 2 || maxArity != 2
-    throw new Error("Please update overloaded.paramNames")
   getHandler = (argtypes) ->
     for [decltypes, handler] in alternatives
       if decltypes.length == argtypes.length && 
          forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) != TYPE_ERROR)
         return handler
-  paramNames: ['left', 'right']
-  argAdapters: (EagerSubformula for i in [0...minArity]).concat(OptionalEagerSubformula for i in [minArity...maxArity])
-  typecheck: (model, vars, argtypes...) ->
-    handler = getHandler(argtypes)
-    valAssert(handler?, "No valid alternative for argument types #{argtypes}")
-    handler.typecheck(model, vars, argtypes...)
-  evaluate: (model, vars, args...) ->      
-    argtypes = (ts.type for ts in args)
-    handler = getHandler(argtypes)
-    valAssert(handler?, "No valid alternative for argument types #{argtypes}")
-    handler.evaluate(model, vars, args...)
-  stringify: (model, vars, sinfos...) ->
-    # Does it even make sense to have different stringifies for different alternatives?
-    [_, handler] = alternatives[0]
-    handler.stringify(model, vars, sinfos...)
-      
+  {
+    paramNames: paramNames
+    argAdapters: (EagerSubformula for i in [0...minArity]).concat(OptionalEagerSubformula for i in [minArity...maxArity])
+    typecheck: (model, vars, argtypes...) ->
+      handler = getHandler(argtypes)
+      valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+      handler.typecheck(model, vars, argtypes...)
+    evaluate: (model, vars, args...) ->
+      argtypes = (ts.type for ts in args)
+      handler = getHandler(argtypes)
+      valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+      handler.evaluate(model, vars, args...)
+    stringify: (model, vars, sinfos...) ->
+      # Does it even make sense to have different stringifies for different alternatives?
+      [_, handler] = alternatives[0]
+      handler.stringify(model, vars, sinfos...)
+  }
+
 compareInfixOperator = (symbol, precedence, associativity, evaluateFn) ->
   overloaded(
+        ['left', 'right'],
         [['number', 'number'], singletonInfixOperator(symbol, precedence, associativity, 'number', 'number', 'bool', evaluateFn)],
         [['date', 'date'],     singletonInfixOperator(symbol, precedence, associativity, 'date',   'date',   'bool', evaluateFn)]
   )
-
 
 dispatch = {
 
@@ -652,7 +653,11 @@ dispatch = {
       str: "-#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG
 
-  '+' : singletonInfixOperator('+' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x +  y)
+  '+' : overloaded(
+    ['left', 'right'],
+    [['number', 'number'], singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x + y)],
+    [['text', 'text'],     singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'text'  , 'text'  , 'text'  , (x, y) -> x + y)]
+  )
   '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x -  y)
   '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x *  y)
   '/' : singletonInfixOperator('/' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x /  y)
@@ -693,6 +698,35 @@ dispatch = {
       str: '{' + (termSinfo.strFor(PRECEDENCE_LOWEST) for termSinfo in termSinfos).join(', ') + '}'
       outerPrecedence: PRECEDENCE_ATOMIC
 
+  toText:
+    paramNames: ['expr']
+    argAdapters: [EagerSubformula]
+    typecheck: (model, vars, argType) -> 'text'
+    evaluate: (model, vars, arg) ->
+      type = arg.type
+      elements = arg.elements()
+      formatOne = (value) ->
+        # XXX Code duplication with ValueFormat.asText
+        if !typeIsPrimitive(type)
+          # It would be nice to use the reference display formula here, but I
+          # don't want to do that until it's properly integrated into the
+          # computational model.  For now, users can basically inline the
+          # reference display formula. :/ ~ Matt
+          '<reference>'
+        else if typeof value == 'string' then value
+        else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
+        # Reasonable fallback
+        else JSON.stringify(value)
+      # XXX Code duplication with TracingView.show
+      text =
+        if elements.length == 1
+          formatOne(elements[0])
+        else
+          '{' + (formatOne(e) for e in elements).join(',') + '}'
+      new TypedSet('text', set([text]))
+    stringify: (model, vars, argSinfo) ->
+      str: "toText(#{argSinfo.strFor(PRECEDENCE_LOWEST)})"
+      outerPrecedence: PRECEDENCE_ATOMIC
 }
 
 # Catches syntax errors, references to nonexistent bound variables, and
