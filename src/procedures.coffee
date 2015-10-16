@@ -133,7 +133,7 @@ mergeTypeMaps = (vars1, vars2) ->
   bodyString = (count1Checks + bodyString +
                 if /\n$/.test(bodyString) then '' else '\n')
 
-  parser = setupParserCommon('PROCEDURE', params)
+  parser = setupParserCommon('ENTRY_PROCEDURE', params)
   # More stuff for scoping and flow sensitivity...
   parser.yy.varsStack = []
   parser.yy.varsPreviousBranch = null

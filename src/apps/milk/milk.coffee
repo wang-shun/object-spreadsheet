@@ -8,7 +8,7 @@ if Meteor.isClient
 
   Template.MilkMaid.helpers
     milk: -> Relsheets.read()
-    label: -> @['*']
+    label: -> @['name']
     isNext: -> @isNext[0]
     sameAs: (o) -> EJSON.equals(@qCellId, o[0]?.qCellId)
     stringify: (a) -> JSON.stringify(a)
@@ -25,7 +25,7 @@ if Meteor.isServer
   Relsheets.procedures 'milk',
     supply:
       params: [['me', 'Cycle']]
-      body: '''$Gauge.reading := {l: $Gauge.Level | l.`*` = "Full"}
+      body: '''$Gauge.reading := {l: $Gauge.Level | l.name = "Full"}
                me.quota := me.quota - 2
                if (me.quota <= 0) {
                  me.lastTime := d"now" 

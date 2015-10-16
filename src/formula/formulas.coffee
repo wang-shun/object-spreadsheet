@@ -186,7 +186,7 @@ Lambda = {
     (argType) ->
       newVars = vars.shallowClone()
       newVars.set(varName, argType)
-      [varName, stringifySubformula(model, newVars, body)]
+      [stringifyIdent(varName), stringifySubformula(model, newVars, body)]
   getSubformulas: ([varName, body]) -> [body]
 }
 ColumnId = {
@@ -283,11 +283,11 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
       actualFmla = resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla)
       valAssert(EJSON.equals(actualFmla, expectedFmla),
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
-      targetName
+      stringifyIdent(targetName)
     catch e
       # Notice: this happens regularly in the client when column
       # type information is wiped
-      targetName + '(problem)'
+      stringifyIdent(targetName) + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
   column = getColumn(targetColumnId)
@@ -880,7 +880,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   # interpreted will become invalid.  This behavior is weird but not worth
   # fixing now.
 
-  parser = setupParserCommon('FORMULA', new EJSONKeyedMap([['this', thisType]]))
+  parser = setupParserCommon('ENTRY_FORMULA', new EJSONKeyedMap([['this', thisType]]))
 
   try
     return parser.parse(fmlaString)
@@ -889,6 +889,19 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
       throw new FormulaValidationError(e.message)
     else
       throw e
+
+stringifyIdent = (ident) ->
+  for str in [ident, "`#{ident}`"]
+    parser = new Jison.Parsers.language.Parser()
+    parser.yy.startToken = 'ENTRY_IDENT'
+    try
+      if parser.parse(str) == ident
+        return str
+    catch e
+      # fall through
+  # Currently I think this only happens if the identifier contains `, but it's
+  # nice for the code to be future-proof. ~ Matt 2015-10-16
+  throw new FormulaValidationError("Cannot stringify identifier #{ident}")
 
 stringifySubformula = (model, vars, formula) ->
   res = dispatchFormula('stringify', formula, model, vars)

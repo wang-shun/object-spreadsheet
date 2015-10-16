@@ -73,6 +73,9 @@ keeping similar operators together. ~ Matt 2015-03-11
 /* Identifiers */
 /* XXX: Allow non-Latin word characters? */
 [_A-Za-z][_A-Za-z0-9]* return 'IDENT'
+
+/* Syntax for non-word identifiers.  Note, 'this' is a reserved _identifier_ and
+   cannot be escaped with this syntax. */
 [`][^`]*[`] yytext = yytext.substr(1,yyleng-2); return 'IDENT'
 
 <<EOF>> return 'EOF'
@@ -129,9 +132,12 @@ Surprisingly, "return" is the recommended way to get a result out of Jison:
 http://librelist.com/browser//jison/2013/8/14/return-value-from-parse/#7dbd17a9671580afa948da054e97bfa6
 */
 entryPointEOF
-    : 'FORMULA' expression EOF
+    : 'ENTRY_FORMULA' expression EOF
         { return $2; }
-    | 'PROCEDURE' statements EOF
+    | 'ENTRY_PROCEDURE' statements EOF
+        { return $2; }
+    /* For stringify to test whether it needs to use `` notation. */
+    | 'ENTRY_IDENT' IDENT EOF
         { return $2; }
     ;
 
