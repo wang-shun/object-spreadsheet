@@ -41,4 +41,11 @@ if Meteor.isServer
                let m = new $Message
                m.`to` := {c: $Cycle | c.isNext}
                m.subject := "Milk Level Alert" '''
-      
+
+    # We can change the semantics of the button request here as desired.
+    dashButtonRequest:
+      params: []
+      body: '''$Gauge.reading := {l: $Gauge.Level | l.name = "Empty"}
+               let m = new $Message
+               m.`to` := {c: $Cycle | c.isNext}
+               m.subject := "Milk Level Alert" '''
