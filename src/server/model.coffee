@@ -436,6 +436,24 @@ class Model
       else
         throw e
 
+# Used by procedures and the UI.
+# Keeping this parallel with the other ways the UI modifies data, which don't go
+# through the model or call invalidateDataCache.  XXX: Fix this (lack of) API.
+@recursiveDeleteStateCellNoInvalidate = (columnId, cellId) ->
+  col = getColumn(columnId)
+  for childColId in col.children
+    childCol = getColumn(childColId)
+    unless childCol.formula?
+      # Empty families are only inserted during evaluateAll, so they may not yet
+      # exist for objects created in the same transaction.
+      if (ce = Cells.findOne({column: childColId, key: cellId}))?
+        for val in ce.values
+          # The Cells.update in here is subsumed by the Cells.remove below.  Oh well.
+          recursiveDeleteStateCellNoInvalidate(childColId, cellIdChild(cellId, val))
+        Cells.remove({column: childColId, key: cellId})
+  Cells.update({column: columnId, key: cellIdParent(cellId)},
+               {$pull: {values: cellIdLastStep(cellId)}})
+
 Meteor.startup () ->
   Tablespace.onCreate ->
     @do ->
@@ -498,6 +516,9 @@ Meteor.methods
       @model.deleteColumn(columnId)
       View.removeColumnFromAll(columnId)
       @model.evaluateAll()
+  recursiveDeleteStateCellNoInvalidate: (cc, columnId, cellId) ->
+    cc.run ->
+      recursiveDeleteStateCellNoInvalidate(columnId, cellId)
   notify: (cc) ->
     cc.run ->
       @model.invalidateDataCache()

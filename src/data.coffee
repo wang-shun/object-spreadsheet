@@ -142,8 +142,11 @@ class FamilyId
     @child(value)
     
   remove: (value, callback=->) ->
-    updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
-        
+    # Why was updateOne needed? ~ Matt 2015-10-19
+    #updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
+    Meteor.call('recursiveDeleteStateCellNoInvalidate', $$,
+                @columnId, cellIdChild(@cellId, value), callback)
+
 
 rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
 

@@ -13,19 +13,6 @@ EagerFamilyRef = {
     keysTset: arg[2]
 }
 
-recursiveDeleteStateCell = (columnId, cellId) ->
-  col = getColumn(columnId)
-  for childColId in col.children
-    childCol = getColumn(childColId)
-    unless childCol.formula?
-      # Empty families are only inserted during evaluateAll, so they may not yet
-      # exist for objects created in the same transaction.
-      if (ce = Cells.findOne({column: childColId, key: cellId}))?
-        for val in ce.values
-          recursiveDeleteStateCell(childColId, cellIdChild(cellId, val))
-  Cells.update({column: columnId, key: cellIdParent(cellId)},
-               {$pull: {values: cellIdLastStep(cellId)}})
-
 dispatch = {
   let:
     argAdapters: [VarName, EagerSubformula]
@@ -75,7 +62,7 @@ dispatch = {
       # functionality is poorly tested since we introduced typechecking.
       model.invalidateDataCache()
       for objectId in objectsTset.elements()
-        recursiveDeleteStateCell(objectsTset.type, objectId)
+        recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId)
   new:
     argAdapters: [OptionalVarName, EagerFamilyRef]
     execute: (model, mutableVars, bindVarName, fref) ->
