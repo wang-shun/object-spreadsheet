@@ -283,11 +283,11 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
       actualFmla = resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla)
       valAssert(EJSON.equals(actualFmla, expectedFmla),
                 'Interpreting the concrete formula did not reproduce the existing abstract formula.')
-      stringifyIdent(targetName)
+      stringifyNavigationStep(targetName)
     catch e
       # Notice: this happens regularly in the client when column
       # type information is wiped
-      stringifyIdent(targetName) + '(problem)'
+      stringifyNavigationStep(targetName) + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
   column = getColumn(targetColumnId)
@@ -924,10 +924,10 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
     else
       throw e
 
-stringifyIdent = (ident) ->
+stringifyIdentCommon = (entryPoint, ident) ->
   for str in [ident, "`#{ident}`"]
     parser = new Jison.Parsers.language.Parser()
-    parser.yy.startToken = 'ENTRY_IDENT'
+    parser.yy.startToken = entryPoint
     try
       if parser.parse(str) == ident
         return str
@@ -936,6 +936,14 @@ stringifyIdent = (ident) ->
   # Currently I think this only happens if the identifier contains `, but it's
   # nice for the code to be future-proof. ~ Matt 2015-10-16
   throw new FormulaValidationError("Cannot stringify identifier #{ident}")
+
+# Special version that won't unnecessarily backquote the [key] fallback object
+# name syntax.
+stringifyNavigationStep = (ident) ->
+  stringifyIdentCommon('ENTRY_NAVIGATION_STEP', ident)
+
+stringifyIdent = (ident) ->
+  stringifyIdentCommon('ENTRY_IDENT', ident)
 
 stringifySubformula = (model, vars, formula) ->
   res = dispatchFormula('stringify', formula, model, vars)

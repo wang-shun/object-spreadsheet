@@ -140,6 +140,8 @@ entryPointEOF
     /* For stringify to test whether it needs to use `` notation. */
     | 'ENTRY_IDENT' IDENT EOF
         { return $2; }
+    | 'ENTRY_NAVIGATION_STEP' navigationStep EOF
+        { return $2; }
     ;
 
 statements
