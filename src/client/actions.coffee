@@ -107,7 +107,7 @@ Template.changeColumn.helpers
       else if c.parent then objectNameWithFallback(getColumn(c.parent))
       else ''
     prefix = if objName? then "#{objName}:" else ""
-    prefix + ((if @isObject then c.objectName else c.fieldName) ? '<unnamed>')
+    prefix + ((if @isObject then objectNameWithFallback(c) else c.fieldName) ? '<unnamed>')
   columnType: ->
     c = getColumn(@columnId)
     if c?.type then stringifyType(c.type) else ''
