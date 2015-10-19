@@ -9,7 +9,9 @@ class Model
   #@columns: EJSONKeyedMap<ColumnId, Column>
 
   constructor: ->
-    @settings = {compiler: true, profiling: 0}
+    # Compiler produced incorrect results on SiteTotals.site on the cost sheet.
+    # ~ Matt 2015-10-19
+    @settings = {compiler: false, profiling: 0}
     @columnCache = {}
     
     # Special case: create root column if missing.
