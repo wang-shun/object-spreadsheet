@@ -497,8 +497,8 @@ Meteor.startup () ->
       appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
       if @model.wasEmpty
         if appName == 'ptc' then loadPTCData(@model)
-        else if appName in ['005q', 'beta', 'milk']
-          loadDump(@model, appName)
+        else
+          loadDumpIfExists(@model, appName)
           # TO MAKE A DUMP:
           # ./private/scripts/mkdump APPNAME
       @model.evaluateAll()

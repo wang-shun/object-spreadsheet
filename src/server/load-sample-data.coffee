@@ -369,10 +369,15 @@
 
 
 
-@loadDump = (model, appName) ->
+@loadDumpIfExists = (model, appName) ->
   try
     for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells']]
-      docs = EJSON.parse(Assets.getText("dump/#{appName}:#{collName}.json"))
+      try
+        dump = Assets.getText("dump/#{appName}:#{collName}.json")
+      catch e
+        # Assume there's no dump to load for this appName.  XXX: Be stricter?
+        return
+      docs = EJSON.parse(dump)
       for doc in docs
         coll.upsert(doc._id, doc)  # upsert needed to overwrite root column
     model.invalidateSchemaCache()
