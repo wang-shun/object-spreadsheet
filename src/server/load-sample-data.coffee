@@ -373,7 +373,7 @@
   try
     for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells']]
       try
-        dump = Assets.getText("dump/#{appName}:#{collName}.json")
+        dump = Assets.getText("dump/#{appName}_#{collName}.json")
       catch e
         # Assume there's no dump to load for this appName.  XXX: Be stricter?
         return
