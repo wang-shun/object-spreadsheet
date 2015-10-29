@@ -443,7 +443,6 @@ class ClientView
       # Show type row in header
       showTypes: false
       # Show '+' button to open hierarchical header
-      # (hierarchical header doesn't render well with sepcols = false)
       headerExpandable: true
       # 'boring' for grey, 'rainbow' for dazzling colors
       palette: 'alternating'
@@ -504,7 +503,7 @@ class ClientView
       gridCaption.pop()
       headerHeight = headerHeight - 1
     gridVertExtend(gridCaption,
-                   ([new ViewCell(i+1, 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
+                   ([new ViewCell("@#{i+1}", 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
     gridHorizExtend(gridCaption, grid)
     grid = gridCaption
 
