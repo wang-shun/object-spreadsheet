@@ -52,29 +52,38 @@ class ViewSection
     @width = (@col.type != '_token') + !!@col.isObject
     @leftEdgeSingular = true
     @rightEdgeSingular = true
-    # field index -> bool (have a separator column before this field)
-    @haveSeparatorColBefore = []
+    # field index -> string or null (class of extra column before this field)
+    @extraColClassBefore = []
     @subsections = []
     # @headerMinHeight refers to the expanded header.
     @headerMinHeight = !!@col.isObject + 2  # fieldName, type
+    amRootWithSeparateTables =
+      options.separateTables && @columnId == rootColumnId
     for sublayout, i in @layoutTree.subtrees
       subsection = new ViewSection(sublayout, @valueFormat, @options)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
-      # TODO removed inner sep for now. Replaced with dashed lines
-      haveSep =
-        if @options.sepcols
-          (!@rightEdgeSingular && !nextLeftEdgeSingular)
-        else (@col._id == rootColumnId && i > 0)
-      @haveSeparatorColBefore.push(haveSep)
-      if haveSep
+      extraColClass =
+        if @options.separateTables && @col._id == rootColumnId && i > 0
+          'tableSeparator'
+        else if @options.sepcols && !@rightEdgeSingular && !nextLeftEdgeSingular
+          'separator'
+        else
+          null
+      @extraColClassBefore.push(extraColClass)
+      if extraColClass?
         @width++
       @width += subsection.width
-      @headerMinHeight = Math.max(@headerMinHeight, 1 + subsection.headerMinHeight)
+      @headerMinHeight = Math.max(
+        @headerMinHeight, !amRootWithSeparateTables + subsection.headerMinHeight)
       @rightEdgeSingular =
         subsection.relationSingular && subsection.rightEdgeSingular
-    @headerHeightBelow = @headerMinHeight - 1
+    # Hack to get the separate tables to pad up to the top so the root doesn't
+    # add its own padding.
+    if amRootWithSeparateTables
+      for subsection in @subsections
+        subsection.headerMinHeight = @headerMinHeight
 
   prerenderVlist: (parentCellId) ->
     ce = Cells.findOne({column: @columnId, key: parentCellId})
@@ -171,7 +180,7 @@ class ViewSection
       gridHorizExtend(grid, gridValue)
     # Subsections
     for subsection, i in @subsections
-      if @haveSeparatorColBefore[i]
+      if @extraColClassBefore[i]?
         gridHorizExtend(grid, gridMergedCell(height, 1))
       subsectionGrid = subsection.renderVlist(hlist.vlists[i], height)
       gridHorizExtend(grid, subsectionGrid)
@@ -239,6 +248,8 @@ class ViewSection
 
     height = if expanded then @headerMinHeight else 3
     currentHeight = 2
+    # "Corner" here is the upper left corner cell, which actually spans all the
+    # way across in some cases (indicated by isFinal).
     makeCorner = (isFinal) =>
       classes = ['rsHeaderCorner']
       unless isFinal
@@ -254,9 +265,12 @@ class ViewSection
       currentHeight = height
 
     for subsection, i in @subsections
-      if @haveSeparatorColBefore[i]
-        gridSeparator = gridMergedCell(currentHeight, 1, '', [myColorClass])
-        gridHorizExtend(grid, gridSeparator)
+      if @extraColClassBefore[i]?
+        cssClasses = [@extraColClassBefore[i]]
+        unless @extraColClassBefore[i] == 'tableSeparator'
+          cssClasses.push(myColorClass)
+        gridExtraCol = gridMergedCell(currentHeight, 1, '', cssClasses)
+        gridHorizExtend(grid, gridExtraCol)
       if currentHeight == 2 && subsection.headerMinHeight > 2
         makeCorner(false)
       subsectionGrid = subsection.renderHeader(expanded, depth+1)
@@ -275,7 +289,11 @@ class ViewSection
       makeCorner(true)
     grid
 
-  colorIndexForDepth: (depth) -> depth % 6
+  colorIndexForDepth: (depth) ->
+    switch @options.palette
+      when 'rainbow' then depth % 6
+      when 'alternating' then depth % 2
+      else 0
 
 
 # Used also by tracing table in actions.coffee
@@ -426,12 +444,14 @@ class ClientView
       showTypes: false
       # Show '+' button to open hierarchical header
       # (hierarchical header doesn't render well with sepcols = false)
-      headerExpandable: false
+      headerExpandable: true
       # 'boring' for grey, 'rainbow' for dazzling colors
-      palette: 'boring'
-      # true: between every pair of adjacent incomparable columns (classic)
-      # false: just make children of the root look like separate tables
+      palette: 'alternating'
+      # Separator column between every pair of adjacent incomparable columns
+      # (except ones that are in separate tables when separateTables is on).
       sepcols: false
+      # Show children of the root as separate tables.
+      separateTables: true
     @valueFormat = new ValueFormat
     @hot = null
 
@@ -503,9 +523,16 @@ class ClientView
 
     @grid = grid
 
-    separatorColumns = (i for cell,i in grid[headerHeight - 1] when i != 0 && !cell.columnId)
-    @separatorColumns = separatorColumns
-    SEPCOL_WIDTH = if @options.sepcols then 10 else 20
+    @colClasses =
+      for col in [0...grid[0].length]
+        colCls = null
+        for row in [0...grid.length]
+          for cls in grid[row][col].cssClasses
+            if cls in ['rsCaption', 'separator', 'tableSeparator']
+              # assert (!colCls? || colCls == cls)
+              colCls = cls
+        colCls
+    console.log(@colClasses)
 
     d = {
       data: ((cell.display || cell.value for cell in row) for row in grid)
@@ -514,8 +541,12 @@ class ClientView
       # need it.  We may also want to fix the header for large data sets.
       fixedColumnsLeft: 1
       # Separator columns are 8 pixels wide.  Others use default width.
-      colWidths: (for i in [0...@grid[0].length]  # no way grid can be empty
-                    if i in separatorColumns then SEPCOL_WIDTH else undefined)
+      colWidths:
+        for i in [0...@grid[0].length]  # no way grid can be empty
+          switch @colClasses[i]
+            when 'tableSeparator' then 20
+            when 'separator' then 10
+            else undefined
       rowHeights:
         # Specify all the row heights (23 pixels is the Handsontable default),
         # otherwise the fixed clone of the left column sometimes reduced the
@@ -530,8 +561,9 @@ class ClientView
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
         adjcol = col+cell.colspan
-        classes = if col in @separatorColumns then ['separator'] else
-                  if adjcol in @separatorColumns then ['incomparable'] else []
+        classes = if @colClasses[col] == 'tableSeparator' then ['tableSeparator'] else
+                  if @colClasses[col] == 'separator' then ['separator'] else
+                  if @colClasses[adjcol] == 'separator' then ['incomparable'] else []
         if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
         ancestors = if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
@@ -712,8 +744,6 @@ class ClientView
   hotCreate: (domElement) ->
     @hot = new Handsontable(domElement, @hotConfig())
     $(domElement).addClass("pal-#{@options.palette}")
-    if @options.sepcols
-      $(domElement).addClass("sepcols-on")
     if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
