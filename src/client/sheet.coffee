@@ -422,9 +422,15 @@ class ClientView
 
   constructor: (@view) ->
     @options =
-      showTypes: false         # Show type row in header
-      headerExpandable: false  # Show '+' button on top left corner
-      palette: 'boring'        # 'boring' for grey, 'rainbow' for dazzling colors
+      # Show type row in header
+      showTypes: false
+      # Show '+' button to open hierarchical header
+      # (hierarchical header doesn't render well with sepcols = false)
+      headerExpandable: false
+      # 'boring' for grey, 'rainbow' for dazzling colors
+      palette: 'boring'
+      # true: between every pair of adjacent incomparable columns (classic)
+      # false: just make children of the root look like separate tables
       sepcols: false
     @valueFormat = new ValueFormat
     @hot = null
@@ -499,7 +505,7 @@ class ClientView
 
     separatorColumns = (i for cell,i in grid[headerHeight - 1] when i != 0 && !cell.columnId)
     @separatorColumns = separatorColumns
-    SEPCOL_WIDTH = 20
+    SEPCOL_WIDTH = if @options.sepcols then 10 else 20
 
     d = {
       data: ((cell.display || cell.value for cell in row) for row in grid)

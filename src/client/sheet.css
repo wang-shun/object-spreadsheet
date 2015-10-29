@@ -15,15 +15,11 @@ body {
 }
 
 @media screen {
-.separator {
+.handsontable.sepcols-on .separator:not(.rsHeader),
+.handsontable:not(.sepcols-on) .separator {
   background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
 }
-}
-
-.separator:not(.rsHeader) {
-  border-top: none !important;
-  border-bottom: none !important;
 }
 
 .handsontable:not(.sepcols-on) .separator {
@@ -31,11 +27,7 @@ body {
   border-bottom: none !important;
 }
 
-.handsontable.sepcols-on .separator.rsHeader { 
-  border-top: 1px solid #CCC;
-}
-
-.handsontable.sepcols-on div.htContainer td.incomparable {
+.handsontable.sepcols-on div.htContainer td.incomparable:not(.rsHeader) {
   /*
   Work around https://bugzilla.mozilla.org/show_bug.cgi?id=332740 in Firefox.
   Unfortunately, this takes a one-pixel bite out of some of the other borders.
@@ -94,7 +86,6 @@ right and a bottom border:
 }
 
 .handsontable td.rsHeaderFieldNameKey {
-  /*border-top: 1px dashed #CCC;*/
   border-top: 1px solid #CCC;
 }
 
@@ -112,12 +103,14 @@ right and a bottom border:
   (i.e., corner, leaf, and object) draw a left border.
 */
 
-.handsontable td.rsHeaderNonfinal,
-.handsontable td.rsHeader.separator {
-  /*border-right: none;*/
-  background-color: transparent;
+.handsontable.sepcols-on td.rsHeaderNonfinal,
+.handsontable.sepcols-on td.rsHeader.separator {
+  border-right: none;
 }
 
+.handsontable:not(.sepcols-on) td.rsHeader.separator {
+  background-color: transparent;
+}
 
 .handsontable td.rsHeader.rsHeaderCorner,
 .handsontable td.rsHeaderFieldNameLeaf,
@@ -131,7 +124,11 @@ right and a bottom border:
 
 .handsontable td.rsHeaderFieldNameKeyedObject,
 .handsontable td.rsHeaderTypeKeyedObject {
-  border-right: 1px solid rgba(204,204,204,0.4);
+  /* Let's be consistent with ".handsontable td.rsKeyedObject".  Change both if
+     you really think this is better (it's hard for me to distinguish).
+     ~ Matt 2015-10-29 */
+  /*border-right: 1px solid rgba(204,204,204,0.4);*/
+  border-right: 1px dashed #CCC;
 }
 
 /* Dotted border between object and key cells in body. */
@@ -145,27 +142,27 @@ right and a bottom border:
 }
 
 .handsontable.pal-rainbow td.rsHeaderColor0:not(.area),
-.rsColor0 {
+.handsontable.pal-rainbow .rsColor0 {
   background-color: #FAA;
 }
 .handsontable.pal-rainbow td.rsHeaderColor1:not(.area),
-.rsColor1 {
+.handsontable.pal-rainbow .rsColor1 {
   background-color: #FFA;
 }
 .handsontable.pal-rainbow td.rsHeaderColor2:not(.area),
-.rsColor2 {
+.handsontable.pal-rainbow .rsColor2 {
   background-color: #AFA;
 }
 .handsontable.pal-rainbow td.rsHeaderColor3:not(.area),
-.rsColor3 {
+.handsontable.pal-rainbow .rsColor3 {
   background-color: #AFF;
 }
 .handsontable.pal-rainbow td.rsHeaderColor4:not(.area),
-.rsColor4 {
+.handsontable.pal-rainbow .rsColor4 {
   background-color: #AAF;
 }
 .handsontable.pal-rainbow td.rsHeaderColor5:not(.area),
-.rsColor5 {
+.handsontable.pal-rainbow .rsColor5 {
   background-color: #FAF;
 }
 .handsontable.pal-rainbow td.rsCaption:not(.area) {
@@ -251,10 +248,12 @@ right and a bottom border:
 
 #ActionBar label { color: #006; }
 
+/* Looks unused ~ Matt 2015-10-29
 .hint {
   font-size: smaller;
   color: rgba(0,0,0,0.8);
 }
+*/
 
 .labelBox {
   white-space: nowrap;
