@@ -933,7 +933,7 @@ Template.Spreadsheet.rendered = ->
 
 Template.Spreadsheet.helpers({
   # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
-  actionBarClass: -> if ActionBar.isExpanded() then 'expanded' else ''
+  actionBarClass: -> if ActionBar.isExpanded() then 'actionBarExpanded' else ''
 })
 
 

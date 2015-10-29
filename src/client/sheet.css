@@ -7,7 +7,13 @@ body {
   box-sizing: border-box;
   padding: 5px 5px 0 5px;
   width: 100%;
-  height: calc(100% - 70px);
+  height: calc(100% - 90px);
+}
+/* This is terrible, but I tried flexbox and tables and wasn't able to get the
+   correct scrolling behavior (and the table not bleeding into the padding when
+   it scrolls) any other way. ~ Matt 2015-10-29 */
+#ViewWrapper.actionBarExpanded {
+  height: calc(100% - 290px);
 }
 #View {
   width: 100%;
@@ -241,6 +247,7 @@ right and a bottom border:
 
 #ActionBar {
   box-sizing: border-box;
+  /* NOTE: Keep the #ViewWrapper height rule consistent with all overrides of this. */
   height: 90px;
   padding: 9px;
   font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
@@ -251,7 +258,7 @@ right and a bottom border:
   background: -webkit-linear-gradient(top, rgba(133,178,211,1) 0%,rgba(167,199,220,1) 100%); /* Chrome10+,Safari5.1+ */
 }
 
-#ActionBar.expanded {
+#ActionBar.actionBarExpanded {
   height: 290px;
 }
 
