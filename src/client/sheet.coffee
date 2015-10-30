@@ -531,7 +531,6 @@ class ClientView
               # assert (!colCls? || colCls == cls)
               colCls = cls
         colCls
-    console.log(@colClasses)
 
     d = {
       data: ((cell.display || cell.value for cell in row) for row in grid)
