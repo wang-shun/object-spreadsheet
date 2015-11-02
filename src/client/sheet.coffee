@@ -552,7 +552,7 @@ class ClientView
         # content of the real table.  We can look out for any similar glitches.
         if headerExpanded.get()
           for i in [0...@grid.length]
-            if i < headerHeight - 3 then 10 else 23
+            if i < headerHeight - (2 + @options.showTypes) then 10 else 23
         else
           23 for i in [0...@grid.length]
       cells: (row, col, prop) =>
