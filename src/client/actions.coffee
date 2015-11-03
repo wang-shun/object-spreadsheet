@@ -76,19 +76,33 @@ origReferenceDisplayStrForColumnId = (columnId) ->
   formula && stringifyFormula(columnId, formula) ? ''
 newReferenceDisplayStr = new ReactiveVar(null)
 
+tracingView = null
+
 Template.changeColumn.rendered = () ->
   formulaStr = origFormulaStrForColumnId(Template.currentData().columnId)
   newFormulaStr.set(formulaStr)
-  if formulaStr?
-    changeColumnInitFormulaBar(this)
   displayStr = origDisplayStrForColumnId(Template.currentData().columnId)
   newDisplayStr.set(displayStr)
   @find('input[name=display]')?.value = displayStr
   referenceDisplayStr = origReferenceDisplayStrForColumnId(Template.currentData().columnId)
   newReferenceDisplayStr.set(referenceDisplayStr)
   @find('input[name=referenceDisplay]')?.value = referenceDisplayStr
-
-tracingView = null
+  @autorun(() =>
+    shouldShowFormulaBar = newFormulaStr.get()? && !Template.currentData().isObject
+    if shouldShowFormulaBar && !@codeMirror?
+      # Have to wait for the template to re-render with the new div.
+      # afterFlush will become unmaintainable if we push it much further, but
+      # works for now and is easier than trying to figure out the referencing
+      # for a child template.
+      Tracker.afterFlush(() => changeColumnInitFormulaBar(this))
+    else if !shouldShowFormulaBar && @codeMirror?
+      # Needed to clear selected band so the action bar collapses.
+      newFormulaInfo.set(null)
+      tracingView?.destroy()
+      tracingView = null
+      # XXX Do we need to tear down the CodeMirror somehow?
+      @codeMirror = null
+    )
 
 Template.changeColumn.destroyed = () ->
   # Try to avoid holding on to data that's no longer relevant.
@@ -408,8 +422,6 @@ Template.changeColumn.events
     # introducing a child template, but it's unclear how the parent and child
     # templates can reference each other. ~ Matt 2015-09-30
     newFormulaStr.set(origFormulaStrForColumnId(@columnId))
-    # Have to wait for the template to re-render with the new div.
-    Tracker.afterFlush(() -> changeColumnInitFormulaBar(template))
   'keydown form': (event, template) ->
     if (event.which == 27) then template.find("[type=reset]")?.click()
   'click .formulaBand': (event, template) ->
