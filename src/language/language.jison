@@ -158,28 +158,28 @@ avoid a shift-reduce conflict at the optElse in the IF production.  :/
 statement
     /* TODO: Allow shadowing only in if statements (the only compelling use case)? */
     : LET IDENT '=' expression NL
-        { yy.bindVar($2, $4, true);
+        { yy.bindVar($2, $4);
           $$ = ['let', $2, $4]; }
     | familyReference ':=' expression NL
-        { $$ = ['set', yy.convertFamilyReference($1, false, false), $3]; }
+        { $$ = ['set', $1, $3]; }
     | TO SET familyReference ADD expression NL
-        { $$ = ['add', yy.convertFamilyReference($3, false, false), $5]; }
+        { $$ = ['add', $3, $5]; }
     | FROM SET familyReference REMOVE expression NL
-        { $$ = ['remove', yy.convertFamilyReference($3, false, false), $5]; }
+        { $$ = ['remove', $3, $5]; }
     | ifHeader '{' NL statements '}' NL optElse
         { yy.commitVars();
           $$ = ['if', $1, $4, $7]; }
-    | foreachHeader '{' NL statements '}' NL
+    | foreachPush '(' binding ')' '{' NL statements '}' NL
         { yy.rollbackVars();
-          $$ = ['foreach', $1.var, $1.domain, $4]; }
+          $$ = ['foreach', $3.var, $3.domain, $7]; }
     | DELETE expression NL
         { $$ = ['delete', $2]; }
     | optLet NEW familyReference NL  /* Rarely useful without a let... */
-        { if ($1) yy.bindVar($1, $3, true);
-          $$ = ['new', $1, yy.convertFamilyReference($3, true, false)]; }
+        { if ($1) yy.bindVar($1, $3);
+          $$ = ['new', $1, $3]; }
     | optLet MAKE familySliceReference NL
-        { if ($1) yy.bindVar($1, $3, true);
-          $$ = ['make', $1, yy.convertFamilyReference($3, true, true)]; }
+        { if ($1) yy.bindVar($1, $3);
+          $$ = ['make', $1, $3]; }
     /* Future: Error messages. */
     | CHECK expression NL
         { $$ = ['check', $2]; }
@@ -203,11 +203,9 @@ elseHeader
         { yy.nextBranch(); }
     ;
 
-foreachHeader
-    : FOREACH '(' IDENT IN expression ')'
-        { yy.pushVars();
-          yy.bindVar($3, $5, false);
-          $$ = {var: $3, domain: $5}; }
+foreachPush
+    : FOREACH
+        { yy.pushVars(); }
     ;
 
 optLet
@@ -230,6 +228,12 @@ familyReferenceCommon
     | expression '.' navigationStep
         { $$ = [$1, $3]; }
     ;
+
+/*
+The presence or absence of the keys formula is validated anyway when the
+statement is validated, but expressing the constraint in the grammar might help
+us provide better completion at some point.
+*/
 
 familyReference
     : familyReferenceCommon
@@ -322,7 +326,7 @@ navigationStep
    https://github.com/zaach/jison/issues/69 */
 binding
     : IDENT ':' expression
-        { yy.bindVar($1, $3, false);
+        { yy.bindVar($1, $3);
           $$ = {var: $1, domain: $3}; }
     ;
 

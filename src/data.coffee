@@ -2,12 +2,13 @@
 #CELLS_COLLECTION = 'cells'
 # need them for publisher? maybe just use Columns._name, Cells._name?
 
-scoped = (name, prop) -> Object.defineProperty @, name, prop
+scoped = (name, prop) -> Object.defineProperty(@, name, prop)
 
-scoped '$$', get: -> Tablespace.get()
-scoped 'Columns', get: -> $$.Columns
-scoped 'Cells',   get: -> $$.Cells
-scoped 'Views',   get: -> $$.Views
+scoped('$$', {get: -> Tablespace.get()})
+for coll in ['Columns', 'Cells', 'Views', 'Procedures']
+  ((coll) ->  # Work around JavaScript variable capture semantics
+    scoped(coll, {get: -> $$[coll]})
+  )(coll)
 
 
 class Tablespace extends ControlContext
@@ -27,11 +28,12 @@ class Tablespace extends ControlContext
 
   setupCollections: () ->
     console.log "created Tablespace[#{@id}]"
-    @Columns = new Mongo.Collection "#{@id}:columns"
-    @Cells   = new Mongo.Collection "#{@id}:cells"
-    @Views   = new Mongo.Collection "#{@id}:views"
+    @Columns    = new Mongo.Collection "#{@id}:columns"
+    @Cells      = new Mongo.Collection "#{@id}:cells"
+    @Views      = new Mongo.Collection "#{@id}:views"
+    @Procedures = new Mongo.Collection "#{@id}:procedures"
     if Meteor.isServer
-      for collection in [@Columns,@Cells,@Views]
+      for collection in [@Columns,@Cells,@Views,@Procedures]
         @publish collection
       @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }  # @@@ Matt will kill me
 

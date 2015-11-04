@@ -59,7 +59,7 @@ readColumnTypeForFormula = (model, columnId) ->
     throw new FormulaValidationError("Reference to column #{columnId} of unknown type.  " +
                                      "Fix its formula or manually specify the type if needed to break a cycle.")
 
-valExpectType = (what, actualType, expectedType) ->
+@valExpectType = (what, actualType, expectedType) ->
   valAssert(mergeTypes(actualType, expectedType) == expectedType,
             "#{what} has type #{actualType}, wanted #{expectedType}")
 
@@ -88,8 +88,6 @@ class FormulaEngine
     @goUpMemo.clear()
     @compiled = {}
 
-
-IDENTIFIER_RE = /[_A-Za-z][_A-Za-z0-9]*/
 
 # Argument adapters to reduce the amount of duplicated work to validate
 # arguments and evaluate subexpressions.
@@ -163,11 +161,11 @@ Lambda = {
     valAssert(_.isArray(arg) && arg.length == 2,
               'Lambda subformula must be a two-element array')
     [varName, body] = arg
-    valAssert(_.isString(varName) && IDENTIFIER_RE.test(varName),
-              "Lambda variable must be an identifier, got '#{arg}'")
+    valAssert(_.isString(varName),
+              'Lambda variable must be a string')
     # Try to save users from themselves.
     valAssert(!vars.has(varName),
-              'Lambda shadows variable ' + varName)
+              'Lambda shadows variable #{varName}')
     newVars = vars.shallowClone()
     newVars.add(varName)
     validateSubformula(newVars, body)
@@ -193,6 +191,7 @@ ColumnId = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Column ID must be a string')
   typecheck: (model, vars, arg) ->
+    # XXX: Disallow the root column and add a special case for '$'?
     valAssert(model.getColumn(arg)?, "No column exists with ID #{arg}")
     arg
 }
@@ -394,7 +393,7 @@ overloaded = (paramNames, alternatives...) ->
   getHandler = (argtypes) ->
     for [decltypes, handler] in alternatives
       if decltypes.length == argtypes.length && 
-         forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) != TYPE_ERROR)
+         forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) == decltype)
         return handler
   {
     paramNames: paramNames
@@ -476,8 +475,8 @@ dispatch = {
   var:
     argAdapters: [{}]
     validate: (vars, varName) ->
-      valAssert(_.isString(varName) && IDENTIFIER_RE.test(varName),
-                "Variable name must be an identifier, got '#{varName}'")
+      valAssert(_.isString(varName),
+                'Variable name must be a string')
       valAssert(vars.has(varName),
                 "Undefined variable #{varName}")
     typecheck: (model, vars, varName) ->
@@ -532,6 +531,7 @@ dispatch = {
     paramNames: ['condition', 'thenExpr', 'elseExpr']
     argAdapters: [EagerSubformula, LazySubformula, LazySubformula]
     typecheck: (model, vars, conditionType, thenType, elseType) ->
+      valExpectType('if condition', conditionType, 'bool')
       type = mergeTypes(thenType, elseType)
       valAssert(type != TYPE_ERROR,
                 "Mismatched types in if branches (#{thenType} and #{elseType})")
@@ -570,10 +570,7 @@ dispatch = {
   # For each cell in the domain, evaluates the predicate with varName bound to
   # the domain cell, which must return a singleton boolean.  Returns the set of
   # domain cells for which the predicate returned true.
-  # Concrete syntax: {all x in expr | predicate}
-  # XXX: The "all" is to avoid a parser conflict.  It's arguable whether we'd
-  # actually like to have both {x in foo | bar} and {x in foo, bar} or this is
-  # confusing to users too.  Find a different compromise?
+  # Concrete syntax: {x : expr | predicate}
   filter:
     paramNames: ['set', 'predicate']
     argAdapters: [EagerSubformula, Lambda]
@@ -895,9 +892,9 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   parser = new Jison.Parsers.language.Parser()
   parser.yy.vars = vars.shallowClone()
   parser.yy.startToken = startToken
-  parser.yy.bindVar = (varName, formula, allowOverwrite) ->
-    unless allowOverwrite
-      valAssert(!this.vars.get(varName)?, 'Shadowing variable ' + varName)
+  parser.yy.bindVar = (varName, formula) ->
+    # Don't check shadowing here, because the rules for procedures are
+    # complicated.  It will be done later by the validate method.
     this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula))
   parser.yy.unbindVar = (varName) ->
     this.vars.delete(varName)
@@ -939,6 +936,8 @@ stringifyIdentCommon = (entryPoint, ident) ->
 
 # Special version that won't unnecessarily backquote the [key] fallback object
 # name syntax.
+# XXX: I guess this lets people define a variable named [foo] and then refer to
+# it without backquotes in some (but not all) contexts.
 stringifyNavigationStep = (ident) ->
   stringifyIdentCommon('ENTRY_NAVIGATION_STEP', ident)
 
@@ -981,4 +980,4 @@ stringifySubformula = (model, vars, formula) ->
     children: children
   }
 
-exported {FormulaEngine}
+exported {FormulaEngine, FormulaInternals: {EagerSubformula}}
