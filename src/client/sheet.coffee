@@ -55,9 +55,9 @@ class ViewSection
     # field index -> string or null (class of extra column before this field)
     @extraColClassBefore = []
     @subsections = []
-    # @headerMinHeight refers to the expanded header.
-    @headerMinHeight = !!@col.isObject + 2  # fieldName, type
-    amRootWithSeparateTables =
+    # @headerHeightBelow and @headerMinHeight refer to the expanded header.
+    @headerHeightBelow = 2  # fieldName, type
+    @amRootWithSeparateTables =
       options.separateTables && @columnId == rootColumnId
     for sublayout, i in @layoutTree.subtrees
       subsection = new ViewSection(sublayout, @valueFormat, @options)
@@ -75,15 +75,11 @@ class ViewSection
       if extraColClass?
         @width++
       @width += subsection.width
-      @headerMinHeight = Math.max(
-        @headerMinHeight, !amRootWithSeparateTables + subsection.headerMinHeight)
+      @headerHeightBelow = Math.max(
+        @headerHeightBelow, subsection.headerMinHeight)
       @rightEdgeSingular =
         subsection.relationSingular && subsection.rightEdgeSingular
-    # Hack to get the separate tables to pad up to the top so the root doesn't
-    # add its own padding.
-    if amRootWithSeparateTables
-      for subsection in @subsections
-        subsection.headerMinHeight = @headerMinHeight
+    @headerMinHeight = (@col.isObject && !@amRootWithSeparateTables) + @headerHeightBelow
 
   prerenderVlist: (parentCellId) ->
     ce = Cells.findOne({column: @columnId, key: parentCellId})
@@ -188,7 +184,9 @@ class ViewSection
 
   # As long as siblings are always separated by a separator, we can color just
   # based on depth.
-  renderHeader: (expanded, depth) ->
+  # If !expanded, then the requested height should always be 3.  Leaves render
+  # at height 2 anyway.
+  renderHeader: (expanded, height, depth) ->
     # Part that is always the same.
     myColorClass = 'rsHeaderColor' + @colorIndexForDepth(if @col.isObject then depth else depth-1)
     grid = [[], []]  # c.f. renderHlist
@@ -246,8 +244,8 @@ class ViewSection
     unless @col.isObject
       return grid
 
-    height = if expanded then @headerMinHeight else 3
-    currentHeight = 2
+    # At this point, height should be at least 3.
+    currentHeight = 2  # should always be 2 or height
     # "Corner" here is the upper left corner cell, which actually spans all the
     # way across in some cases (indicated by isFinal).
     makeCorner = (isFinal) =>
@@ -271,9 +269,10 @@ class ViewSection
           cssClasses.push(myColorClass)
         gridExtraCol = gridMergedCell(currentHeight, 1, '', cssClasses)
         gridHorizExtend(grid, gridExtraCol)
-      if currentHeight == 2 && subsection.headerMinHeight > 2
-        makeCorner(false)
-      subsectionGrid = subsection.renderHeader(expanded, depth+1)
+      subHeight = if expanded then @headerHeightBelow else 3
+      subsectionGrid = subsection.renderHeader(expanded, subHeight, depth+1)
+      if currentHeight == 2 && subsectionGrid.length > 2
+        makeCorner(false)  # may increase currentHeight so next condition holds
       if subsectionGrid.length < currentHeight
         paddingGrid = gridMergedCell(
           currentHeight - subsectionGrid.length, subsection.width,
@@ -466,7 +465,8 @@ class ClientView
     # value.
     hlist = @mainSection.prerenderHlist([], '')
     grid = @mainSection.renderHeader(
-      if headerExpanded.get() then @mainSection.headerMinHeight else null,
+      headerExpanded.get(),
+      if headerExpanded.get() then @mainSection.headerMinHeight else 3,
       0)
     for row in grid
       for cell in row
