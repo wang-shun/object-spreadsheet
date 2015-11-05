@@ -1,0 +1,35 @@
+<template name="PTC_study_login">
+  <h1>Parent-teacher conference system</h1>
+  <p>Choose a student to manage conferences for that student:</p>
+  <ul>
+    {{#each root.FamilyPage}}
+    {{! It would take longer to figure out how to force the trailing slash to be
+        consistent so we can use a relative URL reliably... ~ Matt 2015-11-05 }}
+    <li><a href="/{{../sheet}}/apps/ptc-study/{{JSON_stringify qCellId.cellId}}">{{studentName}}</a></li>
+    {{/each}}
+  </ul>
+</template>
+
+<template name="PTC_study_FamilyPage">
+  {{#with FamilyPage}}
+  <h1>Parent-teacher conferences for student: {{studentName}}</h1>
+  <ul>
+    {{#each EnrollmentBlock}}
+    <li>Class with {{teacherName}}:
+      {{#if ExistingMeetingBlock}}
+      {{#each ExistingMeetingBlock}}
+      meeting currently scheduled for {{formatDate time.[0]}}. <button class="cancel">Cancel</button>
+      {{/each}}
+      {{else}}
+      available meeting times:
+      <ul>
+        {{#each AvailableSlotBlock}}
+        <li>{{formatDate time.[0]}} <button class="schedule">Schedule</button></li>
+        {{/each}}
+      </ul>
+      {{/if}}
+    </li>
+    {{/each}}
+  </ul>
+  {{/with}}
+</template>
