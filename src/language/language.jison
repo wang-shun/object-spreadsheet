@@ -9,7 +9,8 @@ ws [ \t\r]
 %%
 {ws}+ /* skip whitespace */
 \n return 'NL'
-\#[^\n]*\n return 'NL'  /* single-line comments */
+/* Single-line comments.  FIXME: These are lost when code is saved. */
+\#[^\n]*\n return 'NL'
 
 /* Primitive literals */
 {int}{frac}?{exp}?\b return 'NUMBER'
