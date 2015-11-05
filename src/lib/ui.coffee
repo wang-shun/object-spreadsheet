@@ -4,11 +4,9 @@ if Meteor.isClient
     if error?
       alert('The operation failed on the server: ' + error.message)
 
-  andThen = (cont) ->
+  standardServerCallbackThen = (callback) ->
     (error, result) ->
-      if error?
-        standardServerCallback(arguments...)
-      else
-        cont(result)
+      standardServerCallback(arguments...)
+      callback?(arguments...)
 
-  exported {standardServerCallback, andThen}
+  exported {standardServerCallback, standardServerCallbackThen}

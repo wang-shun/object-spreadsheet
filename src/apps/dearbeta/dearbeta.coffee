@@ -26,7 +26,7 @@ if Meteor.isClient
       Relsheets.call(
         "hintAdd",
         {at: [@Hint.qFamilyId.cellId], text: [event.target.text.value]},
-        () -> event.target.reset())
+        (error, result) -> if !error? then event.target.reset())
       false
 
 

@@ -28,7 +28,7 @@ if Meteor.isClient
         name: [event.target.name.value]
         issue: [event.target.issue.value]
         location: [event.target.location.value]
-      Relsheets.call("enqueue", formData, -> event.target.reset())
+      Relsheets.call("enqueue", formData, (error, result) -> if !error? then event.target.reset())
       $('.help.button').addClass("disabled")
       false
       

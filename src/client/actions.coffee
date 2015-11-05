@@ -1,17 +1,3 @@
-
-# Future: Make this better.
-standardServerCallback = (error, result) ->
-  if error?
-    alert('The operation failed on the server: ' + error.message)
-
-andThen = (cont) ->
-  (error, result) ->
-    if error?
-      standardServerCallback(arguments...)
-    else
-      cont(result)
-
-
 fullTextToShow = new ReactiveVar(null)
 isLoading = new ReactiveVar(true)
 
@@ -33,7 +19,8 @@ Template.addStateCell.events({
       valueStr = inputField?.value
       StateEdit.addCell @qFamilyId, valueStr,
       # Clear the field on successful submission (only)
-      andThen -> if inputField? then inputField.value = ''
+      standardServerCallbackThen((error, result) ->
+        if !error? && inputField? then inputField.value = '')
     catch e
       console.error e
     false # prevent clear
@@ -444,4 +431,4 @@ Meteor.methods({
 
 
 
-exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs, isExpanded}, standardServerCallback, andThen}
+exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs, isExpanded}}

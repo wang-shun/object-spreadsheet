@@ -43,12 +43,14 @@ if Meteor.isClient
       Relsheets.call("parentCreateMeeting", {
         clientUser: [@clientUser],
         enr: [@enrollment],
-        slot: [@slot]})
+        slot: [@slot]},
+        (error, result) -> $(ev.target).text('Schedule'))
     "click .cancel": (ev) ->
       blur($(ev.target))
       Relsheets.call("parentCancelMeeting", {
         clientUser: [@clientUser],
-        meeting: @meeting})
+        meeting: @meeting},
+        (error, result) -> $(ev.target).text('Cancel'))
 
       
 if Meteor.isServer

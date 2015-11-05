@@ -9,7 +9,7 @@ if Meteor.isClient
         $$.subscribeAll())
     call: (transaction, argsObj, callback) ->
       $$.call('executeCannedTransaction', transaction, glue(argsObj),
-              andThen (result) -> callback?(result))
+              standardServerCallbackThen(callback))
 
 
 if Meteor.isServer
