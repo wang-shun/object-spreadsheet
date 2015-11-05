@@ -431,7 +431,7 @@ insertBlankColumn = (parentId, index, view) ->
               standardServerCallback)
 
 
-headerExpanded = new ReactiveVar(false)
+headerExpanded = new ReactiveVar(true)
 @toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
 
