@@ -80,6 +80,9 @@ class ViewSection
       @rightEdgeSingular =
         subsection.relationSingular && subsection.rightEdgeSingular
     @headerMinHeight = (@col.isObject && !@amRootWithSeparateTables) + @headerHeightBelow
+    if @col.isObject
+      # Affects empty sheet when @options.separateTables = true.
+      @headerMinHeight = Math.max(@headerMinHeight, 3)
 
   prerenderVlist: (parentCellId) ->
     ce = Cells.findOne({column: @columnId, key: parentCellId})
