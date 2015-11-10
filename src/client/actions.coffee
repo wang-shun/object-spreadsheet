@@ -123,6 +123,8 @@ Template.changeColumn.helpers
     newFormulaInfo.get()
   displayClass: ->
     if newDisplayStr.get() != origDisplayStrForColumnId(@columnId) then 'formulaModified'
+  defaultReferenceDisplay: ->
+    stringifyFormula(@columnId, defaultReferenceDisplayFormula(getColumn(@columnId)))
   referenceDisplayClass: ->
     if newReferenceDisplayStr.get() != origReferenceDisplayStrForColumnId(@columnId) then 'formulaModified'
   contextText: ->

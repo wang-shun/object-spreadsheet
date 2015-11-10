@@ -305,6 +305,27 @@ class ViewSection
       else 0
 
 
+# Exported: Used for placeholder in action bar
+@defaultReferenceDisplayFormula = (col) ->
+  # Current heuristic: First primitive-type field.  Ideas:
+  # - Prefer a tuple of fields declared unique, if and when we have that
+  #   information.
+  # - Remove "primitive-type" condition once we can handle the recursion.
+  # - Require singular once we have that information.
+  # - Automatically detect certain field names, e.g., "name" or "title"?  A hack
+  #   but maybe the right thing in this context.
+
+  # XXX: Duplicating logic from columnLogicalChildrenByName?  (Avoiding this
+  # would require a comprehensive emulation layer for keys as fields.)
+  if col.type != '_token' && typeIsPrimitive(col.type)
+    return ['up', ['var', 'this'], col._id, true]
+  for childColId in col.children
+    childCol = getColumn(childColId)
+    unless typeIsPrimitive(childCol.type) && !childCol.isObject
+      continue
+    return ['down', ['var', 'this'], childColId, null, true]
+  return ['lit', 'text', ['<reference>']]  # :(
+
 # Used also by tracing table in actions.coffee
 class @ValueFormat
   
@@ -328,19 +349,14 @@ class @ValueFormat
       # TODO: More type-specific rendering?
       if !typeIsPrimitive(type)
         targetCol = getColumn(type)
-        display =
-          if targetCol.referenceDisplay?
-            vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
-            fmtd = evaluateFormula(@tinyModel, vars, targetCol.referenceDisplay)
-            if fmtd.type != 'text'
-              # For now.  Better ideas?
-              throw Error("reference display formula must return a string")
-            elems = fmtd.elements()
-            if elems.length != 1
-              throw Error("reference display function returned #{elems.length} elements (#{JSON.stringify elems})")
-            elems[0]
-          else null
-        new CellReference({columnId: type, cellId: value}, display)
+        fmla = targetCol.referenceDisplay ? defaultReferenceDisplayFormula(targetCol)
+        vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
+        # toText contains some of the same primitive type formatting code as below.
+        # XXX: Untangle this.
+        fmtd = evaluateFormula(@tinyModel, vars, ['toText', fmla])
+        elems = fmtd.elements()
+        # toText should always return exactly one string...
+        new CellReference({columnId: type, cellId: value}, elems[0])
       # Should be unambiguous if the user knows which columns are string-typed.
       else if typeof value == 'string' then value
       else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
@@ -363,13 +379,14 @@ class StateEdit
     if text == @PLACEHOLDER then return "-"  # placeholder. TODO use a special object as placeholder
     type = getColumn(qFamilyId.columnId).type
     if !typeIsPrimitive(type)
-      if (m = /^@(\d+)$/.exec(text))
-        wantRowNum = Number.parseInt(m[1])
-        for [qCellId, coords] in view.qCellIdToGridCoords.entries()
-          if qCellId.columnId == type && coords.dataRow == wantRowNum
-            return qCellId.cellId
-        throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
-      else if getColumn(type).referenceDisplay?
+      #if (m = /^@(\d+)$/.exec(text))
+      #  wantRowNum = Number.parseInt(m[1])
+      #  for [qCellId, coords] in view.qCellIdToGridCoords.entries()
+      #    if qCellId.columnId == type && coords.dataRow == wantRowNum
+      #      return qCellId.cellId
+      #  throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
+      #else
+      if true  # getColumn(type).referenceDisplay?
         # XXX: Don't match against error messages returned by ValueFormat.asText.
         # Ignore errors: erroneous families are not candidates to match against.
         matchingCells = (cellId for cellId in allCellIdsInColumnIgnoreErrors(type) when (
@@ -378,7 +395,7 @@ class StateEdit
           return matchingCells[0]
         else if matchingCells.length > 1
           throw new Error('The given reference display string matches ' + matchingCells.length + ' cells.  ' +
-                          'Fix the reference display strings to be unique or enter the @n notation instead.')
+                          'Fix the reference display strings to be unique.')  # "or enter the @n notation instead"
         else
           throw new Error('The given reference display string does not match any cells.')
       else
@@ -491,44 +508,47 @@ class ClientView
     gridData = @mainSection.renderHlist(hlist, hlist.minHeight)
     gridVertExtend(grid, gridData)
 
-    gridCaption = []
+    #gridCaption = []
     if @options.headerExpandable
       if headerHeight > 2
         # This is terrible but it will take ten times as long to do properly...
         # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
-        cnHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-                  "#{if headerExpanded.get() then '-' else '+'}</button> Obj")
-        gridVertExtend(gridCaption,
-                       gridMergedCell(headerHeight - 2, 1, cnHtml, ['htBottom', 'rsCaption']))
-      gridCaption.push(
-        [new ViewCell('Field', 1, 1, ['rsCaption'])],
-        [new ViewCell('Type', 1, 1, ['rsCaption'])])
-    else
-      gridVertExtend(gridCaption,
-                     gridMergedCell(headerHeight - 1, 1, "", ['htBottom', 'rsCaption']))
-      gridVertExtend(gridCaption,
-                     gridMergedCell(1, 1, "", ['rsCaption']))
-      
+        toggleHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
+                      "#{if headerExpanded.get() then '-' else '+'}</button>")
+        grid[0][0].value = toggleHtml
+        #gridVertExtend(gridCaption,
+        #               gridMergedCell(headerHeight - 2, 1, toggleHtml + ' Obj', ['htBottom', 'rsCaption']))
+      #gridCaption.push(
+      #  [new ViewCell('Field', 1, 1, ['rsCaption'])],
+      #  [new ViewCell('Type', 1, 1, ['rsCaption'])])
+    #else
+    #  gridVertExtend(gridCaption,
+    #                 gridMergedCell(headerHeight - 1, 1, "", ['htBottom', 'rsCaption']))
+    #  gridVertExtend(gridCaption,
+    #                 gridMergedCell(1, 1, "", ['rsCaption']))
+
     if !@options.showTypes # HACK: Same
-      gridCaption.pop()
+      #gridCaption.pop()
       headerHeight = headerHeight - 1
-    gridVertExtend(gridCaption,
-                   ([new ViewCell("@#{i+1}", 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
-    gridHorizExtend(gridCaption, grid)
-    grid = gridCaption
+    #gridVertExtend(gridCaption,
+    #               ([new ViewCell("@#{i+1}", 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
+    #gridHorizExtend(gridCaption, grid)
+    #grid = gridCaption
 
     # Resolve cell cross-references.
+    # @ notation disabled; relevant code commented out. ~ Matt 2015-11-10
     @qCellIdToGridCoords = new EJSONKeyedMap()
     for rowCells, i in grid
       for cell, j in rowCells
         if cell.qCellId? && cell.isObject
-          # dataRow is user-facing row number, one-based.
-          @qCellIdToGridCoords.set(cell.qCellId, {row: i, col: j, dataRow: i - headerHeight + 1})
+          @qCellIdToGridCoords.set(cell.qCellId, {row: i, col: j})
+          ## dataRow is user-facing row number, one-based.
+          # dataRow: i - headerHeight + 1
     for row in grid
       for cell in row
         if cell.value instanceof CellReference
           cell.referent = cell.value.qCellId
-          cell.display = cell.value.display ? '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
+          cell.display = cell.value.display  # ? '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
 
     @grid = grid
 
@@ -547,7 +567,7 @@ class ClientView
       # Future: Fixing the ancestors of the leftmost visible column would be
       # clever, though with carefully designed individual views, we may never
       # need it.  We may also want to fix the header for large data sets.
-      fixedColumnsLeft: 1
+      #fixedColumnsLeft: 1  # Caption removed
       # Separator columns are 8 pixels wide.  Others use default width.
       colWidths:
         for i in [0...@grid[0].length]  # no way grid can be empty
@@ -581,7 +601,7 @@ class ClientView
           if (refc = @refId(ancestor.q()))?
             classes.push("parent-#{refc}")
         {
-          renderer: if col == 0 then 'html' else 'text'
+          renderer: if col == 0 && row == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
           # Only column header "top", "below", and "type" cells can be edited,
           # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
