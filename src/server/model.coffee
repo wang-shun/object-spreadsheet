@@ -65,13 +65,10 @@ class Model
         throw new Meteor.Error('defineColumn-state-under-formula',
                                'Creating a state column as child of a formula column is currently not allowed.')
       if !specifiedType?
-        # XXX We should never allow this, but it is pointless to fix when we
-        # don't validate the values anyway.
-        specifiedType = '_any'
         # TODO perhaps a better flow would be to leave undefined, but check when
         #  user enters data
-        #throw new Meteor.Error('defineColumn-type-required',
-        #                       'Must specify type for a state column')
+        throw new Meteor.Error('defineColumn-type-required',
+                               'Must specify type for a state column')
     if formula?
       validateFormula(formula)
     @invalidateSchemaCache()
@@ -152,26 +149,23 @@ class Model
       #   and that child is removed.
       # - Otherwise, column must have no children.
       if col.type == '_token'
-        if col.children?.length > 1
+        if col.children?.length != 1
           throw new Meteor.Error('remove-object-has-children',
                                  'Object must have a single field before converting to values.')
-        if col.children?.length == 1
-          childId = col.children[0]
-          childCol = @getColumn(childId)
-          if childCol.isObject || childCol.children?.length
-            throw new Meteor.Error('remove-object-complex-value',
-                                   "Child '#{childCol.objectName ? childCol.fieldName}' is not a simple value.")
-          Cells.find({column: columnId}).forEach (family) ->
-            newValues = []
-            for value in family.values
-              Cells.find({column: childId, key: value}).forEach (family) ->
-                newValues.push(family.values...)
-            Cells.update(family._id, {$set: {values: newValues}})
-          Columns.update(columnId, {$set: {specifiedType: childCol.type, children: []}})
-          Columns.remove(childId)
-          Cells.remove({column: childId})
-        else
-          Columns.update(columnId, {$set: {specifiedType: '_any'}})
+        childId = col.children[0]
+        childCol = @getColumn(childId)
+        if childCol.isObject || childCol.children?.length
+          throw new Meteor.Error('remove-object-complex-value',
+                                 "Child '#{childCol.objectName ? childCol.fieldName}' is not a simple value.")
+        Cells.find({column: columnId}).forEach (family) ->
+          newValues = []
+          for value in family.values
+            Cells.find({column: childId, key: value}).forEach (family) ->
+              newValues.push(family.values...)
+          Cells.update(family._id, {$set: {values: newValues}})
+        Columns.update(columnId, {$set: {specifiedType: childCol.type, children: []}})
+        Columns.remove(childId)
+        Cells.remove({column: childId})
         @invalidateSchemaCache()
       else
         if col.children?.length
@@ -211,8 +205,11 @@ class Model
       validateFormula(formula)
     col = @getColumn(columnId)
     # Hack: When a state column is converted to a formula column,
-    # automatically remove the default type of '_any'.
-    if !col.formula? && col.specifiedType == '_any'
+    # automatically remove the specified type.  This should be OK because having
+    # to specify a type for a formula column is a rare case.  If at some point
+    # we distinguish whether state column types were user-specified or inferred
+    # from data, then we could consider keeping a user-specified type here.
+    if !col.formula?
       Columns.update(columnId, {$set: {specifiedType: null}})
     Columns.update(columnId, {$set: {formula}})
     @invalidateSchemaCache()  # type may change
@@ -336,7 +333,7 @@ class Model
             # permanently not ready, which is tedious to debug.
             throw new Error('typecheckFormula returned null/undefined')
           if col.specifiedType?
-            valAssert(mergeTypes(col.specifiedType, type) == col.specifiedType,
+            valAssert(commonSupertype(col.specifiedType, type) == col.specifiedType,
                       "Column #{columnId} formula returns #{type}, which is not a subtype of specified type #{col.specifiedType}")
           else
             @_changeColumnType(columnId, type)
@@ -559,7 +556,7 @@ Meteor.methods
   changeColumnIsObject: (cc, columnId, isObject) ->
     cc.run ->
       @model.changeColumnIsObject(columnId, isObject)
-      # For the case where specifiedType is automatically changed between _token and _any.
+      # For the case where a token object is converted to or from a field.
       @model.evaluateAll()
   changeColumnObjectName: (cc, columnId, objectName) ->
     cc.run -> @model.changeColumnObjectName(columnId, objectName)

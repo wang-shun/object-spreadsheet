@@ -442,7 +442,7 @@ class StateEdit
     col? && columnIsState(col) && col.type not in ['_token', '_unit']
 
 
-insertBlankColumn = (parentId, index, view) ->
+insertBlankColumn = (parentId, index, isObject, view) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
   formula = if getColumn(parentId).formula? then DUMMY_FORMULA else null
@@ -450,8 +450,8 @@ insertBlankColumn = (parentId, index, view) ->
               parentId,
               index,
               null,  # fieldName
-              null,  # specifiedType
-              false, # isObject
+              if formula? then null else 'text',  # specifiedType
+              isObject,  # isObject
               null,  # objectName
               formula,  # formula
               view?.id,
@@ -689,7 +689,7 @@ class ClientView
                           standardServerCallback)
           }
           removeObjectType: {
-            name: 'Make into value'
+            name: 'Collapse to field'
             disabled: () =>
               c = @getSingleSelectedCell()
               !((ci = c?.columnId)? && ci != rootColumnId &&
@@ -702,8 +702,8 @@ class ClientView
                           standardServerCallback)
           }
 
-          addChildLast: {
-            name: 'Add child column'
+          addChildFieldLast: {
+            name: 'Add field'
             disabled: () =>
               c = @getSingleSelectedCell()
               !(c?.columnId)?
@@ -715,7 +715,22 @@ class ClientView
               col = getColumn(ci)
               index = col.children.length
               #@hot.deselectCell()
-              insertBlankColumn ci, index, @view
+              insertBlankColumn(ci, index, false, @view)
+          }
+          addChildObjectLast: {
+            name: 'Add nested object type'
+            disabled: () =>
+              c = @getSingleSelectedCell()
+              !(c?.columnId)?
+              #!((ci = c?.columnId)? && c.kind == 'top' &&
+              #  (col = getColumn(ci)).isObject && col.type == '_token')
+            callback: () =>
+              c = @getSingleSelectedCell()
+              ci = c.columnId
+              col = getColumn(ci)
+              index = col.children.length
+              #@hot.deselectCell()
+              insertBlankColumn(ci, index, true, @view)
           }
           deleteColumn: {
             name: 'Delete column'

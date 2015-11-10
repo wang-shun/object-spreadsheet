@@ -3,7 +3,7 @@
 
 @rootColumnId = '_root'
 
-PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
+PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
 
 @typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type) || type in PRIMITIVE_TYPES
 
@@ -154,13 +154,13 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
   ancestors1.splice(idx + 1, ancestors1.length - (idx + 1))
   return [ancestors1, ancestors2]
 
-# Literal empty sets, etc.
-@TYPE_ANY = '_any'
+# The empty type, subtype of all other types, used for literal empty sets, etc.
+@TYPE_EMPTY = '_empty'
 @TYPE_ERROR = '_error'
 
-@mergeTypes = (t1, t2) ->
-  if t1 != TYPE_ANY
-    if t2 != TYPE_ANY && t2 != t1
+@commonSupertype = (t1, t2) ->
+  if t1 != TYPE_EMPTY
+    if t2 != TYPE_EMPTY && t2 != t1
       TYPE_ERROR
     else
       t1
@@ -170,17 +170,17 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date', 'any']
 
 class TypedSet
   # public fields
-  #@type: column ID or primitive, or TYPE_ANY if we don't know because the set is empty.
+  #@type: column ID or primitive, or TYPE_EMPTY if we don't know because the set is empty.
   #@set: EJSONKeyedSet<@type>
-  constructor: (@type = TYPE_ANY, @set = new EJSONKeyedSet()) ->
+  constructor: (@type = TYPE_EMPTY, @set = new EJSONKeyedSet()) ->
 
   # Note, these can make a meaningless mess if the types are mixed.  The caller
   # has to check @type afterwards.
   add: (xType, x) ->
-    @type = mergeTypes(@type, xType)
+    @type = commonSupertype(@type, xType)
     @set.add(x)
   addAll: (tset) ->
-    @type = mergeTypes(@type, tset.type)
+    @type = commonSupertype(@type, tset.type)
     for e in tset.set.elements()
       @set.add(e)
 

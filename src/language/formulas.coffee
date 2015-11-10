@@ -60,7 +60,7 @@ readColumnTypeForFormula = (model, columnId) ->
                                      "Fix its formula or manually specify the type if needed to break a cycle.")
 
 @valExpectType = (what, actualType, expectedType) ->
-  valAssert(mergeTypes(actualType, expectedType) == expectedType,
+  valAssert(commonSupertype(actualType, expectedType) == expectedType,
             "#{what} has type #{actualType}, wanted #{expectedType}")
 
 @singleElement = (set) ->
@@ -133,10 +133,10 @@ HomogeneousEagerSubformulaList = {
     for item in arg
       validateSubformula(vars, item)
   typecheck: (model, vars, termFmlas) ->
-    typeSoFar = TYPE_ANY
+    typeSoFar = TYPE_EMPTY
     for fmla in termFmlas
       termType = typecheckFormula(model, vars, fmla)
-      newType = mergeTypes(typeSoFar, termType)
+      newType = commonSupertype(typeSoFar, termType)
       valAssert(newType != TYPE_ERROR,
                 "Mismatched types in list (#{typeSoFar} and #{termType})")
       typeSoFar = newType
@@ -239,7 +239,7 @@ typecheckDown = (model, vars, startCellsType, targetColId, keysType, wantValues)
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
-  # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
+  # XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
 
   # Go up.
   if startCellsTset.type == targetColId
@@ -258,7 +258,7 @@ goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
   if wantValues then getValues(model, vars, result) else result
 
 goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
-  # XXX: Can we get here with startCellsTset.type == TYPE_ANY?
+  # XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
 
   # Go down.
   targetCellsSet = new EJSONKeyedSet()
@@ -375,7 +375,7 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, par
   paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
-    valAssert(mergeTypes(lhsType, rhsType) != TYPE_ERROR,
+    valAssert(commonSupertype(lhsType, rhsType) != TYPE_ERROR,
               "Mismatched types to '#{symbol}' operator (#{lhsType} and #{rhsType})")
     'bool'
   evaluate: (model, vars, lhs, rhs) ->
@@ -393,7 +393,7 @@ overloaded = (paramNames, alternatives...) ->
   getHandler = (argtypes) ->
     for [decltypes, handler] in alternatives
       if decltypes.length == argtypes.length && 
-         forall(zip(decltypes, argtypes), ([decltype, argtype]) -> mergeTypes(decltype, argtype) == decltype)
+         forall(zip(decltypes, argtypes), ([decltype, argtype]) -> commonSupertype(decltype, argtype) == decltype)
         return handler
   {
     paramNames: paramNames
@@ -532,7 +532,7 @@ dispatch = {
     argAdapters: [EagerSubformula, LazySubformula, LazySubformula]
     typecheck: (model, vars, conditionType, thenType, elseType) ->
       valExpectType('if condition', conditionType, 'bool')
-      type = mergeTypes(thenType, elseType)
+      type = commonSupertype(thenType, elseType)
       valAssert(type != TYPE_ERROR,
                 "Mismatched types in if branches (#{thenType} and #{elseType})")
       type
@@ -597,7 +597,7 @@ dispatch = {
           # If we try to stringify a formula that doesn't typecheck, we want to
           # get something half-useful rather than crash.  Any dependent
           # navigations will most likely be marked "problem".
-          TYPE_ANY)
+          TYPE_EMPTY)
       {
         str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)} " +
              "| #{predicateSinfo[1].strFor(PRECEDENCE_LOWEST)}}"
@@ -625,7 +625,7 @@ dispatch = {
           # If we try to stringify a formula that doesn't typecheck, we want to
           # get something half-useful rather than crash.  Any dependent
           # navigations will most likely be marked "problem".
-          TYPE_ANY)
+          TYPE_EMPTY)
       {
         str: "sum[#{addendSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)}]" +
              "(#{addendSinfo[1].strFor(PRECEDENCE_LOWEST)})"

@@ -250,7 +250,7 @@ mergeTypeMaps = (vars1, vars2) ->
     mergedVars = new EJSONKeyedMap()
     for [varName, type1] in vars1.entries()
       if (type2 = vars2.get(varName))?
-        mergedVars.set(varName, mergeTypes(type1, type2))
+        mergedVars.set(varName, commonSupertype(type1, type2))
   else
     vars2
 
