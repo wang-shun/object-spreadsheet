@@ -114,10 +114,6 @@ right and a bottom border:
   border-right: none;
 }
 
-.handsontable td.rsHeader.tableSeparator {
-  background-color: transparent;
-}
-
 .handsontable td.rsHeader.rsHeaderCorner,
 .handsontable td.rsHeaderFieldNameLeaf,
 .handsontable td.rsHeaderFieldNameObject,
@@ -143,7 +139,10 @@ right and a bottom border:
   border-right: 1px dashed #CCC;
 }
 
-.handsontable td.rsHeader {
+/* Ideally we'd like the .handsontable td.area rule to just override this one,
+   but there isn't a good way to write this one with lower specificity, so just
+   exclude .area . */
+.handsontable td.rsHeader:not(.tableSeparator):not(.area) {
   background-color: #EEE;
 }
 
