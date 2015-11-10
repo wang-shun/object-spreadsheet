@@ -180,7 +180,12 @@ class ViewSection
     # Subsections
     for subsection, i in @subsections
       if @extraColClassBefore[i]?
-        gridHorizExtend(grid, gridMergedCell(height, 1))
+        extraCells = gridMergedCell(height, 1)
+        if @extraColClassBefore[i] == 'separator'
+          # Include separator cells in object region highlighting (but for now,
+          # not table separator cells in the corner case of the root object).
+          extraCells[0][0].qCellId = qCellId
+        gridHorizExtend(grid, extraCells)
       subsectionGrid = subsection.renderVlist(hlist.vlists[i], height)
       gridHorizExtend(grid, subsectionGrid)
     grid
