@@ -46,6 +46,10 @@ body {
   background-color: #FDF;
 }
 
+.reference {
+  text-decoration: underline;
+}
+
 .handsontable td.selected-object {
   background-color: #FFD;
 }

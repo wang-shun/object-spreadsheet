@@ -173,9 +173,11 @@ class ViewSection
       gridHorizExtend(grid, gridObject)
     if @col.type != '_token'
       # Value
-      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses)
+      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses[..])
       gridValue[0][0].qCellId = qCellId
       gridValue[0][0].qFamilyId = qFamilyId
+      if !typeIsPrimitive(@col.type)
+        gridValue[0][0].cssClasses.push('reference')
       gridHorizExtend(grid, gridValue)
     # Subsections
     for subsection, i in @subsections
