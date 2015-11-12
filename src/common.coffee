@@ -99,6 +99,7 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
     throw new SemanticError("#{s} refers to a value column, not an object type.")
   return colId2[0]
 
+# Compare to resolveNavigation.
 # Returns: [columnId, isValues]
 @parseColumnRef = (s) ->
   unless s
@@ -113,25 +114,29 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
     if interpretations.length != 1
       throw new SemanticError(
         "#{interpretations.length} interpretations for "+
-        "<#{colId2[0]}>:#{n}, wanted one.")
+        "#{stringifyColumnRef(colId2)}:#{n}, wanted one.")
     colId2 = interpretations[0][0..1]
   return colId2
 
+# Compare to stringifyNavigation.
 @stringifyColumnRef = ([columnId, isValues]) ->
   if columnId == rootColumnId
     throw new SemanticError('We currently do not support references to the root column.')
   names = []
   while columnId != rootColumnId
     col = getColumn(columnId)
+    unless col?
+      return '(deleted)'
     name = if isValues then col.fieldName else objectNameWithFallback(col)
+    logicalParent = if isValues && col.isObject then columnId else col.parent
     if name?
-      if columnLogicalChildrenByName(col.parent, name).length != 1
+      if columnLogicalChildrenByName(logicalParent, name).length != 1
         name += '(ambiguous)'
     else
       name = '(unnamed)'
     names.unshift(name)
     isValues = false
-    columnId = col.parent
+    columnId = logicalParent
   return names.join(':')
 
 # Finds the lowest common ancestor of columnId1 and columnId2 and returns a

@@ -56,7 +56,7 @@ readColumnTypeForFormula = (model, columnId) ->
   if type != TYPE_ERROR
     return type
   else
-    throw new FormulaValidationError("Reference to column #{columnId} of unknown type.  " +
+    throw new FormulaValidationError("Reference to column #{stringifyColumnRef([columnId, true])} of unknown type.  " +
                                      "Fix its formula or manually specify the type if needed to break a cycle.")
 
 @valExpectType = (what, actualType, expectedType) ->
@@ -235,7 +235,7 @@ typecheckDown = (model, vars, startCellsType, targetColId, keysType, wantValues)
             'Target column has no object type to navigate to.')
   if keysType?
     valAssert(!wantValues, 'Can only specify keys when navigating to objects.')
-    valExpectType('Key set', keysType, model.typecheckColumn(targetCol))
+    valExpectType('Key set', keysType, model.typecheckColumn(targetColId))
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->

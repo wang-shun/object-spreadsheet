@@ -318,6 +318,9 @@ class Model
   # These don't have to be done at the same time, but for now that's convenient.
   typecheckColumn: (columnId) ->
     col = @getColumn(columnId)
+    # Reference to a deleted column?
+    unless col?
+      return TYPE_ERROR
     type = col.type
     unless type?
       # Formula columns of unspecified type are set to TYPE_ERROR at the
@@ -347,7 +350,6 @@ class Model
           # If type was unspecified, it is left as TYPE_ERROR, i.e., unknown
           # for the purposes of other formulas.
           @_changeColumnTypecheckError(columnId, e.message)
-          type = "<error>"
 
     console.assert(type?)
     type

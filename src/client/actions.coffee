@@ -102,13 +102,7 @@ Template.changeColumn.destroyed = () ->
 
 Template.changeColumn.helpers
   columnName: ->
-    c = getColumn(@columnId)
-    objName =
-      if !@isObject && c.isObject then objectNameWithFallback(c)
-      else if c.parent then objectNameWithFallback(getColumn(c.parent))
-      else ''
-    prefix = if objName? then "#{objName}:" else ""
-    prefix + ((if @isObject then objectNameWithFallback(c) else c.fieldName) ? '<unnamed>')
+    stringifyColumnRef([@columnId, !@isObject]).split(':')[-2..].join(':')
   columnType: ->
     c = getColumn(@columnId)
     if c?.type then stringifyType(c.type) else ''
