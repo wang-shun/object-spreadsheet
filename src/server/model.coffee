@@ -502,6 +502,23 @@ class Model
       unless liveFamilies.has({column: ce.column, key: ce.key})
         Cells.remove(ce)
 
+    for col in Columns.find().fetch()
+      if col.formula?
+        # A mitigation for the common problem of formula operations being
+        # removed.  There are obviously many other ways a bad database can break
+        # us.
+        try
+          validateFormula(col.formula)
+        catch e
+          unless e instanceof Meteor.Error && e.error == 'invalid-formula'
+            throw e
+          console.log("Column #{stringifyColumnRef([col._id, true])} contains invalid formula " +
+                      "#{JSON.stringify(col.formula)}: #{e.message}.  Resetting.")
+          col.formula = DUMMY_FORMULA
+          col.specifiedType = null
+          Columns.update(col._id, col)
+
+
 # Used by procedures and the UI.
 # Keeping this parallel with the other ways the UI modifies data, which don't go
 # through the model or call invalidateDataCache.  XXX: Fix this (lack of) API.
@@ -537,7 +554,7 @@ Meteor.startup () ->
 
   if Meteor.isServer
     Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
-    tspace.run()
+    #tspace.run()  # Slows down server startup.
 
 
 Meteor.methods

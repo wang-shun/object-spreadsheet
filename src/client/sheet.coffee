@@ -9,12 +9,10 @@ Router.route "/:sheet/views/:_id", ->
   @render "Spreadsheet", data: {sheet: @params.sheet, viewId: @params._id}
 
 
-# The Error constructor is not usable by subclasses
-# (see https://github.com/jashkenas/coffeescript/issues/2359, unclear what our
-# version of CoffeeScript is doing), but apparently we can throw any object we
-# like, it just won't have a stack trace.
-class NotReadyError
-  constructor: (@what) ->
+NotReadyError = Meteor.makeErrorType('NotReadyError',
+  class NotReadyError
+    constructor: (@message) ->
+)
 
 # Object that can be used as ViewCell.value or ViewHlist.value to defer the
 # resolution of the target cell ID to a row number.  I'm a terrible person for
@@ -407,7 +405,7 @@ class StateEdit
       # unprivileged users, we probably want the server to generate it, but we
       # may not reuse this code for unprivileged users anyway.
       Random.id()
-    else if type == '_string' || type == 'text'
+    else if type == 'text'
       text
     else if type == 'date'
       Date.parse(text) || throw new Error("Invalid date, '#{text}'")
@@ -965,6 +963,7 @@ guarded = (op) ->
         window.why = e
         return  # Let the autorun run again once we have the data.
       throw e
+    window.why = null
 
 
 Template.Spreadsheet.rendered = ->

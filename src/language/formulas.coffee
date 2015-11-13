@@ -14,9 +14,6 @@
 # "this" bound to that parent cell, and the returned set gives the values of
 # cells to generate in a "family" in the formula column.  Some operations may
 # evaluate subformulas with additional variable bindings.
-#
-# Primitive types known to the system so far: _unit ('X') and _bool
-# (false, true).
 
 @valAssert = (cond, message) ->
   throw new FormulaValidationError(message) unless cond

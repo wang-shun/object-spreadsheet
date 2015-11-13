@@ -58,7 +58,7 @@ if Meteor.isServer
   Relsheets.procedures 'ptc',
     teacherCreateSlot:
       params: [['clientUser', 'Person'],
-               ['time', '_string']]
+               ['time', 'text']]
       body: '''
   let t = clientUser.Teacher
   check t != {}

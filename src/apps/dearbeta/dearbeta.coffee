@@ -46,7 +46,7 @@ if Meteor.isServer
       params: [['at', 'File:Node:Time:Hint']]
       body: '''delete oneOf(at.Vote)'''
     hintAdd:
-      params: [['at', 'File:Node:Time'], ['text', '_string']]
+      params: [['at', 'File:Node:Time'], ['text', 'text']]
       body: '''let h = new at.Hint
                h.body := text'''
     hintDel:
