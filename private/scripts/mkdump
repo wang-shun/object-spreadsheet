@@ -1,4 +1,11 @@
 #!/bin/bash
+if [[ "$(meteor mongo --url)" =~ mongodb://([^/]+)/([^/]+) ]]; then
+  host_port="${BASH_REMATCH[1]}"
+  db="${BASH_REMATCH[2]}"
+else
+  echo >&2 'Failed to determine or parse MongoDB URL'
+  exit 1
+fi
 for c in columns cells
-  do mongoexport --port 3001 --db meteor -c $1:$c --jsonArray >private/dump/$1_$c.json
+  do mongoexport --host "$host_port" --db "$db" -c $1:$c --jsonArray -o private/dump/$1_$c.json
 done
