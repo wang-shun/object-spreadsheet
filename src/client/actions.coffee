@@ -32,15 +32,10 @@ Template.addStateCell.events({
 changeColumnArgs = new ReactiveVar([], EJSON.equals)
 
 stringifyType = (type) ->
-  if typeIsPrimitive(type) then type
+  if typeIsReference(type)
+    stringifyColumnRef([type, false])
   else
-    c = getColumn(type)
-    if c?
-      objName = if c.parent then getColumn(c.parent).objectName else ""
-      prefix = if objName? then "#{objName}:" else ""
-      prefix + c.objectName
-    else
-      "?<#{type}>"
+    type
 
 NESTED_UNDERLINING_PX_PER_LEVEL = 4
 NESTED_UNDERLINING_MAX_DEPTH = 5

@@ -184,7 +184,7 @@ dispatch = {
     typecheck: (model, mutableVars, objectsType) ->
       # XXX Duplicating functionality of EagerSubformulaCells in formulas.coffee.
       # It's not worth providing a whole EagerSubformulaCells wrapper yet.
-      valAssert(!typeIsPrimitive(objectsType),
+      valAssert(typeIsReference(objectsType),
                 "Expected a set of cells, got set of '#{objectsType}'")
     execute: (model, mutableVars, objectsTset) ->
       # XXX: We are relying on objectsTset.type being correct!  This
@@ -374,7 +374,7 @@ stringifyStatements = (model, mutableVars, arg) ->
   mutableVars = new EJSONKeyedMap()
   for param in proc.params
     # XXX Duplicates logic from {Type,ColumnId}.typecheck
-    unless typeIsPrimitive(param.type)
+    if typeIsReference(param.type)
       valAssert(model.getColumn(param.type)?, "No column exists with ID #{param.type}")
     mutableVars.set(param.name, param.type)
   typecheckStatements(model, mutableVars, proc.body)

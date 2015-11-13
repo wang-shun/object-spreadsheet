@@ -117,7 +117,7 @@ EagerSubformulaCells = {
   validate: EagerSubformula.validate
   typecheck: (model, vars, arg) ->
     type = typecheckFormula(model, vars, arg)
-    valAssert(!typeIsPrimitive(type), "Expected a set of cells, got set of '#{type}'")
+    valAssert(typeIsReference(type), "Expected a set of cells, got set of '#{type}'")
     type
   evaluate: EagerSubformula.evaluate
   stringify: EagerSubformula.stringify
@@ -201,9 +201,9 @@ Type = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Type must be a string')
     # Future: Reject unknown primitive types
-    #if typeIsPrimitive(arg) ...
+    #if !typeIsReference(arg) ...
   typecheck: (model, vars, arg) ->
-    unless typeIsPrimitive(arg)
+    if typeIsReference(arg)
       ColumnId.typecheck(model, vars, arg)
     arg
 }
@@ -701,7 +701,7 @@ dispatch = {
       elements = arg.elements()
       formatOne = (value) ->
         # XXX Code duplication with ValueFormat.asText
-        if !typeIsPrimitive(type)
+        if typeIsReference(type)
           # It would be nice to use the reference display formula here, but I
           # don't want to do that until it's properly integrated into the
           # computational model.  For now, users can basically inline the
@@ -823,7 +823,7 @@ validateAndTypecheckFormula = (model, vars, formula) ->
 resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   interpretations = []
   unless startCellsFmla?
-    if vars.get('this')? && !typeIsPrimitive(vars.get('this'))
+    if vars.get('this')? && typeIsReference(vars.get('this'))
       valAssert(targetName != 'this',
                 'Explicit "this" is not allowed in concrete syntax.  ' +
                 'Please use the object name for clarity.')
@@ -838,7 +838,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.
   startCellsType = validateAndTypecheckFormula(model, vars, startCellsFmla)
-  valAssert(startCellsType && !typeIsPrimitive(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
+  valAssert(startCellsType && typeIsReference(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
 
   # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or

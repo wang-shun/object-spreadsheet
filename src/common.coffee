@@ -3,10 +3,6 @@
 
 @rootColumnId = '_root'
 
-PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
-
-@typeIsPrimitive = (type) -> type != rootColumnId && /^_/.test(type) || type in PRIMITIVE_TYPES
-
 # Multisets unsupported for now: twindex removed.
 
 @rootCellId = []
@@ -88,10 +84,13 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
   return ret
 
 @parseTypeStr = (s) ->
-  if typeIsPrimitive(s)
-    s
-  else
+  # This is an abuse of typeIsReference, since s is a UI-level (not internal)
+  # type string, but it will work to check whether s is recognized as the name
+  # of a non-reference type.
+  if typeIsReference(s)
     parseObjectTypeRef(s)
+  else
+    s
 
 @parseObjectTypeRef = (s) ->
   colId2 = parseColumnRef(s)
@@ -160,8 +159,25 @@ PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
   return [ancestors1, ancestors2]
 
 # The empty type, subtype of all other types, used for literal empty sets, etc.
-@TYPE_EMPTY = '_empty'
-@TYPE_ERROR = '_error'
+@TYPE_EMPTY = 'empty'
+@TYPE_ERROR = 'error'
+
+MAIN_PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
+
+# Other special types:
+# _root: reference, should never be user-visible (no concrete syntax to get at it)
+# _unit: primitive, deprecated but still used in ptc
+# _token: special primitive, should never be user-visible
+
+NON_REFERENCE_TYPES = [TYPE_EMPTY, TYPE_ERROR].concat(MAIN_PRIMITIVE_TYPES)
+
+# It's messy to have some primitive types that begin with underscore and others
+# that don't.  We could have hidden the underscore only in the UI, though at
+# this stage of development, it might have been too costly in terms of us
+# forgetting that the underscore should be present internally.  Or we could have
+# chosen a different representation altogether.  But that's too much work at the
+# moment. :( ~ Matt 2015-11-13
+@typeIsReference = (type) -> type == rootColumnId || (!/^_/.test(type) && type not in NON_REFERENCE_TYPES)
 
 @commonSupertype = (t1, t2) ->
   if t1 != TYPE_EMPTY

@@ -22,8 +22,8 @@ class @CellReference
 
 @stringifyTypeForSheet = (type) ->
   if type == '_unit' then 'X'
-  else if typeIsPrimitive(type) then type
-  else Columns.findOne(type)?.objectName ? (""+type)[...4]
+  else if typeIsReference(type) then Columns.findOne(type)?.objectName ? (""+type)[...4]
+  else type
 
 @markDisplayClassesForType = (type) ->
   if type == '_unit' then ['centered'] else []
@@ -39,7 +39,7 @@ class ViewSection
   constructor: (@layoutTree, @valueFormat=((x)->x.toString()), @options={}) ->
     @columnId = @layoutTree.root
     @col = getColumn(@columnId)
-    # Typechecking should always fill in a type, even _error.
+    # Typechecking should always fill in a type, even 'error'.
     unless @col? && @col.type?
       throw new NotReadyError("column #{@columnId}")
     # Future: Set this when we know it.
@@ -174,7 +174,7 @@ class ViewSection
       gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses[..])
       gridValue[0][0].qCellId = qCellId
       gridValue[0][0].qFamilyId = qFamilyId
-      if !typeIsPrimitive(@col.type)
+      if typeIsReference(@col.type)
         gridValue[0][0].cssClasses.push('reference')
       gridHorizExtend(grid, gridValue)
     # Subsections
@@ -315,11 +315,11 @@ class ViewSection
 
   # XXX: Duplicating logic from columnLogicalChildrenByName?  (Avoiding this
   # would require a comprehensive emulation layer for keys as fields.)
-  if col.type != '_token' && typeIsPrimitive(col.type)
+  if col.type != '_token' && !typeIsReference(col.type)
     return ['up', ['var', 'this'], col._id, true]
   for childColId in col.children
     childCol = getColumn(childColId)
-    unless typeIsPrimitive(childCol.type) && !childCol.isObject
+    unless !typeIsReference(childCol.type) && !childCol.isObject
       continue
     return ['down', ['var', 'this'], childColId, null, true]
   return ['lit', 'text', ['<reference>']]  # :(
@@ -345,7 +345,7 @@ class @ValueFormat
           throw Error("display function returned #{elems.length} elements (#{JSON.stringify elems})")
         value = elems[0]
       # TODO: More type-specific rendering?
-      if !typeIsPrimitive(type)
+      if typeIsReference(type)
         targetCol = getColumn(type)
         fmla = targetCol.referenceDisplay ? defaultReferenceDisplayFormula(targetCol)
         vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
@@ -376,7 +376,7 @@ class StateEdit
   @parseValue: (qFamilyId, text) ->
     if text == @PLACEHOLDER then return "-"  # placeholder. TODO use a special object as placeholder
     type = getColumn(qFamilyId.columnId).type
-    if !typeIsPrimitive(type)
+    if typeIsReference(type)
       #if (m = /^@(\d+)$/.exec(text))
       #  wantRowNum = Number.parseInt(m[1])
       #  for [qCellId, coords] in view.qCellIdToGridCoords.entries()

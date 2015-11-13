@@ -65,7 +65,7 @@ Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, vis
         # TODO: Sending the full content of all referenced objects to the client
         # is a security problem.  Remove this feature and update all affected
         # applications.  (Doesn't really matter until we have authentication.)
-        if expandRefs && c.type? && !typeIsPrimitive(c.type)
+        if expandRefs && c.type? && typeIsReference(c.type)
           ot = View.drillDown(c.type)
           vals = vals.map((v) => @readObj(ot, v, expandRefs, Columns.findOne(ot.root)?.fieldName, visited))
         obj[c.fieldName] = vals
