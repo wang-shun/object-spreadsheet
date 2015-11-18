@@ -272,6 +272,10 @@ class ViewSection
 
     for subsection, i in @subsections
       if @extraColClassBefore[i]?
+        if @extraColClassBefore[i] == 'tableSeparator' && currentHeight == 2
+          # Close off the corner for the root object so we can draw a complete
+          # table separator column.
+          makeCorner(true)
         cssClasses = [@extraColClassBefore[i]]
         unless @extraColClassBefore[i] == 'tableSeparator'
           cssClasses.push(myColorClass)
@@ -282,13 +286,12 @@ class ViewSection
       if currentHeight == 2 && subsectionGrid.length > 2
         makeCorner(false)  # may increase currentHeight so next condition holds
       if subsectionGrid.length < currentHeight
+        cssClasses = [myColorClass]
+        if i < @subsections.length - 1 && !@amRootWithSeparateTables
+          cssClasses.push('rsHeaderNonfinal')
         paddingGrid = gridMergedCell(
           currentHeight - subsectionGrid.length, subsection.width,
-          '',
-          [
-            (if i < @subsections.length - 1 then ['rsHeaderNonfinal'] else [])...,
-            myColorClass
-          ])
+          '', cssClasses)
         gridVertExtend(paddingGrid, subsectionGrid)
         subsectionGrid = paddingGrid
       gridHorizExtend(grid, subsectionGrid)
