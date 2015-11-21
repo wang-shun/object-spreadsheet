@@ -42,7 +42,7 @@ NESTED_UNDERLINING_MAX_DEPTH = 5
 
 # We mainly care that this doesn't crash.
 origFormulaStrForData = (data) ->
-  if data.isObject then return null
+  if data.onObjectHeader then return null
   col = getColumn(data.columnId)
   formula = col?.formula
   formula && stringifyFormula(col.parent, formula)
@@ -131,10 +131,10 @@ Template.changeColumn.helpers
   isFormulaModified: ->
     newFormulaStr.get() != origFormulaStrForData(this)
   columnName: ->
-    stringifyColumnRef([@columnId, !@isObject])
+    stringifyColumnRef([@columnId, !@onObjectHeader])
   keyColumnName: ->
     c = getColumn(@columnId)
-    if @isObject && c.type != '_token' then c.fieldName else null
+    if @onObjectHeader && c.type != '_token' then c.fieldName else null
   typeMenu: ->
     col = getColumn(@columnId)
     items = []
@@ -151,8 +151,8 @@ Template.changeColumn.helpers
       new HtmlOption('state', 'editable'),
       new HtmlOption('computed', 'computed by formula'),
       ], if getColumn(@columnId).formula? then 'computed' else 'state')
-  isFormula: ->  # Used to test whether the formula box should appear.
-    origFormulaStrForData(this)?
+  isComputed: ->
+    getColumn(@columnId).formula?
   newFormulaInfo: ->
     newFormulaInfo.get()
   isFormulaDebuggerOpen: ->
@@ -169,7 +169,7 @@ Template.changeColumn.helpers
   #    colorIndexForDepth(columnDepth(col.parent))
   #  else null
 
-  # Should only be called when isObject = true
+  # Should only be called when onObjectHeader = true
   referenceDisplayColumnMenu: ->
     col = getColumn(@columnId)
     defaultColId = defaultReferenceDisplayColumn(col)

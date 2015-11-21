@@ -168,7 +168,7 @@ class ViewSection
       gridObject = gridMergedCell(height, 1, @objectSymbol(), ['centered'])
       gridObject[0][0].qCellId = qCellId
       gridObject[0][0].qFamilyId = qFamilyId
-      gridObject[0][0].isObject = true
+      gridObject[0][0].isObjectCell = true
       # For debugging and calling canned transactions from the console.
       gridObject[0][0].fullText = 'Object ID: ' + JSON.stringify(hlist.cellId)
       if @col.type != '_token'
@@ -216,14 +216,14 @@ class ViewSection
          (if @col.type != '_token' then ['rsHeaderFieldNameKeyedObject'] else [])...,
          myColorClass])
       fieldNameCell.columnId = @columnId
-      fieldNameCell.isObject = true
+      fieldNameCell.isObjectHeader = true
       typeCell = new ViewCell(
         @objectSymbol(), 1, 1,
         ['rsHeaderTypeObject',
          (if @col.type != '_token' then ['rsHeaderTypeKeyedObject'] else [])...,
          'centered', myColorClass])
       typeCell.columnId = @columnId
-      typeCell.isObject = true
+      typeCell.isObjectHeader = true
       if @col.type == '_token'
         # There is no value UI-column, so certain functionality that would
         # normally be on the value UI-column is on the object UI-column instead.
@@ -275,7 +275,7 @@ class ViewSection
       corner = gridMergedCell(height - 2, grid[0].length,
                               @col.objectName ? '', classes)
       corner[0][0].columnId = @columnId
-      corner[0][0].isObject = true
+      corner[0][0].isObjectHeader = true
       corner[0][0].kind = 'top'
       gridVertExtend(corner, grid)
       grid = corner
@@ -500,7 +500,7 @@ class ClientView
     @qCellIdToGridCoords = new EJSONKeyedMap()
     for rowCells, i in grid
       for cell, j in rowCells
-        if cell.qCellId? && cell.isObject
+        if cell.qCellId? && cell.isObjectCell
           @qCellIdToGridCoords.set(cell.qCellId, {row: i, col: j})
           ## dataRow is user-facing row number, one-based.
           # dataRow: i - headerHeight + 1
@@ -552,7 +552,7 @@ class ClientView
         classes = if @colClasses[col] == 'tableSeparator' then ['tableSeparator'] else
                   if @colClasses[col] == 'separator' then ['separator'] else
                   if @colClasses[adjcol] == 'separator' then ['incomparable'] else []
-        if cell.qCellId? && cell.isObject && (refc = @refId(cell.qCellId))?
+        if cell.qCellId? && cell.isObjectCell && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
         ancestors = if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
                     else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).ancestors() \
@@ -566,8 +566,8 @@ class ClientView
           # Only column header "top", "below", and "type" cells can be edited,
           # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
           readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
-                      cell.qCellId? && !cell.isObject && StateEdit.canEdit(cell.qCellId.columnId) ||
-                      cell.qFamilyId? && !cell.isObject && StateEdit.canEdit(cell.qFamilyId.columnId))
+                      cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
+                      cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
       autoColumnSize: true
       mergeCells: [].concat((
@@ -618,12 +618,12 @@ class ClientView
             if parsed
               Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
                           standardServerCallback
-          if cell.qCellId? && !cell.isObject
+          if cell.qCellId? && !cell.isObjectCell
             if newVal
               StateEdit.modifyCell cell.qCellId, newVal
             else
               StateEdit.removeCell cell.qCellId
-          else if cell.qFamilyId? && !cell.isObject
+          else if cell.qFamilyId? && !cell.isObjectCell
             if newVal
               StateEdit.addCell cell.qFamilyId, newVal
         # Don't apply the changes directly; let them come though the Meteor
@@ -803,15 +803,15 @@ class ClientView
         [{
           _id: EJSON.stringify(qf)
           qFamilyId: qf
-          canAddValue: col.type not in ['_token', '_unit'] && !selectedCell.isObject
+          canAddValue: col.type not in ['_token', '_unit'] && !selectedCell.isObjectCell
           # A token column has only the object UI-column, though we don't set
           # isObject on family padding cells.  So don't check it.
           canAddToken: col.type == '_token'
           # Adding a duplicate value has no effect, but disallow it as a
-          # hint to the user.  !selectedCell.isObject is in principle a
+          # hint to the user.  !selectedCell.isObjectCell is in principle a
           # requirement, though it ends up being redundant because the only way
           # to select an object cell is to already have a unit value present.
-          canAddUnit: (col.type == '_unit' && !selectedCell.isObject &&
+          canAddUnit: (col.type == '_unit' && !selectedCell.isObjectCell &&
                        !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
         }]
       else
@@ -820,7 +820,7 @@ class ClientView
     ActionBar.changeColumnArgs.set(
       if selectedCell? &&
          (ci = selectedCell.columnId)? && ci != rootColumnId
-        [{_id: ci, columnId: ci, isObject: selectedCell.isObject}]
+        [{_id: ci, columnId: ci, onObjectHeader: selectedCell.isObjectHeader}]
       else
         []
     )
@@ -900,7 +900,7 @@ rebuildView = (viewId) ->
   if selectedCell?
     ((selectedCell.qCellId? &&
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId) &&
-                                     selectedCell.isObject == c.isObject)) ||
+                                     selectedCell.isObjectCell == c.isObjectCell)) ||
      (selectedCell.qFamilyId? &&
       view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
      (selectedCell.qFamilyId? &&

@@ -61,10 +61,10 @@
       Total hack.  Feel free to replace with a better solution. }}
   <div style="height: 32px; margin-bottom: 4px;">
     <span style="display: inline-block; height: 25px;"></span>{{columnName}} :
-    {{#if isObject}}
+    {{#if onObjectHeader}}
       {{! The below should still be half-reasonable for state keyed objects,
           even though we're deprecating them for now. }}
-      {{#unless isFormula}}
+      {{#unless isComputed}}
         editable
       {{/unless}}
       objects
@@ -83,38 +83,39 @@
       </select>
     {{/if}}
   </div>
-  {{#if isFormula}}
-    <div style="margin-bottom: 4px; width: 100%; display: flex; flex-direction: row;">
-      {{! Wrap in div so height does not change along with formula bar when debugger is opened }}
-      <div style="margin-right: 4px;">
-        <button class="formulaDebuggerToggle" style="font-family: monospace;">{{#if isFormulaDebuggerOpen}}-{{else}}+{{/if}}</button>
-        Formula{{#if contextText}} (in context of {{contextText}}){{/if}}:
-      </div>
-      <div id="changeFormula-formula" class="formula {{#if isFormulaModified}}formulaModified{{/if}}"
-           style="flex-grow: 1; position: relative;">{{! height determined by code }}
-        {{#if isFormulaDebuggerOpen}}
-          <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
-          {{#each newFormulaInfo.bands}}
-            <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
-                 style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
-          {{/each}}
-        {{/if}}
-      </div>
-      <div style="margin-left: 4px;">
-        <button class="saveFormula" disabled={{not isFormulaModified}}>Save</button>
-        <button class="revertFormula" disabled={{not isFormulaModified}}>Cancel</button>
-      </div>
-    </div>
-    {{#if isFormulaDebuggerOpen}}
-    {{! May as well let this exist empty when no band is selected to save an afterFlush in the template. }}
-    <div id="TracingView" style="width: 100%; height: 180px; overflow: auto;"></div>
-    {{/if}}
-  {{/if}}
-  {{#if isObject}}
+  {{#if onObjectHeader}}
   <div>Display references using:
     <select id="changeColumn-referenceDisplayColumn">
       {{> html_select_content referenceDisplayColumnMenu}}
     </select>
   </div>
+  {{else}}
+    {{#if isComputed}}
+      <div style="margin-bottom: 4px; width: 100%; display: flex; flex-direction: row;">
+        {{! Wrap in div so height does not change along with formula bar when debugger is opened }}
+        <div style="margin-right: 4px;">
+          <button class="formulaDebuggerToggle" style="font-family: monospace;">{{#if isFormulaDebuggerOpen}}-{{else}}+{{/if}}</button>
+          Formula{{#if contextText}} (in context of {{contextText}}){{/if}}:
+        </div>
+        <div id="changeFormula-formula" class="formula {{#if isFormulaModified}}formulaModified{{/if}}"
+             style="flex-grow: 1; position: relative;">{{! height determined by code }}
+          {{#if isFormulaDebuggerOpen}}
+            <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
+            {{#each newFormulaInfo.bands}}
+              <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
+                   style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
+            {{/each}}
+          {{/if}}
+        </div>
+        <div style="margin-left: 4px;">
+          <button class="saveFormula" disabled={{not isFormulaModified}}>Save</button>
+          <button class="revertFormula" disabled={{not isFormulaModified}}>Cancel</button>
+        </div>
+      </div>
+      {{#if isFormulaDebuggerOpen}}
+      {{! May as well let this exist empty when no band is selected to save an afterFlush in the template. }}
+      <div id="TracingView" style="width: 100%; height: 180px; overflow: auto;"></div>
+      {{/if}}
+    {{/if}}
   {{/if}}
 </template>
