@@ -57,59 +57,64 @@
 </template>
 
 <template name="changeColumn">
-  <form>
-    <!-- hack to extend formula bar to fill the window and leave room -->
-    <!-- for the buttons -->
-    <table style="width: 100%">
-      <tr>
-      <td class="labelBox">
-        {{columnName}}
-        {{#unless isObject}}
-        :: <input name="type" value="{{columnSpecifiedType}}" placeholder="{{columnType}}">
-        {{/unless}}
-      </td>
-      {{#if isObject}}
-        <td colspan="2"></td>
-      {{else}}
-        {{#if formula}}
-        <th class="labelBox"><label for="changeFormula-formula">=</label></th>
-        <td>
-          <div id="changeFormula-formula" class="formula {{formulaClass}}" style="width: 100%; position: relative;">
-            <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
-            {{#each newFormulaInfo.bands}}
-              <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
-                   style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
-            {{/each}}
-          </div>
-        </td>
-        {{else}}
-        <td colspan="2"><button type="button" class="create">Create formula</button></td>
-        {{/if}}
+  {{! Avoid size change when drop-down boxes appear, at least in Matt's configuration.
+      Total hack.  Feel free to replace with a better solution. }}
+  <div style="height: 32px; margin-bottom: 4px;">
+    <span style="display: inline-block; height: 25px;"></span>{{columnName}} :
+    {{#if isObject}}
+      {{! The below should still be half-reasonable for state keyed objects,
+          even though we're deprecating them for now. }}
+      {{#unless isFormula}}
+        editable
+      {{/unless}}
+      objects
+      {{#if keyColumnName}}
+        generated for {{keyColumnName}}
       {{/if}}
-      <td class="buttonBox">
-        <input type="submit" value="Save"/>
-        <input type="reset" value="Revert"/>
-      </td>
-      </tr>
-      <tr>
-        {{#if isObject}}
-          <td class="labelBox" colspan="3">Reference display format:
-            <input id="changeColumn-referenceDisplay" type="text" name="referenceDisplay" placeholder="{{defaultReferenceDisplay}}"
-                   class="referenceDisplay {{referenceDisplayClass}}"/></td>
-        {{else}}
-          <!-- I'm not sold on this feature, but keeping it until it causes a problem. ~ Matt 2015-10-06 -->
-          <td class="labelBox" colspan="3">Display format:
-            <input id="changeColumn-display" type="text" name="display" placeholder="(default)"
-                   class="display {{displayClass}}"/></td>
+    {{else}}
+      type
+      <select id="changeColumn-type">
+        {{> html_select_content typeMenu}}
+      </select>,
+      {{! Disallowed state transitions are rejected in code. }}
+      <select id="changeColumn-backend">
+        {{! Doesn't buy us much in this case. }}
+        {{> html_select_content backendMenu}}
+      </select>
+    {{/if}}
+  </div>
+  {{#if isFormula}}
+    <div style="margin-bottom: 4px; width: 100%; display: flex; flex-direction: row;">
+      {{! Wrap in div so height does not change along with formula bar when debugger is opened }}
+      <div style="margin-right: 4px;">
+        <button class="formulaDebuggerToggle" style="font-family: monospace;">{{#if isFormulaDebuggerOpen}}-{{else}}+{{/if}}</button>
+        Formula{{#if contextText}} (in context of {{contextText}}){{/if}}:
+      </div>
+      <div id="changeFormula-formula" class="formula {{#if isFormulaModified}}formulaModified{{/if}}"
+           style="flex-grow: 1; position: relative;">{{! height determined by code }}
+        {{#if isFormulaDebuggerOpen}}
+          <!-- Spacebars docs: "However, an error is never thrown when trying to index into a non-object or an undefined value." -->
+          {{#each newFormulaInfo.bands}}
+            <div class="formulaBand {{#if selected}}formulaBandSelected{{/if}}"
+                 style="left: {{left}}px; width: {{width}}px; top: {{top}}px; height: {{height}}px;"></div>
+          {{/each}}
         {{/if}}
-      </tr>
-      {{#if newFormulaInfo.selectedBand}}
-      <tr>
-        <td colspan="3">
-          <div id="TracingView" style="height: 180px; overflow: auto;"></div>
-        </td>
-      </tr>
-      {{/if}}
-    </table>
-  </form>
+      </div>
+      <div style="margin-left: 4px;">
+        <button class="saveFormula" disabled={{not isFormulaModified}}>Save</button>
+        <button class="revertFormula" disabled={{not isFormulaModified}}>Cancel</button>
+      </div>
+    </div>
+    {{#if isFormulaDebuggerOpen}}
+    {{! May as well let this exist empty when no band is selected to save an afterFlush in the template. }}
+    <div id="TracingView" style="width: 100%; height: 180px; overflow: auto;"></div>
+    {{/if}}
+  {{/if}}
+  {{#if isObject}}
+  <div>Display references using:
+    <select id="changeColumn-referenceDisplayColumn">
+      {{> html_select_content referenceDisplayColumnMenu}}
+    </select>
+  </div>
+  {{/if}}
 </template>

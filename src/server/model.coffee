@@ -27,6 +27,7 @@ class Model
         typecheckError: null
         isObject: true  # Allow children.
         objectName: null
+        referenceDisplayColumn: null
         formula: null
 
     # If this is the first time the server process is accessing this sheet, it
@@ -62,8 +63,8 @@ class Model
                              'A column with isObject = false cannot have an objectName.')
     if !formula?
       if parentCol.formula?
-        throw new Meteor.Error('defineColumn-state-under-formula',
-                               'Creating a state column as child of a formula column is currently not allowed.')
+        throw new Meteor.Error('state-under-formula',
+                               'Cannot have a state column as child of a formula column.')
       if !specifiedType?
         # TODO perhaps a better flow would be to leave undefined, but check when
         #  user enters data
@@ -82,6 +83,7 @@ class Model
       typecheckError: null
       isObject: isObject
       objectName: objectName
+      referenceDisplayColumn: null
       formula: formula
       children: []
     }
@@ -97,6 +99,14 @@ class Model
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
 
     return thisId
+
+  # Should be roughly equivalent to what you get by adding a field and then
+  # "promoting" to an object type via the flow in changeColumnIsObject.  I'd
+  # rather do this in one call to the server. ~ Matt 2015-11-12
+  insertUnkeyedStateObjectTypeWithField: (parentId, index, objectName, fieldName, specifiedType, attrs) ->
+    objectColId = @defineColumn(parentId, index, null, '_token', true, objectName, null, attrs)
+    fieldColId = @defineColumn(objectColId, 0, fieldName, specifiedType, false, null, null, attrs)
+    return [objectColId, fieldColId]
 
   changeColumnFieldName: (columnId, fieldName) ->
     if columnId == rootColumnId
@@ -135,8 +145,8 @@ class Model
       # newly created child column
       if !col.formula?
         @invalidateSchemaCache()
-        Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: col.fieldName, fieldName: null}})
-        childId = @defineColumn(columnId, 0, "field1", col.specifiedType, false, null, null, {})
+        Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: null, fieldName: null}})
+        childId = @defineColumn(columnId, 0, col.fieldName, col.specifiedType, false, null, null, {})
         Cells.find({column: columnId}).forEach (family) ->
           tokens = (Random.id() for value in family.values)
           Cells.update(family._id, {$set: {values: tokens}})
@@ -196,39 +206,56 @@ class Model
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
-    # TODO check that there are no state cells
-    #unless col.formula?
-    # ...
-    #  throw new Meteor.Error('changeFormula-on-non-formula-column',
-    #                         'Can only changeFormula on a formula column!')
     if formula?
       validateFormula(formula)
+
     col = @getColumn(columnId)
-    # Hack: When a state column is converted to a formula column,
-    # automatically remove the specified type.  This should be OK because having
-    # to specify a type for a formula column is a rare case.  If at some point
-    # we distinguish whether state column types were user-specified or inferred
-    # from data, then we could consider keeping a user-specified type here.
-    if !col.formula?
-      Columns.update(columnId, {$set: {specifiedType: null}})
-    Columns.update(columnId, {$set: {formula}})
+    updates = {formula}
+    if !col.formula? && formula?
+      for childColumnId in col.children
+        if !@getColumn(childColumnId).formula?
+          throw new Meteor.Error('state-under-formula',
+                                 'Cannot have a state column as child of a formula column.')
+
+      # Currently this is allowed to just blow away existing state cells.
+
+      # Hack: When a state column is converted to a formula column,
+      # automatically remove the specified type.  This should be OK because having
+      # to specify a type for a formula column is a rare case.  If at some point
+      # we distinguish whether state column types were user-specified or inferred
+      # from data, then we could consider keeping a user-specified type here.
+      updates.specifiedType = null
+    else if col.formula? && !formula?
+      parentCol = @getColumn(col.parent)
+      if parentCol.formula?
+        throw new Meteor.Error('state-under-formula',
+                               'Cannot have a state column as child of a formula column.')
+      if col.type not in [TYPE_EMPTY, TYPE_ERROR]
+        # We'd better set a specifiedType that matches the evaluated families.
+        # If col.specifiedType is already set, col.type will be the same and
+        # this will be a no-op.
+        updates.specifiedType = col.type
+      else
+        # In this case, there are no nonempty evaluated families.
+        # The user can easily change the type if it isn't what they want.
+        updates.specifiedType = DEFAULT_STATE_FIELD_TYPE
+      # Convert erroneous families to empty. :/
+      Cells.update({column: columnId, error: {$exists: true}},
+                   {$unset: {error: null}, $set: {values: []}},
+                   {multi: true})
+
+    Columns.update(columnId, {$set: updates})
     @invalidateSchemaCache()  # type may change
 
-  changeColumnDisplay: (columnId, display) ->
+  changeColumnReferenceDisplayColumn: (columnId, referenceDisplayColumn) ->
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
-    if display?
-      validateFormula(display)
-    Columns.update(columnId, {$set: {display}})
-    
-  changeColumnReferenceDisplay: (columnId, referenceDisplay) ->
-    if columnId == rootColumnId
-      throw new Meteor.Error('modify-root-column',
-                             'Cannot modify the root column.')
-    if referenceDisplay?
-      validateFormula(referenceDisplay)
-    Columns.update(columnId, {$set: {referenceDisplay}})
+    # Don't bother with further validation here because we have to be prepared
+    # anyway for the choice of reference display column to become invalid as a
+    # result of modifications to the sheet.
+    check(referenceDisplayColumn, Match.Optional(String))
+    Columns.update(columnId, {$set: {referenceDisplayColumn}})
 
   reorderColumn: (columnId, newIndex) ->
     if columnId == rootColumnId
@@ -245,17 +272,13 @@ class Model
     if columnId == rootColumnId
       throw new Meteor.Error('delete-root-column',
                              'Cannot delete the root column.')
-    # Assert not root
     col = @getColumn(columnId)
     if col.children?.length
       throw new Meteor.Error('delete-column-has-children',
                              'Please delete all child columns first.')
-    # XXX: Make this work again.
-    #if columnIsState(col) && col.numStateCells > 0
-    #  throw new Meteor.Error('delete-column-has-state-cells',
-    #                         'Please delete all state cells first.')
     parentCol = @getColumn(col.parent)
     @invalidateSchemaCache()
+    Cells.remove({column: columnId})
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     Columns.remove(columnId)
@@ -570,6 +593,16 @@ Meteor.methods
       id = @model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula)
       if viewId? then new View(viewId).addColumn(id, true)  # FIXME: honor index
       @model.evaluateAll()
+  insertUnkeyedStateObjectTypeWithField: (cc, parentId, index, objectName, fieldName, specifiedType, viewId) ->
+    cc.run ->
+      #attrs = if viewId? then {view: viewId} else {}
+      [objectColId, fieldColId] = @model.insertUnkeyedStateObjectTypeWithField(
+        parentId, index, objectName, fieldName, specifiedType)
+      if viewId?
+        view = new View(viewId)
+        view.addColumn(objectColId, true)  # FIXME: honor index
+        view.addColumn(fieldColId, true)  # FIXME: honor index
+      @model.evaluateAll()
   changeColumnFieldName: (cc, columnId, fieldName) ->
     cc.run -> @model.changeColumnFieldName(columnId, fieldName)
   changeColumnIsObject: (cc, columnId, isObject) ->
@@ -587,12 +620,9 @@ Meteor.methods
     cc.run ->
       @model.changeColumnFormula(columnId, formula)
       @model.evaluateAll()
-  changeColumnDisplay: (cc, columnId, display) ->
+  changeColumnReferenceDisplayColumn: (cc, columnId, referenceDisplayColumn) ->
     cc.run ->
-      @model.changeColumnDisplay(columnId, display)
-  changeColumnReferenceDisplay: (cc, columnId, referenceDisplay) ->
-    cc.run ->
-      @model.changeColumnReferenceDisplay(columnId, referenceDisplay)
+      @model.changeColumnReferenceDisplay(columnId, referenceDisplayColumn)
   reorderColumn: (cc, columnId, newIndex) ->
     cc.run -> @model.reorderColumn(columnId, newIndex)
   deleteColumn: (cc, columnId) ->

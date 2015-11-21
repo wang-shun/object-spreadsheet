@@ -234,7 +234,7 @@ right and a bottom border:
   margin: 9px;
 }
 
-.formulaModified, .formulaModified .CodeMirror {
+.formulaModified .CodeMirror {
   background-color: #FF0;
 }
 

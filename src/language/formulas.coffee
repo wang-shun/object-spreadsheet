@@ -208,7 +208,7 @@ Type = {
     arg
 }
 
-getValues = (model, vars, cells) ->
+getValues = (model, cells) ->
   # XXX: Fail on token columns
   type = model.typecheckColumn(cells.type)
   new TypedSet(type, set((cellIdLastStep(x) for x in cells.elements())))
@@ -252,7 +252,7 @@ goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
       s.add(targetCellId)
     result = new TypedSet(targetColId, s)
 
-  if wantValues then getValues(model, vars, result) else result
+  if wantValues then getValues(model, result) else result
 
 goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
   # XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
@@ -265,7 +265,54 @@ goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
         targetCellsSet.add(cellIdChild(cellId, value))
   targetCellsTset = new TypedSet(targetColId, targetCellsSet)
 
-  if wantValues then getValues(model, vars, targetCellsTset) else targetCellsTset
+  if wantValues then getValues(model, targetCellsTset) else targetCellsTset
+
+# Even now that we only support a reference display column (not an arbitrary
+# formula), there's still a risk of infinite recursion because we allow the user
+# to choose a reference display column that contains another reference, which
+# we'd have to convert to text.  Ideally we'd bring the toText of each object
+# into the data cache so we could stop infinite recursion the same way we do for
+# formulas in general.  But I don't know how long we'll be keeping this
+# functionality, so for now I'm using the refsSeen set because it's easy.
+#
+# refsSeen contains qCellIds.  Since we have to use the equivalent of
+# EJSON.equals to compare them, we use an EJSONKeyedSet rather than implementing
+# our own list membership test.
+@valueToText = (model, type, value, refsSeen=new EJSONKeyedSet()) ->
+  if typeIsReference(type)
+    qCellId = {columnId: type, cellId: value}
+    if refsSeen.has(qCellId)
+      # C.f. readFamilyForFormula
+      throw new EvaluationError(
+        "Circular dependency while converting object of type " +
+        "#{stringifyType(type)}, ID #{JSON.stringify(value)}, to text")
+    newRefsSeen = refsSeen.shallowClone()
+    newRefsSeen.add(qCellId)
+    col = model.getColumn(type)
+    displayColId = col.referenceDisplayColumn ? defaultReferenceDisplayColumn(col)
+    if displayColId == null
+      # Really nothing we can use?
+      return '<reference>'
+    else if displayColId == type && col.type != '_token'
+      # The key of a keyed object.
+      displayTset = getValues(model, new TypedSet(type, set([value])))
+    else if displayColId in col.children && !model.getColumn(displayColId).isObject
+      displayTset = readFamilyForFormula(model, {columnId: displayColId, cellId: value})
+    else
+      throw new EvaluationError("Invalid reference display column for type #{stringifyType(type)}")
+    tsetToText(model, displayTset, newRefsSeen)
+  else if typeof value == 'string' then value
+  else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
+  # Reasonable fallback
+  else JSON.stringify(value)
+
+tsetToText = (model, tset, refsSeen=new EJSONKeyedSet()) ->
+  type = tset.type
+  elements = tset.elements()
+  if elements.length == 1
+    valueToText(model, type, elements[0], refsSeen)
+  else
+    '{' + (valueToText(model, type, e, refsSeen) for e in elements).join(',') + '}'
 
 annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, expectedFmla) ->
   if !targetName?
@@ -697,27 +744,7 @@ dispatch = {
     argAdapters: [EagerSubformula]
     typecheck: (model, vars, argType) -> 'text'
     evaluate: (model, vars, arg) ->
-      type = arg.type
-      elements = arg.elements()
-      formatOne = (value) ->
-        # XXX Code duplication with ValueFormat.asText
-        if typeIsReference(type)
-          # It would be nice to use the reference display formula here, but I
-          # don't want to do that until it's properly integrated into the
-          # computational model.  For now, users can basically inline the
-          # reference display formula. :/ ~ Matt
-          '<reference>'
-        else if typeof value == 'string' then value
-        else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
-        # Reasonable fallback
-        else JSON.stringify(value)
-      # XXX Code duplication with TracingView.show
-      text =
-        if elements.length == 1
-          formatOne(elements[0])
-        else
-          '{' + (formatOne(e) for e in elements).join(',') + '}'
-      new TypedSet('text', set([text]))
+      new TypedSet('text', set([tsetToText(model, arg)]))
     stringify: (model, vars, argSinfo) ->
       str: "toText(#{argSinfo.strFor(PRECEDENCE_LOWEST)})"
       outerPrecedence: PRECEDENCE_ATOMIC
@@ -878,9 +905,16 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 
   return formula
 
+# Fake model object that can be used by the client or the server to manipulate
+# formulas "on top of" an already evaluated sheet.  (On the server, it would
+# probably also be OK to use the real model object.  However, the client doesn't
+# have access to the real model object under the current design.  Arguably the
+# design could use improvement, but not now. ~ Matt 2015-11-20)
 @liteModel = {
   # Eta-expand to avoid load-order dependency.
   getColumn: (columnId) -> getColumn(columnId)
+  # FIXME: propagate errors
+  evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
   typecheckColumn: (columnId) -> getColumn(columnId).type || throw new Error("Not ready")
 }
 

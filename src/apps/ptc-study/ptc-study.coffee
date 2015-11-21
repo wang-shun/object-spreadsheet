@@ -28,7 +28,7 @@ if Meteor.isClient
 
   Template.PTC_study_FamilyPage.helpers
     FamilyPage: -> Relsheets.readSubtree('FamilyPage', @familyPage)
-    formatDate: (d) -> new ValueFormat().asText(d, null, 'date')
+    formatDate: (d) -> valueToText('date', d)
 
   blur = (jbutton) ->
     jbutton.width(jbutton.width())

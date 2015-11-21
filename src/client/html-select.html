@@ -1,0 +1,19 @@
+<!-- Should be called with an HtmlSelect as context. {{#if isSelected}}selected="true"{{/if}}-->
+<template name="html_select_content">
+  {{#unless currentValueFound}}
+    <option value="{{currentValue}}" selected="true">(invalid choice)</option>
+  {{/unless}}
+  {{#each items}}
+    {{#if isOptgroup}}
+      <optgroup label="{{label}}">
+        {{#each members}}
+          {{! Meteor handles `attr={{false}}` specially to omit the attribute:
+              https://github.com/meteor/meteor/issues/1930#issuecomment-72350318 }}
+          <option value="{{value}}" selected={{isSelected}}>{{label}}</option>
+        {{/each}}
+      </optgroup>
+    {{else}}
+      <option value="{{value}}" selected={{isSelected}}>{{label}}</option>
+    {{/if}}
+  {{/each}}
+</template>

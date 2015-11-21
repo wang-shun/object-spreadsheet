@@ -159,10 +159,13 @@
   return [ancestors1, ancestors2]
 
 # The empty type, subtype of all other types, used for literal empty sets, etc.
+# Not allowed for state columns.
 @TYPE_EMPTY = 'empty'
+
 @TYPE_ERROR = 'error'
 
-MAIN_PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
+@MAIN_PRIMITIVE_TYPES = ['text', 'number', 'bool', 'date']
+@DEFAULT_STATE_FIELD_TYPE = 'text'
 
 # Other special types:
 # _root: reference, should never be user-visible (no concrete syntax to get at it)
@@ -212,6 +215,39 @@ class TypedSet
   @fromJSONValue: (json) ->
     new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set))
 EJSON.addType('TypedSet', TypedSet.fromJSONValue)
+
+
+# The next two definitions are exported for the action bar.
+
+@allowedReferenceDisplayColumns = (col) ->
+  allowed = []
+  # XXX: Duplicating logic from columnLogicalChildrenByName?  (Avoiding this
+  # would require a comprehensive emulation layer for keys as fields.)
+  if col.type != '_token'
+    allowed.push(col._id)
+  for childColId in col.children
+    childCol = getColumn(childColId)
+    if !childCol.isObject
+      allowed.push(childColId)
+  allowed
+
+@defaultReferenceDisplayColumn = (col) ->
+  # Current heuristic: First allowed.
+  #
+  # NOTE: Formulas are allowed to depend on the default reference display column
+  # via toText, so reordering columns may change the spreadsheet values!  This
+  # is a little surprising, but I think it's better than any of the
+  # alternatives. ~ Matt 2015-11-20
+  #
+  # Ideas:
+  # - Prefer a tuple of fields declared unique, if and when we have that
+  #   information.
+  # - Require singular once we have that information.
+  # - Automatically detect certain field names, e.g., "name" or "title"?  A hack
+  #   but maybe the right thing in this context.
+
+  allowed = allowedReferenceDisplayColumns(col)
+  if allowed.length > 0 then allowed[0] else null
 
 
 exported {TypedSet}

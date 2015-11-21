@@ -1,3 +1,6 @@
+# XXX: The division of code between this file and common.coffee is not
+# well-defined.  Define it and move things as necessary.
+
 #COLUMN_COLLECTION = 'columns'
 #CELLS_COLLECTION = 'cells'
 # need them for publisher? maybe just use Columns._name, Cells._name?
@@ -130,7 +133,7 @@ class FamilyId
   # FIXME: Review all callers and implement error propagation where appropriate.
   values: -> @read()?.values ? []
   
-  type: -> Columns.find(@columnId).type
+  type: -> Columns.findOne(@columnId).type
   
   typedValues: -> new TypedSet(@type(), set(@values()))
   

@@ -32,11 +32,11 @@ class ViewVlist
   constructor: (@parentCellId, @minHeight, @hlists, @error) ->
 
 class ViewHlist
-  constructor: (@cellId, @minHeight, @value, @vlists, @cssClasses=[]) ->
+  constructor: (@cellId, @minHeight, @value, @error, @vlists) ->
 
 class ViewSection
 
-  constructor: (@layoutTree, @valueFormat=((x)->x.toString()), @options={}) ->
+  constructor: (@layoutTree, @options={}) ->
     @columnId = @layoutTree.root
     @col = getColumn(@columnId)
     # Typechecking should always fill in a type, even 'error'.
@@ -58,7 +58,7 @@ class ViewSection
     @amRootWithSeparateTables =
       options.separateTables && @columnId == rootColumnId
     for sublayout, i in @layoutTree.subtrees
-      subsection = new ViewSection(sublayout, @valueFormat, @options)
+      subsection = new ViewSection(sublayout, @options)
       @subsections.push(subsection)
       nextLeftEdgeSingular =
         subsection.relationSingular && subsection.leftEdgeSingular
@@ -104,12 +104,20 @@ class ViewSection
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
-    displayValue = @valueFormat(value, @col)
+    try
+      displayValue = valueToText(liteModel, @col.type, value)
+      if typeIsReference(@col.type)
+        displayValue = new CellReference(
+          {columnId: @col.type, cellId: value}, displayValue)
+      error = null
+    catch e
+      displayValue = null
+      error = e.message
     vlists =
       for subsection in @subsections
         subsection.prerenderVlist(cellId)
     minHeight = Math.max(1, (vlist.minHeight for vlist in vlists)...)
-    new ViewHlist(cellId, minHeight, displayValue, vlists, @markDisplayClasses().concat(@valueDisplayClasses()))
+    new ViewHlist(cellId, minHeight, displayValue, error, vlists)
 
   renderVlist: (vlist, height) ->
     qFamilyId = {columnId: @columnId, cellId: vlist.parentCellId}
@@ -140,9 +148,6 @@ class ViewSection
   markDisplayClasses: ->
     markDisplayClassesForType(@col.type)
       
-  valueDisplayClasses: ->
-    if @subsections.length == 0 then ['leaf'] else []
-
   # Only applicable if @col.isObject.
   objectSymbol: ->
     if @col._id == rootColumnId then ''
@@ -171,11 +176,17 @@ class ViewSection
       gridHorizExtend(grid, gridObject)
     if @col.type != '_token'
       # Value
-      gridValue = gridMergedCell(height, 1, hlist.value, hlist.cssClasses[..])
+      gridValue = gridMergedCell(height, 1, hlist.value ? '!')
+      if @subsections.length == 0
+        gridValue[0][0].cssClasses.push('leaf')
+      if hlist.value?
+        gridValue[0][0].cssClasses.push(@markDisplayClasses()...)
+        if typeIsReference(@col.type)
+          gridValue[0][0].cssClasses.push('reference')
+      if hlist.error?
+        gridValue[0][0].fullText = 'Error converting to text: ' + hlist.error
       gridValue[0][0].qCellId = qCellId
       gridValue[0][0].qFamilyId = qFamilyId
-      if typeIsReference(@col.type)
-        gridValue[0][0].cssClasses.push('reference')
       gridHorizExtend(grid, gridValue)
     # Subsections
     for subsection, i in @subsections
@@ -183,7 +194,7 @@ class ViewSection
         extraCells = gridMergedCell(height, 1)
         if @extraColClassBefore[i] == 'separator'
           # Include separator cells in object region highlighting (but for now,
-          # not table separator cells in the corner case of the root object).
+          # not table separator cells for the root object).
           extraCells[0][0].qCellId = qCellId
         gridHorizExtend(grid, extraCells)
       subsectionGrid = subsection.renderVlist(hlist.vlists[i], height)
@@ -306,68 +317,6 @@ class ViewSection
       else 0
 
 
-# Exported: Used for placeholder in action bar
-@defaultReferenceDisplayFormula = (col) ->
-  # Current heuristic: First primitive-type field.  Ideas:
-  # - Prefer a tuple of fields declared unique, if and when we have that
-  #   information.
-  # - Remove "primitive-type" condition once we can handle the recursion.
-  # - Require singular once we have that information.
-  # - Automatically detect certain field names, e.g., "name" or "title"?  A hack
-  #   but maybe the right thing in this context.
-
-  # XXX: Duplicating logic from columnLogicalChildrenByName?  (Avoiding this
-  # would require a comprehensive emulation layer for keys as fields.)
-  if col.type != '_token' && !typeIsReference(col.type)
-    return ['up', ['var', 'this'], col._id, true]
-  for childColId in col.children
-    childCol = getColumn(childColId)
-    unless !typeIsReference(childCol.type) && !childCol.isObject
-      continue
-    return ['down', ['var', 'this'], childColId, null, true]
-  return ['lit', 'text', ['<reference>']]  # :(
-
-# Used also by tracing table in actions.coffee
-class @ValueFormat
-  
-  constructor: ->
-    @tinyModel =
-      # FIXME: propagate errors
-      evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
-      typecheckColumn: (columnId) -> getColumn(columnId).type
-  
-  asText: (value, col, type) ->
-    try
-      type ?= col.type
-      if col?.display?
-        vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
-        fmtd = evaluateFormula(@tinyModel, vars, col.display)
-        type = fmtd.type
-        elems = fmtd.elements()
-        if elems.length != 1
-          throw Error("display function returned #{elems.length} elements (#{JSON.stringify elems})")
-        value = elems[0]
-      # TODO: More type-specific rendering?
-      if typeIsReference(type)
-        targetCol = getColumn(type)
-        fmla = targetCol.referenceDisplay ? defaultReferenceDisplayFormula(targetCol)
-        vars = new EJSONKeyedMap([['this', new TypedSet(type, set([value]))]])
-        # toText contains some of the same primitive type formatting code as below.
-        # XXX: Untangle this.
-        fmtd = evaluateFormula(@tinyModel, vars, ['toText', fmla])
-        elems = fmtd.elements()
-        # toText should always return exactly one string...
-        new CellReference({columnId: type, cellId: value}, elems[0])
-      # Should be unambiguous if the user knows which columns are string-typed.
-      else if typeof value == 'string' then value
-      else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
-      # Reasonable fallback
-      else JSON.stringify(value)
-    catch e
-      console.log(e)
-      e.message
-
-        
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
@@ -388,10 +337,13 @@ class StateEdit
       #  throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
       #else
       if true  # getColumn(type).referenceDisplay?
-        # XXX: Don't match against error messages returned by ValueFormat.asText.
-        # Ignore errors: erroneous families are not candidates to match against.
+        # Ignore erroneous families: they do not contain any objects we can match against.
+        # Also ignore references that fail to convert to text.
         matchingCells = (cellId for cellId in allCellIdsInColumnIgnoreErrors(type) when (
-            text == new ValueFormat().asText(cellId, null, type).display))
+            try
+              text == valueToText(liteModel, type, cellId)
+            catch e
+              false))
         if matchingCells.length == 1
           return matchingCells[0]
         else if matchingCells.length > 1
@@ -430,11 +382,9 @@ class StateEdit
     cel = new CellId(qCellId)
     fam = cel.family()
     if (newValue = @parseValueUi(fam, enteredValue))?
-      # TODO check if cell has children!
       cel.value(newValue, -> $$.call 'notify', callback)
 
   @removeCell: (qCellId, callback=->) ->
-    # TODO check if cell has children!
     new CellId(qCellId).remove(-> $$.call 'notify', callback)
 
   @canEdit: (columnId) ->
@@ -447,16 +397,26 @@ insertBlankColumn = (parentId, index, isObject, view) ->
   # Obey the restriction on a state column as child of a formula column.
   # Although changeColumnFormula allows this to be bypassed anyway... :(
   formula = if getColumn(parentId).formula? then DUMMY_FORMULA else null
-  $$.call('defineColumn',
-              parentId,
-              index,
-              null,  # fieldName
-              if formula? then null else 'text',  # specifiedType
-              isObject,  # isObject
-              null,  # objectName
-              formula,  # formula
-              view?.id,
-              standardServerCallback)
+  if isObject && !formula?
+    $$.call('insertUnkeyedStateObjectTypeWithField',
+            parentId,
+            index,
+            null,  # objectName
+            null,  # fieldName
+            DEFAULT_STATE_FIELD_TYPE,  # specifiedType
+            view?.id,
+            standardServerCallback)
+  else
+    $$.call('defineColumn',
+            parentId,
+            index,
+            null,  # fieldName
+            if formula? then null else DEFAULT_STATE_FIELD_TYPE,  # specifiedType
+            isObject,  # isObject
+            null,  # objectName
+            formula,  # formula
+            view?.id,
+            standardServerCallback)
 
 
 headerExpanded = new ReactiveVar(true)
@@ -478,14 +438,13 @@ class ClientView
       sepcols: false
       # Show children of the root as separate tables.
       separateTables: true
-    @valueFormat = new ValueFormat
     @hot = null
 
     @reload()
 
   reload: () ->
     @layoutTree = @view?.def()?.layout || View.rootLayout()
-    @mainSection = new ViewSection(@layoutTree, @valueFormat.asText.bind(@valueFormat), @options)
+    @mainSection = new ViewSection(@layoutTree, @options)
 
   hotConfig: ->
     thisView = this

@@ -41,36 +41,36 @@ NESTED_UNDERLINING_PX_PER_LEVEL = 4
 NESTED_UNDERLINING_MAX_DEPTH = 5
 
 # We mainly care that this doesn't crash.
-origFormulaStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.formula
-  formula && stringifyFormula(getColumn(columnId).parent, formula)
+origFormulaStrForData = (data) ->
+  if data.isObject then return null
+  col = getColumn(data.columnId)
+  formula = col?.formula
+  formula && stringifyFormula(col.parent, formula)
 newFormulaStr = new ReactiveVar(null)
 newFormulaInfo = new ReactiveVar(null)
 
-origDisplayStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.display
-  formula && stringifyFormula(getColumn(columnId).type, formula) ? ''
-newDisplayStr = new ReactiveVar(null)
-
-origReferenceDisplayStrForColumnId = (columnId) ->
-  formula = getColumn(columnId)?.referenceDisplay
-  # Note!  "this" type is the column itself, not its (key) type.
-  formula && stringifyFormula(columnId, formula) ? ''
-newReferenceDisplayStr = new ReactiveVar(null)
+isFormulaDebuggerOpen = new ReactiveVar(false)
 
 tracingView = null
 
 Template.changeColumn.rendered = () ->
-  formulaStr = origFormulaStrForColumnId(Template.currentData().columnId)
-  newFormulaStr.set(formulaStr)
-  displayStr = origDisplayStrForColumnId(Template.currentData().columnId)
-  newDisplayStr.set(displayStr)
-  @find('input[name=display]')?.value = displayStr
-  referenceDisplayStr = origReferenceDisplayStrForColumnId(Template.currentData().columnId)
-  newReferenceDisplayStr.set(referenceDisplayStr)
-  @find('input[name=referenceDisplay]')?.value = referenceDisplayStr
+  # XXX What if there are unsaved changes when the formula changes externally?
+  @autorun(() ->
+    newFormulaStr.set(origFormulaStrForData(Template.currentData()))
+    )
+  @autorun(() ->
+    unless isFormulaDebuggerOpen.get()
+      info = newFormulaInfo.get()
+      if info?.selectedBand?
+        info.selectedBand.selected = false
+        info.selectedBand = null
+        # Retriggers this autorun, but it will do nothing the second time.
+        newFormulaInfo.set(info)
+      tracingView?.destroy()
+      tracingView = null
+    )
   @autorun(() =>
-    shouldShowFormulaBar = newFormulaStr.get()? && !Template.currentData().isObject
+    shouldShowFormulaBar = newFormulaStr.get()?
     if shouldShowFormulaBar && !@codeMirror?
       # Have to wait for the template to re-render with the new div.
       # afterFlush will become unmaintainable if we push it much further, but
@@ -78,74 +78,151 @@ Template.changeColumn.rendered = () ->
       # for a child template.
       Tracker.afterFlush(() => changeColumnInitFormulaBar(this))
     else if !shouldShowFormulaBar && @codeMirror?
-      # Needed to clear selected band so the action bar collapses.
-      newFormulaInfo.set(null)
-      tracingView?.destroy()
-      tracingView = null
+      # TODO: Consider allowing the action bar to remain expanded when the user
+      # switches columns.  But if we make the toggle button always visible, it
+      # will be less clear that it is related to the formula.
+      isFormulaDebuggerOpen.set(false)
+      for c in @formulaBarComputations
+        c.stop()
+      @formulaBarComputations = null
       # XXX Do we need to tear down the CodeMirror somehow?
       @codeMirror = null
     )
 
 Template.changeColumn.destroyed = () ->
   # Try to avoid holding on to data that's no longer relevant.
-  newFormulaStr.set(null)
-  newFormulaInfo.set(null)
-  newDisplayStr.set(null)
-  newReferenceDisplayStr.set(null)
+  # XXX: Should we rather define the reactive vars on the template instance?
+  # Then we'd need more Template.instance() from the helpers.
+  isFormulaDebuggerOpen.set(false)
   tracingView?.destroy()
   tracingView = null
+  newFormulaInfo.set(null)
+  newFormulaStr.set(null)
+
+# Scanning for all possible reference types is slow enough to make the selection
+# feel laggy, so cache the menu and reuse it.
+typeMenuCommonItems = new ReactiveVar([])
+Relsheets.onOpen(() ->
+  Tracker.autorun(() ->
+    # Note: It's possible to create cycles in the "key + parent" relation on
+    # object types.  This is a pointless thing to do but does not break our
+    # tool; it's as if all of those reference types were merely empty.  So
+    # don't try to prevent it for now.
+    refItems = []
+    scan = (colId) ->
+      c = getColumn(colId)
+      unless c?
+        return  # Not ready?  What a pain.
+      if colId != rootColumnId && c.isObject
+        refItems.push(new HtmlOption(colId, stringifyType(colId)))
+      for childId in c.children
+        scan(childId)
+    scan(rootColumnId)
+
+    items = []
+    items.push(new HtmlOptgroup('Basic types',
+                                (new HtmlOption(t, t) for t in MAIN_PRIMITIVE_TYPES)))
+    items.push(new HtmlOptgroup('Reference to:', refItems))
+    typeMenuCommonItems.set(items)
+    ))
 
 Template.changeColumn.helpers
+  #col: -> getColumn(@columnId)
+  isFormulaModified: ->
+    newFormulaStr.get() != origFormulaStrForData(this)
   columnName: ->
-    stringifyColumnRef([@columnId, !@isObject]).split(':')[-2..].join(':')
-  columnType: ->
+    stringifyColumnRef([@columnId, !@isObject])
+  keyColumnName: ->
     c = getColumn(@columnId)
-    if c?.type then stringifyType(c.type) else ''
-  columnSpecifiedType: ->
-    c = getColumn(@columnId)
-    if c?.specifiedType then stringifyType(c.specifiedType) else ''
-  formula: ->  # Used to test whether the formula box should appear.
-    origFormulaStrForColumnId(@columnId)
-  formulaClass: ->
-    if newFormulaStr.get() != origFormulaStrForColumnId(@columnId) then 'formulaModified'
+    if @isObject && c.type != '_token' then c.fieldName else null
+  typeMenu: ->
+    col = getColumn(@columnId)
+    items = []
+    if col.formula?
+      # Note: Inferred type should match c.type if c.specifiedType is null and
+      # there are no unsaved changes to the formula.
+      info = newFormulaInfo.get()
+      inferredTypeDesc = if info? then stringifyType(info.root.formula.type) else 'error'
+      items.push(new HtmlOption('auto', "auto (#{inferredTypeDesc})"))
+    items.push(typeMenuCommonItems.get()...)
+    new HtmlSelect(items, col.specifiedType ? 'auto')
+  backendMenu: ->
+    new HtmlSelect([
+      new HtmlOption('state', 'editable'),
+      new HtmlOption('computed', 'computed by formula'),
+      ], if getColumn(@columnId).formula? then 'computed' else 'state')
+  isFormula: ->  # Used to test whether the formula box should appear.
+    origFormulaStrForData(this)?
   newFormulaInfo: ->
     newFormulaInfo.get()
-  displayClass: ->
-    if newDisplayStr.get() != origDisplayStrForColumnId(@columnId) then 'formulaModified'
-  defaultReferenceDisplay: ->
-    stringifyFormula(@columnId, defaultReferenceDisplayFormula(getColumn(@columnId)))
-  referenceDisplayClass: ->
-    if newReferenceDisplayStr.get() != origReferenceDisplayStrForColumnId(@columnId) then 'formulaModified'
+  isFormulaDebuggerOpen: ->
+    isFormulaDebuggerOpen.get()
   contextText: ->
     col = getColumn(@columnId)
-    if col.isObject
-      objectNameWithFallback(getColumn(col.parent)) ? '<unnamed>'
+    if col.isObject  # i.e., we are editing the formula of a key column
+      objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
     else null
-  contextColorIndex: ->
+  # Color-coding is much less useful with non-rainbow palettes.
+  #contextColorIndex: ->
+  #  col = getColumn(@columnId)
+  #  if col.isObject
+  #    colorIndexForDepth(columnDepth(col.parent))
+  #  else null
+
+  # Should only be called when isObject = true
+  referenceDisplayColumnMenu: ->
     col = getColumn(@columnId)
-    if col.isObject
-      colorIndexForDepth(columnDepth(col.parent))
-    else null
+    defaultColId = defaultReferenceDisplayColumn(col)
+    defaultColDesc =
+      if defaultColId?
+        getColumn(defaultColId).fieldName ? 'unnamed'
+      else
+        'none'
+    items = [new HtmlOption('auto', "Choose automatically (#{defaultColDesc})")]
+    for displayColId in allowedReferenceDisplayColumns(col)
+      displayCol = getColumn(displayColId)
+      items.push(new HtmlOption(displayColId, displayCol.fieldName ? '(unnamed)'))
+    new HtmlSelect(items, col.referenceDisplayColumn ? 'auto')
 
 changeColumnInitFormulaBar = (template) ->
-  formula = origFormulaStrForColumnId(template.data.columnId)
+  formula = origFormulaStrForData(template.data)
   template.codeMirror = CodeMirror(template.find('#changeFormula-formula'), {
-    value: formula
+    value: ''  # filled in by autorun below
     extraKeys: {
-      Enter: (cm) => changeColumnSubmit(template)
+      Enter: (cm) -> template.find('.saveFormula').click()
+      Esc: (cm) -> template.find('.revertFormula').click()
     }
     })
-  # http://stackoverflow.com/a/15256593
-  template.codeMirror.setSize('100%', template.codeMirror.defaultTextHeight() + 2 * 4 +
-                              NESTED_UNDERLINING_PX_PER_LEVEL * NESTED_UNDERLINING_MAX_DEPTH)
+  template.codeMirrorDoc = template.codeMirror.getDoc()
+  template.formulaBarComputations = [
+    template.autorun(() ->
+      # http://stackoverflow.com/a/15256593
+      height = template.codeMirror.defaultTextHeight() + 2 * 4
+      if isFormulaDebuggerOpen.get()
+        height += NESTED_UNDERLINING_PX_PER_LEVEL * NESTED_UNDERLINING_MAX_DEPTH
+      template.codeMirror.setSize('100%', height)
+    ),
+    template.autorun(() ->
+      formulaStr = newFormulaStr.get()
+      unless formulaStr?
+        # When the formula is cleared, sometimes this runs before the autorun
+        # that tears down the formula bar.  Grr, Meteor, how are we supposed to
+        # avoid these problems in general?
+        return
+      # Avoid re-setting in response to user input, since this sends the cursor
+      # back to the beginning.  Wish for a better two-way binding mechanism...
+      if formulaStr != template.codeMirrorDoc.getValue()
+        template.codeMirrorDoc.setValue(formulaStr)
+      updateFormulaView(template))
+    ]
   template.codeMirror.on('beforeChange', (cm, change) ->
-    newtext = change.text.join('').replace(/\n/g, '')
-    change.update(null, null, [newtext])
-    true)
+    if change.update?
+      newtext = change.text.join('').replace(/\n/g, '')
+      change.update(null, null, [newtext])
+    # Otherwise, change is coming from undo or redo; hope it's OK.
+    )
   template.codeMirror.on('changes', (cm) ->
-    newFormulaStr.set(cm.getDoc().getValue())
-    updateFormulaView(template))
-  updateFormulaView(template)
+    newFormulaStr.set(template.codeMirrorDoc.getValue()))
 
 updateFormulaView = (template) ->
   tracingView?.destroy()
@@ -215,12 +292,14 @@ class TracingView
   show: (node) ->
     formula = node.formula
     formatOne = (val, type) ->
-      fmtd = new ValueFormat().asText(val, null, type)
-      # TODO: Lookup @ references from main table.
-      # TODO (later): highlighting, jump to referent
-      if fmtd instanceof CellReference then fmtd.display ? '@?' else fmtd
+      try
+        valueToText(liteModel, type, value)
+      catch e
+        '<toText failed>'
     formatOutcome = (outcome) ->
       if outcome.result?
+        # XXX Code duplication with tsetToText, currently needed to catch
+        # exceptions for each element of the tset independently.
         if outcome.result.set.size() == 1
           formatOne(outcome.result.elements()[0], outcome.result.type)
         else
@@ -286,122 +365,84 @@ updateTracingView = (template) ->
   tracingView.show(formulaInfo.selectedBand.node)
 
 isExpanded = () ->
-  newFormulaInfo.get()?.selectedBand?
-
-changeColumnSubmit = (template) ->
-  try
-    if template.data.isObject
-      # Set the reference display formula.
-      referenceDisplayStr = newReferenceDisplayStr.get()
-      if referenceDisplayStr?
-        if referenceDisplayStr == ''
-          referenceDisplay = null   # revert to default
-        else
-          try
-            referenceDisplay = parseFormula(template.data.columnId, referenceDisplayStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse reference display formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          referenceDisplayStr = stringifyFormula(template.data.columnId, referenceDisplay)
-          template.find('input[name=referenceDisplay]').value = referenceDisplayStr
-          newReferenceDisplayStr.set(referenceDisplayStr)
-        Meteor.call('changeColumnReferenceDisplay', $$,
-                    template.data.columnId,
-                    referenceDisplay,
-                    standardServerCallback)
-    else
-      # Set the type
-      newVal = template.find('input[name=type]').value
-      parsed = false
-      try
-        type = if newVal == '' then null else parseTypeStr(newVal)
-        parsed = true
-      catch e
-        alert("Invalid type '#{newVal}'.")
-        return false
-      if parsed
-        Meteor.call 'changeColumnSpecifiedType', $$, template.data.columnId, type,
-                    standardServerCallback
-      # Set the formula
-      formulaStr = newFormulaStr.get()
-      if formulaStr?
-        if formulaStr == ''
-          formula = null   # remove formula
-        else
-          try
-            formula = parseFormula(getColumn(template.data.columnId).parent, formulaStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          formulaStr = stringifyFormula(getColumn(template.data.columnId).parent, formula)
-          template.codeMirror?.getDoc().setValue(formulaStr)
-          newFormulaStr.set(formulaStr)
-        Meteor.call('changeColumnFormula', $$,
-                    template.data.columnId,
-                    formula,
-                    standardServerCallback)
-      # Set the display
-      displayStr = newDisplayStr.get()
-      if displayStr?
-        if displayStr == ''
-          display = null   # revert to default
-        else
-          try
-            display = parseFormula(getColumn(template.data.columnId).type, displayStr)
-          catch e
-            unless e instanceof FormulaValidationError
-              throw e
-            alert('Failed to parse display formula: ' + e.message)
-            return false
-          # Canonicalize the string in the field, otherwise the field might stay
-          # yellow after successful submission.
-          displayStr = stringifyFormula(getColumn(template.data.columnId).type, display)
-          template.find('input[name=display]').value = displayStr
-          newDisplayStr.set(displayStr)
-        Meteor.call('changeColumnDisplay', $$,
-                    template.data.columnId,
-                    display,
-                    standardServerCallback)
-  catch e
-    console.error e
+  isFormulaDebuggerOpen.get()
 
 Template.changeColumn.events
-  'input .display': (event, template) ->
-    newDisplayStr.set(event.target.value) #template.find('input[name=display]').value)
-  'input .referenceDisplay': (event, template) ->
-    newReferenceDisplayStr.set(event.target.value)
-  'submit form': (event, template) ->
-    changeColumnSubmit(template)
-    false # prevent refresh
-  'click [type=reset]': (event, template) ->
-    orig = origFormulaStrForColumnId(@columnId)
-    newFormulaStr.set(orig)
-    template.codeMirror?.getDoc().setValue(orig)
-    orig = origDisplayStrForColumnId(@columnId)
-    newDisplayStr.set(orig)
-    template.find('input[name=display]')?.value = orig
-    false # prevent clear
-  'click .create': (event, template) ->
-    # Default formula to get the new column created ASAP.
-	# Then the user can edit it as desired.
-    formula = DUMMY_FORMULA
-    Meteor.call 'changeColumnFormula', $$, @columnId, formula,
-                standardServerCallback
-    # TODO warn user if column has data!!
-    # It's ugly to code this state transition manually.  I considered
-    # introducing a child template, but it's unclear how the parent and child
-    # templates can reference each other. ~ Matt 2015-09-30
-    newFormulaStr.set(origFormulaStrForColumnId(@columnId))
-  'keydown form': (event, template) ->
-    if (event.which == 27) then template.find("[type=reset]")?.click()
+  'change #changeColumn-backend': (event, template) ->
+    newFormula =
+      if getValueOfSelectedOption(template, '#changeColumn-backend') == 'computed'
+        DUMMY_FORMULA
+      else
+        null
+    col = getColumn(@columnId)
+    # With these conditions (plus the fact that DUMMY_FORMULA returns empty sets),
+    # one can toggle between an empty state column and DUMMY_FORMULA without warnings.
+    # If we add the ability to undo this operation, we can probably remove the warnings
+    # (except the numErroneousFamilies one, which Matt believes deserves more respect
+    # in general).
+    if newFormula? && Cells.find({column: @columnId, values: {$not: {$size: 0}}}).count() &&
+        !window.confirm('This will delete all existing cells in the column.  Are you sure?')
+      selectOptionWithValue(template, '#changeColumn-backend', 'state')
+      return
+    if !newFormula? && !EJSON.equals(col.formula, DUMMY_FORMULA)
+      numErroneousFamilies = Cells.find({column: @columnId, error: {$exists: true}}).count()
+      if col.typecheckError?
+        msg = 'This will delete your formula.  '
+      else
+        msg = 'This will take a snapshot of the current computed data and delete your formula.'
+        if numErroneousFamilies
+          msg += "\n\n#{numErroneousFamilies} families are currently failing to evaluate; " +
+               "they will become empty, and you will not be able to distinguish them from " +
+               "families that were originally empty.\n\n"
+        else
+          msg += '  '
+      msg += 'Are you sure?'
+      if !window.confirm(msg)
+        selectOptionWithValue(template, '#changeColumn-backend', 'computed')
+        return
+    # Server checks for "state column as child of formula column" error.
+    # XXX: Disallow converting keyed objects to state?
+    Meteor.call('changeColumnFormula', $$,
+                @columnId,
+                newFormula,
+                standardServerCallback)
+  'change #changeColumn-type': (event, template) ->
+    newSpecifiedType = getValueOfSelectedOption(template, '#changeColumn-type')
+    if newSpecifiedType == 'auto'
+      newSpecifiedType = null
+    Meteor.call('changeColumnSpecifiedType', $$,
+                @columnId,
+                newSpecifiedType,
+                standardServerCallback)
+  'change #changeColumn-referenceDisplayColumn': (event, template) ->
+    newReferenceDisplayColumn = getValueOfSelectedOption(template, '#changeColumn-referenceDisplayColumn')
+    if newReferenceDisplayColumn == 'auto'
+      newReferenceDisplayColumn = null
+    Meteor.call('changeColumnReferenceDisplayColumn', $$,
+                @columnId,
+                newReferenceDisplayColumn,
+                standardServerCallback)
+  'click .saveFormula': (event, template) ->
+    formulaStr = newFormulaStr.get()
+    contextColumnId = getColumn(@columnId).parent
+    try
+      formula = parseFormula(contextColumnId, formulaStr)
+    catch e
+      unless e instanceof FormulaValidationError
+        throw e
+      alert('Failed to parse formula: ' + e.message)
+      return
+    # Canonicalize the string in the field, otherwise the field might stay
+    # yellow after successful submission.
+    newFormulaStr.set(stringifyFormula(contextColumnId, formula))
+    Meteor.call('changeColumnFormula', $$,
+                @columnId,
+                formula,
+                standardServerCallback)
+  'click .revertFormula': (event, template) ->
+    newFormulaStr.set(origFormulaStrForData(this))
+  'click .formulaDebuggerToggle': (event, template) ->
+    isFormulaDebuggerOpen.set(!isFormulaDebuggerOpen.get())
   'click .formulaBand': (event, template) ->
     # Update selection.
     formulaInfo = newFormulaInfo.get()
@@ -410,8 +451,8 @@ Template.changeColumn.events
     @selected = true
     newFormulaInfo.set(formulaInfo)  # Trigger reactive dependents
 
-    # Make sure tracing area has become visible, if necessary.
-    Tracker.afterFlush(() -> updateTracingView(template))
+    # XXX Might be nice to make this an autorun.
+    updateTracingView(template)
 
 # Needed for the formula div to get added during the "Create formula" handler,
 # rather than sometime later when we get the update from the server.

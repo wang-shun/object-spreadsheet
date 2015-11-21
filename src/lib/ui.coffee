@@ -1,4 +1,6 @@
 if Meteor.isClient
+  Template.registerHelper('not', (x) -> !x)
+
   # Future: Make this better.
   standardServerCallback = (error, result) ->
     if error?

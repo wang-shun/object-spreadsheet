@@ -1,5 +1,6 @@
 
 if Meteor.isClient
+  openCallbacks = []
   Relsheets =
     open: (sheet, proceduresAppName=null) ->
       Tablespace.default = Tablespace.get(sheet)
@@ -7,9 +8,13 @@ if Meteor.isClient
         if proceduresAppName?
           $$.call('compileProcedures', proceduresAppName)
         $$.subscribeAll())
+      for callback in openCallbacks
+        callback()
     call: (transaction, argsObj, callback) ->
       $$.call('executeCannedTransaction', transaction, glue(argsObj),
               standardServerCallbackThen(callback))
+    onOpen: (callback) ->
+      openCallbacks.push(callback)
 
 
 if Meteor.isServer
