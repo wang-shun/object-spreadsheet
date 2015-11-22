@@ -293,8 +293,9 @@ class TracingView
     formula = node.formula
     formatOne = (val, type) ->
       try
-        valueToText(liteModel, type, value)
+        valueToText(liteModel, type, val)
       catch e
+        # TODO: Make error message viewable like in the sheet.
         '<toText failed>'
     formatOutcome = (outcome) ->
       if outcome.result?
