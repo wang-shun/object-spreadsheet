@@ -536,15 +536,15 @@ class ClientView
             when 'separator' then 10
             else undefined
       rowHeights:
-        # Specify all the row heights (23 pixels is the Handsontable default),
+        # Specify all the row heights (24 pixels is the Handsontable default),
         # otherwise the fixed clone of the left column sometimes reduced the
         # objectName row to zero height because it wasn't constrained by the
         # content of the real table.  We can look out for any similar glitches.
         if headerExpanded.get()
           for i in [0...@grid.length]
-            if i < headerHeight - (2 + @options.showTypes) then 10 else 23
+            if i < headerHeight - (2 + @options.showTypes) then 11 else 24
         else
-          23 for i in [0...@grid.length]
+          24 for i in [0...@grid.length]
       cells: (row, col, prop) =>
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
@@ -569,7 +569,12 @@ class ClientView
                       cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
                       cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
-      autoColumnSize: true
+      autoColumnSize: {
+        # I saw glitches with the asynchronous sizing on the cost sheet.  Rather
+        # than investigate, I'm happy to go back to synchronous for now.
+        # ~ Matt 2015-11-21
+        syncLimit: '100%'
+      }
       mergeCells: [].concat((
         for row,i in grid
           for cell,j in row when cell.rowspan != 1 || cell.colspan != 1
@@ -750,18 +755,12 @@ class ClientView
     if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
-    @hot
 
-  hotReconfig: (hot) ->
+  hotReconfig: () ->
     d = @hotConfig()
-    ## Crazy hack!
-    @hot = hot = hot ? @hot
-    MergeCells = hot.mergeCells.constructor
-    hot.mergeCells = new MergeCells(d.mergeCells)
-    hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
-    hot.updateSettings {colWidths: d.colWidths, rowHeights: d.rowHeights}
-    hot.loadData d.data
-    #hot.render()
+    @hot.updateSettings {colWidths: d.colWidths, rowHeights: d.rowHeights, mergeCells: d.mergeCells}
+    @hot.loadData d.data
+    #@hot.render()
 
   getSingleSelectedCell: =>
     s = @hot.getSelected()
@@ -826,9 +825,8 @@ class ClientView
     )
 
   onKeyDown: (event) ->
-    Handsontable.Dom.enableImmediatePropagation(event)
     if event.altKey && event.metaKey
-      event.stopImmediatePropagation()
+      Handsontable.Dom.stopImmediatePropagation(event)
     else if !event.altKey && !event.ctrlKey && !event.metaKey 
       if event.which == 13    # Enter
         selectedCell = @getSingleSelectedCell()
@@ -845,12 +843,12 @@ class ClientView
         selectedCell = @getSingleSelectedCell()
         if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
           StateEdit.addCell qf, (if col.type == '_token' then '*' else StateEdit.PLACEHOLDER)
-          event.stopImmediatePropagation()
+          Handsontable.Dom.stopImmediatePropagation(event)
     else if event.altKey && !event.ctrlKey && !event.metaKey
       # Use Alt + Left/Right to reorder columns inside parent
       #     Alt + Up/Down to make column into object/value
       if event.which == 37 || event.which == 39 || event.which == 38 || event.which == 40
-        event.stopImmediatePropagation()
+        Handsontable.Dom.stopImmediatePropagation(event)
         event.stopPropagation()
         event.preventDefault()
         selectedCell = @getSingleSelectedCell()

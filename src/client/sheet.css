@@ -55,14 +55,14 @@ body {
 }
 
 /*
-Override some Handsontable styles.  div.htContainer is an extra selector that
+Override some Handsontable styles.  div.wtHolder is an extra selector that
 will always match, just to get higher priority.
 */
-.handsontable div.htContainer td {
+.handsontable div.wtHolder td {
   /* Allow height to be determined by settings. */
   height: auto;
 }
-.handsontable div.htContainer table.htCore {
+.handsontable div.wtHolder table.htCore {
   /*
   Allows the right border of a cell to be used interchangeably with the left
   border of the next cell to the right, and similarly for horizontal borders;
@@ -73,7 +73,7 @@ will always match, just to get higher priority.
 }
 .handsontable table.htCore {
   /* Adding div.htContainer to the above selector results in incorrect column widths
-     (Handsontable uses a ghost element to compute the width). */
+     (Handsontable uses a ghost element to compute the width). TODO */
   font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
   font-size: 12px;
 }

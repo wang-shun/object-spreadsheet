@@ -674,10 +674,7 @@ var $WalkontableViewportColumnsCalculator = WalkontableViewportColumnsCalculator
     return width;
   }
 }, {get DEFAULT_WIDTH() {
-    // This is used as the minimum width of auto-sized columns.
-    // Change for Object Spreadsheets to allow narrower object and unit columns.
-    // XXX: Make this properly configurable. ~ Matt 2015-11-21
-    return 24;
+    return 50;
   }});
 ;
 window.WalkontableViewportColumnsCalculator = WalkontableViewportColumnsCalculator;
@@ -3205,14 +3202,14 @@ var WalkontableTableRenderer = function WalkontableTableRenderer(wtTable) {
       if (!isWorkingOnClone || WalkontableOverlay.isOverlayTypeOf(this.wot.cloneOverlay, WalkontableOverlay.CLONE_BOTTOM)) {
         this.resetOversizedRow(sourceRowIndex);
       }
-      // Set height on TR.  This seems to work and doesn't have problems with cell merging.
-      // ~ Matt 2015-02-10
-      var height = this.wot.wtTable.getRowHeight(sourceRowIndex);
-      if (height) {
-        height--;
-        TR.style.height = height + 'px';
-      } else {
-        TR.style.height = '';
+      if (TR.firstChild) {
+        var height = this.wot.wtTable.getRowHeight(sourceRowIndex);
+        if (height) {
+          height--;
+          TR.firstChild.style.height = height + 'px';
+        } else {
+          TR.firstChild.style.height = '';
+        }
       }
       visibleRowIndex++;
       sourceRowIndex = this.rowFilter.renderedToSource(visibleRowIndex);
@@ -10669,16 +10666,6 @@ var AutoColumnSize = function AutoColumnSize(hotInstance) {
   this.ghostTable = new GhostTable(this.hot);
   this.samplesGenerator = new SamplesGenerator((function(row, col) {
     return $__10.hot.getDataAtCell(row, col);
-  }), (function(row, col) {
-    if (!$__10.hot.mergeCells)
-      return col;
-    var mergeInfo = $__10.hot.mergeCells.mergedCellInfoCollection.getInfo(row, col);
-    if (!mergeInfo)
-      return col;
-    if (mergeInfo.col + mergeInfo.colspan - 1 == col)
-      return mergeInfo.col;
-    else
-      return null;
   }));
   this.firstCalculation = true;
   this.inProgress = false;
@@ -10689,9 +10676,7 @@ var AutoColumnSize = function AutoColumnSize(hotInstance) {
 var $AutoColumnSize = AutoColumnSize;
 ($traceurRuntime.createClass)(AutoColumnSize, {
   isEnabled: function() {
-    // Allow plugin to be forced on even if colWidths is set. ~ Matt 2015-11-21
-    return this.hot.getSettings().autoColumnSize ||
-      (this.hot.getSettings().autoColumnSize !== false && !this.hot.getSettings().colWidths);
+    return this.hot.getSettings().autoColumnSize !== false && !this.hot.getSettings().colWidths;
   },
   enablePlugin: function() {
     var $__10 = this;
@@ -10715,7 +10700,6 @@ var $AutoColumnSize = AutoColumnSize;
   disablePlugin: function() {
     $traceurRuntime.superGet(this, $AutoColumnSize.prototype, "disablePlugin").call(this);
   },
-  // Currently we assume this always works from left to right.
   calculateColumnsWidth: function() {
     var colRange = arguments[0] !== (void 0) ? arguments[0] : {
       from: 0,
@@ -10725,7 +10709,7 @@ var $AutoColumnSize = AutoColumnSize;
       from: 0,
       to: this.hot.countRows() - 1
     };
-    //var force = arguments[2] !== (void 0) ? arguments[2] : false;
+    var force = arguments[2] !== (void 0) ? arguments[2] : false;
     var $__10 = this;
     if (typeof colRange === 'number') {
       colRange = {
@@ -10740,28 +10724,16 @@ var $AutoColumnSize = AutoColumnSize;
       };
     }
     rangeEach(colRange.from, colRange.to, (function(col) {
-      if (/*force ||*/ ($__10.widths[col] === void 0)) {
-        $__10.widths[col] = $__10.hot._getColWidthFromSettings(col);
-        if (!$__10.widths[col]) {
-          $__10.widths[col] = WalkontableViewportColumnsCalculator.DEFAULT_WIDTH;
-          var samples = $__10.samplesGenerator.generateColumnSamples(col, rowRange);
-          samples.forEach((function(samplesBySpanFrom, col) {
-            samplesBySpanFrom.forEach((function(sample, spanFrom) {
-              return $__10.ghostTable.addColumn(col, sample, spanFrom);
-            }));
-          }));
-        }
+      if (force || ($__10.widths[col] === void 0 && !$__10.hot._getColWidthFromSettings(col))) {
+        var samples = $__10.samplesGenerator.generateColumnSamples(col, rowRange);
+        samples.forEach((function(sample, col) {
+          return $__10.ghostTable.addColumn(col, sample);
+        }));
       }
     }));
     if (this.ghostTable.columns.length) {
-      // This should maintain increasing order on "col", so by the time we
-      // process any entry for a column, all previous $__10.widths values
-      // reflect the actual column widths to be used (since we incorporated the
-      // settings and the minimum width above).
-      this.ghostTable.getWidths((function(col, width, spanFrom) {
-        for (var prevCol = spanFrom; prevCol < col; prevCol++)
-          width -= $__10.widths[prevCol];
-        $__10.widths[col] = Math.max($__10.widths[col], width);
+      this.ghostTable.getWidths((function(col, width) {
+        return $__10.widths[col] = width;
       }));
       this.ghostTable.clean();
     }
@@ -10867,20 +10839,16 @@ var $AutoColumnSize = AutoColumnSize;
     this.widths.length = 0;
   },
   isNeedRecalculate: function() {
-    return (this.widths.length < this.hot.countCols() ||
-            (arrayFilter(this.widths, (function(item) {
-              return (item === void 0);
-            })).length ? true : false));
+    return arrayFilter(this.widths, (function(item) {
+      return (item === void 0);
+    })).length ? true : false;
   },
   onBeforeRender: function() {
     var force = this.hot.renderCall;
-    if (force) {
-      this.clearCache();
-    }
-    //this.calculateColumnsWidth({
-    //  from: this.getFirstVisibleColumn(),
-    //  to: this.getLastVisibleColumn()
-    //}, void 0, force);
+    this.calculateColumnsWidth({
+      from: this.getFirstVisibleColumn(),
+      to: this.getLastVisibleColumn()
+    }, void 0, force);
     if (this.isNeedRecalculate() && !this.inProgress) {
       this.calculateAllColumnsWidth();
     }
@@ -10898,18 +10866,15 @@ var $AutoColumnSize = AutoColumnSize;
     }
   },
   onBeforeChange: function(changes) {
-    // With merged cells, it's simplest to assume any change invalidates all
-    // column widths.
-    this.clearCache();
-    //var $__10 = this;
-    //arrayEach(changes, (function(data) {
-    //  return $__10.widths[data[1]] = void 0;
-    //}));
+    var $__10 = this;
+    arrayEach(changes, (function(data) {
+      return $__10.widths[data[1]] = void 0;
+    }));
   },
   onBeforeColumnResize: function(col, size, isDblClick) {
     if (isDblClick) {
-      //this.calculateColumnsWidth(col, void 0, true);
-      //size = this.getColumnWidth(col, void 0, false);
+      this.calculateColumnsWidth(col, void 0, true);
+      size = this.getColumnWidth(col, void 0, false);
     }
     return size;
   },
@@ -18735,14 +18700,14 @@ var GhostTable = function GhostTable(hotInstance) {
     this.container.container.appendChild(this.table.fragment);
     rowObject.table = this.table.table;
   },
-  addColumn: function(column, samples, spanFrom) {
+  addColumn: function(column, samples) {
     if (this.rows.length) {
       throw new Error('Doesn\'t support multi-dimensional table');
     }
     if (!this.columns.length) {
       this.container = this.createContainer(this.hot.rootElement.className);
     }
-    var columnObject = {col: column, spanFrom: spanFrom};
+    var columnObject = {col: column};
     this.columns.push(columnObject);
     this.samples = samples;
     this.table = this.createTable(this.hot.table.className);
@@ -18766,7 +18731,7 @@ var GhostTable = function GhostTable(hotInstance) {
       this.injectTable();
     }
     arrayEach(this.columns, (function(column) {
-      callback(column.col, outerWidth(column.table), column.spanFrom);
+      callback(column.col, outerWidth(column.table));
     }));
   },
   createColGroupsCol: function() {
@@ -18936,10 +18901,9 @@ var arrayEach = ($___46__46__47_helpers_47_array__ = require("helpers/array"), $
 var objectEach = ($___46__46__47_helpers_47_object__ = require("helpers/object"), $___46__46__47_helpers_47_object__ && $___46__46__47_helpers_47_object__.__esModule && $___46__46__47_helpers_47_object__ || {default: $___46__46__47_helpers_47_object__}).objectEach;
 var rangeEach = ($___46__46__47_helpers_47_number__ = require("helpers/number"), $___46__46__47_helpers_47_number__ && $___46__46__47_helpers_47_number__.__esModule && $___46__46__47_helpers_47_number__ || {default: $___46__46__47_helpers_47_number__}).rangeEach;
 var stringify = ($___46__46__47_helpers_47_mixed__ = require("helpers/mixed"), $___46__46__47_helpers_47_mixed__ && $___46__46__47_helpers_47_mixed__.__esModule && $___46__46__47_helpers_47_mixed__ || {default: $___46__46__47_helpers_47_mixed__}).stringify;
-var SamplesGenerator = function SamplesGenerator(dataFactory, spanQueryFunc) {
+var SamplesGenerator = function SamplesGenerator(dataFactory) {
   this.samples = null;
   this.dataFactory = dataFactory;
-  this.spanQueryFunc = spanQueryFunc;
 };
 var $SamplesGenerator = SamplesGenerator;
 ($traceurRuntime.createClass)(SamplesGenerator, ($__7 = {}, Object.defineProperty($__7, "generateRowSamples", {
@@ -18981,44 +18945,25 @@ var $SamplesGenerator = SamplesGenerator;
     var samples = new Map();
     rangeEach(range.from, range.to, (function(index) {
       var $__7;
-      var row, col;
+      var value;
       if (type === 'row') {
-        row = specifierValue;
-        col = index;
+        value = $__5.dataFactory(specifierValue, index);
       } else if (type === 'col') {
-        row = index;
-        col = specifierValue;
+        value = $__5.dataFactory(index, specifierValue);
       } else {
         throw new Error('Unsupported sample type');
       }
-      var samplesForSpan;
-      if ($__5.spanQueryFunc) {
-        var spanFrom = $__5.spanQueryFunc(row, col);
-        if (spanFrom === null)
-          return;
-        if (type === 'row')
-          row = spanFrom;
-        else
-          col = spanFrom;
-        if (!samples.has(spanFrom)) {
-          samples.set(spanFrom, new Map());
-        }
-        samplesForSpan = samples.get(spanFrom);
-      } else {
-        samplesForSpan = samples;
-      }
-      var value = $__5.dataFactory(row, col);
       if (!Array.isArray(value)) {
         value = stringify(value);
       }
       var len = value.length;
-      if (!samplesForSpan.has(len)) {
-        samplesForSpan.set(len, {
+      if (!samples.has(len)) {
+        samples.set(len, {
           needed: $SamplesGenerator.SAMPLE_COUNT,
           strings: []
         });
       }
-      var sample = samplesForSpan.get(len);
+      var sample = samples.get(len);
       if (sample.needed) {
         var computedKey = type === 'row' ? 'col' : 'row';
         sample.strings.push(($__7 = {}, Object.defineProperty($__7, "value", {
