@@ -910,12 +910,15 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
 # probably also be OK to use the real model object.  However, the client doesn't
 # have access to the real model object under the current design.  Arguably the
 # design could use improvement, but not now. ~ Matt 2015-11-20)
+#
+# If the client is unlucky enough to call this while the server is recomputing,
+# return dummy values.  If the code is reactive, it will recover.
 @liteModel = {
   # Eta-expand to avoid load-order dependency.
   getColumn: (columnId) -> getColumn(columnId)
   # FIXME: propagate errors
   evaluateFamily: (qFamilyId) -> new FamilyId(qFamilyId).typedValues()
-  typecheckColumn: (columnId) -> getColumn(columnId).type || throw new Error("Not ready")
+  typecheckColumn: (columnId) -> getColumn(columnId).type ? TYPE_ERROR
 }
 
 # Reused by parseProcedure. :/

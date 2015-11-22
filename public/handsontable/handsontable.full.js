@@ -12415,6 +12415,26 @@ var $ContextMenu = ContextMenu;
     if (!this.menu) {
       return;
     }
+    // Add good-enough support for jQuery-style "build", like I thought
+    // Handsontable would support based on the documentation at
+    // http://docs.handsontable.com/0.20.1/demo-context-menu.html#page-custom .
+    // The method from https://github.com/handsontable/handsontable/issues/2312 did not work.
+    // ~ Matt 2015-11-21
+    var build = this.hot.getSettings().contextMenu.build;
+    if (build) {
+      // Copy relevant parts from enablePlugin
+      var dynamicSettings = build();
+      var menuItems = this.itemsFactory.getVisibleItems(dynamicSettings);
+      this.menu.setMenuItems(menuItems);
+      this.commandExecutor = new CommandExecutor(this.hot);
+      if (typeof dynamicSettings.callback === 'function') {
+        this.commandExecutor.setCommonCallback(dynamicSettings.callback);
+      }
+      var $__11 = this;
+      arrayEach(menuItems, (function(command) {
+        return $__11.commandExecutor.registerCommand(command.key, command);
+      }));
+    }
     this.menu.open();
     this.menu.setPosition(event);
     this.menu.hotMenu.isHotTableEnv = this.hot.isHotTableEnv;

@@ -522,8 +522,8 @@ class ClientView
               colCls = cls
         colCls
 
-    d = {
-      data: ((cell.display || cell.value for cell in row) for row in grid)
+    {
+      data: ((cell.display ? cell.value for cell in row) for row in grid)
       # Future: Fixing the ancestors of the leftmost visible column would be
       # clever, though with carefully designed individual views, we may never
       # need it.  We may also want to fix the header for large data sets.
@@ -637,129 +637,134 @@ class ClientView
         return false
 
       contextMenu: {
-        items: {
-          # Future: Would be nice to move selection appropriately on column
-          # insert/delete, but this is a less common case.
+        build: (() =>
+          c = @getSingleSelectedCell()
+          unless c?
+            return false
+          items = {}
 
-          addObjectType: {
-            name: 'Make into object'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId &&
-                !(col = getColumn(ci)).isObject)
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              Meteor.call('changeColumnIsObject', $$, ci, true,
-                          standardServerCallback)
-          }
-          removeObjectType: {
-            name: 'Collapse to field'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !((ci = c?.columnId)? && ci != rootColumnId &&
-                (col = getColumn(ci)).isObject &&
-                (col.children.length == (if col.type == '_token' then 1 else 0)))
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              Meteor.call('changeColumnIsObject', $$, ci, false,
-                          standardServerCallback)
-          }
+          if (ci = c.columnId)?
+            col = getColumn(ci)
+            objectName = objectNameWithFallback(col) ? '(unnamed)'
+            fieldName = col.fieldName ? '(unnamed)'
+            if !col.isObject
+              items.promote = {
+                name: "Add section around #{fieldName}"
+                callback: () =>
+                  Meteor.call('changeColumnIsObject', $$, ci, true,
+                              standardServerCallback)
+              }
+            # If !col.isObject, then the defineColumn (or the first defineColumn
+            # of the insertUnkeyedStateObjectTypeWithField) will automatically
+            # promote col.
+            addFieldItem = {
+              name:
+                if ci == rootColumnId
+                  "Add global field to sheet"
+                else if col.isObject
+                  "Add field to #{objectName}"
+                else
+                  "...and add a field"
+              callback: () =>
+                index = col.children.length
+                insertBlankColumn(ci, index, false, @view)
+            }
+            addSubsectionItem = {
+              name:
+                if ci == rootColumnId
+                  "Add section to sheet"
+                else if col.isObject
+                  "Add subsection to #{objectName}"
+                else
+                  "...and add a subsection"
+              callback: () =>
+                index = col.children.length
+                insertBlankColumn(ci, index, true, @view)
+            }
+            if ci == rootColumnId  # order tweak for common case
+              items.addSubsectionItem = addSubsectionItem
+              items.addField = addFieldItem
+            else
+              items.addField = addFieldItem
+              items.addSubsectionItem = addSubsectionItem
+            if (ci != rootColumnId && col.isObject &&
+                col.children.length == (if col.type == '_token' then 1 else 0))
+              parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
+              flattenFieldName =
+                (if col.type == '_token'
+                  getColumn(col.children[0]).fieldName
+                else
+                  col.fieldName) ? '(unnamed)'
+              items.demote = {
+                name: "Flatten #{flattenFieldName} into #{parentName}"
+                callback: () =>
+                  Meteor.call('changeColumnIsObject', $$, ci, false,
+                              standardServerCallback)
+              }
 
-          addChildFieldLast: {
-            name: 'Add field'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !(c?.columnId)?
-              #!((ci = c?.columnId)? && c.kind == 'top' &&
-              #  (col = getColumn(ci)).isObject && col.type == '_token')
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              col = getColumn(ci)
-              index = col.children.length
-              #@hot.deselectCell()
-              insertBlankColumn(ci, index, false, @view)
-          }
-          addChildObjectLast: {
-            name: 'Add nested object type'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !(c?.columnId)?
-              #!((ci = c?.columnId)? && c.kind == 'top' &&
-              #  (col = getColumn(ci)).isObject && col.type == '_token')
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              col = getColumn(ci)
-              index = col.children.length
-              #@hot.deselectCell()
-              insertBlankColumn(ci, index, true, @view)
-          }
-          deleteColumn: {
-            name: 'Delete column'
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              # Future: Support recursive delete.
-              !((ci = c?.columnId)? && ci != rootColumnId &&
-                (col = getColumn(ci)).children.length == 0 &&
-                # A keyed object with no (non-key) children spans two UI
-                # columns.  It might be surprising if "Delete column" on a
-                # header cell in one of the two UI columns deleted the entire
-                # thing.  But "Delete column" on the top cell (which spans both
-                # columns) is OK.
-                (!col.isObject || col.type == '_token' || c.kind == 'top'))
-            callback: () =>
-              c = @getSingleSelectedCell()
-              ci = c.columnId
-              @hot.deselectCell() # <- Otherwise changeColumn form gets hosed.
-              Meteor.call('deleteColumn', $$, ci,
-                          standardServerCallback)
-          }
-          sep1: '----------'
-          jumpToReferent: {
-            name: 'Jump to referent'
-            # Future: There should be some way to take advantage of this feature
-            # without needing the referent to be in the same view as the
-            # selected cell.
-            disabled: () =>
-              c = @getSingleSelectedCell()
-              !(c?.referent? && @qCellIdToGridCoords.get(c.referent)?)
-            callback: () =>
-              c = @getSingleSelectedCell()
-              coords = @qCellIdToGridCoords.get(c.referent)
-              @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
-          }
-          deleteStateCell: {
-            name: 'Delete cell'
-            disabled: () =>
-              # XXX: For keyed objects, one could argue it's more consistent to
-              # allow this only on the key.
-              c = @getSingleSelectedCell()
-              !(c? && c.qCellId? &&
-                columnIsState(getColumn(c.qCellId.columnId)))
-            callback: () =>
-              c = @getSingleSelectedCell()
-              if c.qCellId?
-                StateEdit.removeCell c.qCellId, standardServerCallback
-          }
-        }
-      }
-    }
-    d
+            # It's OK to perform this command on a keyed object type now that it
+            # is clearly labeled "Delete section".
+            if ci != rootColumnId && col.children.length == 0
+              items.delete = {
+                name: if col.isObject then "Delete section #{objectName}" else "Delete field #{fieldName}"
+                callback: () =>
+                  @hot.deselectCell() # <- Otherwise changeColumn form gets hosed.
+                  Meteor.call('deleteColumn', $$, ci,
+                              standardServerCallback)
+              }
+
+          else
+            if c.referent? && (coords = @qCellIdToGridCoords.get(c.referent))?
+              items.jumpToReferent = {
+                name: "Jump to block #{c.display}"
+                callback: () =>
+                  @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
+              }
+            # TODO: Support adding values too.  We just have to figure out the
+            # flow to temporarily create a cell for the new value and then
+            # remove it again if the user doesn't end up adding a value.
+            if c.qFamilyId? && columnIsState(col = getColumn(c.qFamilyId.columnId)) && col.isObject
+              objectName = objectNameWithFallback(col) ? '(unnamed)'
+              items.add = {
+                name: "Add #{objectName} block here"
+                callback: () =>
+                  StateEdit.addCell(c.qFamilyId, standardServerCallback)
+              }
+            if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
+              items.delete = {
+                # This currently gives 'Delete block' for the key of a keyed object
+                # (deprecated).  If we wanted that case to say 'Delete cell', we
+                # would test c.isObjectCell instead.
+                name: if col.isObject then 'Delete block' else 'Delete cell'
+                callback: () =>
+                  StateEdit.removeCell(c.qCellId, standardServerCallback)
+              }
+
+          haveSomething = false
+          for k, v of items
+            haveSomething = true
+          unless haveSomething
+            items.nothing = {
+              name: 'No actions available here'
+              disabled: () -> true
+            }
+
+          {items: items})  # build callback
+      }  # contextMenu
+    }  # Handsontable config object
 
   hotCreate: (domElement) ->
-    @hot = new Handsontable(domElement, @hotConfig())
+    cfg = @hotConfig()
+    @hot = new Handsontable(domElement, cfg)
     $(domElement).addClass("pal-#{@options.palette}")
     if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
 
   hotReconfig: () ->
-    d = @hotConfig()
-    @hot.updateSettings {colWidths: d.colWidths, rowHeights: d.rowHeights, mergeCells: d.mergeCells}
-    @hot.loadData d.data
+    cfg = @hotConfig()
+    @hot.updateSettings {colWidths: cfg.colWidths, rowHeights: cfg.rowHeights, mergeCells: cfg.mergeCells}
+    @hot.loadData cfg.data
     #@hot.render()
 
   getSingleSelectedCell: =>
@@ -795,7 +800,7 @@ class ClientView
     selectedCell = @getSingleSelectedCell()
     ActionBar.fullTextToShow.set(selectedCell?.fullText)
     @highlightReferent(selectedCell?.referent)
-    @highlightObject(selectedCell?.qCellId)
+    @highlightObject(if selectedCell?.isObjectCell then selectedCell.qCellId else null)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
     ActionBar.addStateCellArgs.set(
       if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))

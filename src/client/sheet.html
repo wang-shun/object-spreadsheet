@@ -41,18 +41,11 @@
     <input id="addStateCell-value" type="text" name="value" size="40"/>
     <input type="submit" value="Add"/>
   </form>
-  {{else}}
-  {{#if canAddToken}}
-  <form>
-    <input type="submit" value="Add object"/>
-  </form>
-  {{else}}
+  {{/if}}
   {{#if canAddUnit}}
   <form>
     <input type="submit" value="Add X"/>
   </form>
-  {{/if}}
-  {{/if}}
   {{/if}}
 </template>
 
@@ -67,12 +60,12 @@
       {{#unless isComputed}}
         editable
       {{/unless}}
-      objects
+      section
       {{#if keyColumnName}}
         generated for {{keyColumnName}}
       {{/if}}
     {{else}}
-      type
+      field of type
       <select id="changeColumn-type">
         {{> html_select_content typeMenu}}
       </select>,
