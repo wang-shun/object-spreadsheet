@@ -21,7 +21,6 @@ body {
 }
 
 @media screen {
-.separator:not(.rsHeader),
 .tableSeparator {
   background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
   background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(220,220,220,0.1) 50%,rgba(220,220,220,0.5) 100%); /* Chrome10+,Safari5.1+ */
@@ -208,6 +207,17 @@ right and a bottom border:
 
 .handsontable td.leaf:not(.vlast) {
   border-bottom-style: dashed;
+}
+
+.handsontable td.separator:not(.rsHeader) {
+  box-shadow: inset 0px 0px 1px 2px #EEE;
+}
+
+.handsontable td.dataPadding:not(.selected-object) {
+  background: #F7F7F7;
+}
+.handsontable td.dataPadding {
+  box-shadow: inset 0px 0px 2px 3px #DDD;
 }
 
 .handsontable button.headerCollapse {

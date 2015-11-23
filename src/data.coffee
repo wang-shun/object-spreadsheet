@@ -142,15 +142,29 @@ class FamilyId
   
   children: -> @values().map (v) => @child(v)
   
-  add: (value, callback=->) ->
-    upsertOne Cells, {column: @columnId, key: @cellId}, {$addToSet: {values: value}}, callback
+  # XXX: Should we change the database format so this is just a qFamilyId?
+  selector: () -> {column: @columnId, key: @cellId}
+
+  add: (value, callback=(->), consumePlaceholder=false) ->
+    updates = {$addToSet: {values: value}}
+    if consumePlaceholder && Cells.findOne(@selector())?.numPlaceholders
+      updates.$inc = {numPlaceholders: -1}
+    upsertOne(Cells, @selector(), updates, callback)
     @child(value)
-    
+
   remove: (value, callback=->) ->
     # Why was updateOne needed? ~ Matt 2015-10-19
     #updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
     Meteor.call('recursiveDeleteStateCellNoInvalidate', $$,
                 @columnId, cellIdChild(@cellId, value), callback)
+
+  addPlaceholder: (callback=->) ->
+    # If the field is initially absent, $inc treats it as 0.
+    upsertOne(Cells, @selector(), {$inc: {numPlaceholders: 1}}, callback)
+
+  removePlaceholder: (callback=->) ->
+    if Cells.findOne(@selector())?.numPlaceholders   # XXX race
+      updateOne(Cells, @selector(), {$inc: {numPlaceholders: -1}}, callback)
 
 
 rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
@@ -164,6 +178,8 @@ allCellIdsInColumnIgnoreErrors = (columnId) ->
       cellIds.push(cellIdChild(family.key, v))
   return cellIds
 
+# Helpers to access collections from the client, which is only allowed to select
+# documents by ID.
 
 updateOne = (collection, selector, modifier, callback) ->
   if (doc = collection.findOne(selector))?

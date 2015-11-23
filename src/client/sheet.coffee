@@ -29,7 +29,7 @@ class @CellReference
   if type == '_unit' then ['centered'] else []
 
 class ViewVlist
-  constructor: (@parentCellId, @minHeight, @hlists, @error) ->
+  constructor: (@parentCellId, @minHeight, @hlists, @numPlaceholders, @error) ->
 
 class ViewHlist
   constructor: (@cellId, @minHeight, @value, @error, @vlists) ->
@@ -91,16 +91,18 @@ class ViewSection
       minHeight = 0
       for hlist in hlists
         minHeight += hlist.minHeight
-      # Don't add any extra rows: it's looking ridiculous.  Once we know which
-      # columns are plural, we can reconsider adding extra rows.
-      new ViewVlist(parentCellId, minHeight, hlists)
+      # Don't add any placeholders automatically: it's looking ridiculous.  Once
+      # we know which columns are plural, we can reconsider adding extra rows.
+      numPlaceholders = ce.numPlaceholders ? 0
+      minHeight += numPlaceholders
+      new ViewVlist(parentCellId, minHeight, hlists, numPlaceholders, null)
     else if ce?.error?
-      new ViewVlist(parentCellId, 1, null, ce.error)
+      new ViewVlist(parentCellId, 1, null, null, ce.error)
     else
       if @col.formula?
         throw new NotReadyError("Cell #{@columnId}:#{JSON.stringify parentCellId}")
       else
-        new ViewVlist(parentCellId, 0, null, "internal error: missing family")
+        new ViewVlist(parentCellId, 0, null, null, "internal error: missing family")
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
@@ -125,6 +127,13 @@ class ViewSection
       grid = []
       for hlist in vlist.hlists
         gridVertExtend(grid, @renderHlist(hlist, hlist.minHeight))
+      for cell in gridBottomRow(grid)
+        cell.cssClasses.push('vlast')
+      for i in [0...vlist.numPlaceholders]
+        placeholder = gridMergedCell(1, @width, '', ['dataPadding'])
+        placeholder[0][0].qFamilyId = qFamilyId
+        placeholder[0][0].isPlaceholder = true
+        gridVertExtend(grid, placeholder)
       if grid.length < height
         if grid.length == 1
           # Make this row span 'height' rows
@@ -134,11 +143,9 @@ class ViewSection
             cell.rowspan = height
         else
           # Add blank cell at bottom
-          bottomGrid = gridMergedCell(height - grid.length, @width)
+          bottomGrid = gridMergedCell(height - grid.length, @width, '', ['dataPadding'])
           bottomGrid[0][0].qFamilyId = qFamilyId
           gridVertExtend(grid, bottomGrid)
-      for cell in gridBottomRow(grid)
-        cell.cssClasses.push('vlast')
     else
       grid = gridMergedCell(height, @width, '!')
       grid[0][0].fullText = 'Error: ' + vlist.error
@@ -191,11 +198,13 @@ class ViewSection
     # Subsections
     for subsection, i in @subsections
       if @extraColClassBefore[i]?
-        extraCells = gridMergedCell(height, 1)
+        extraCells = gridMergedCell(height, 1, '', [@extraColClassBefore[i]])
         if @extraColClassBefore[i] == 'separator'
           # Include separator cells in object region highlighting (but for now,
-          # not table separator cells for the root object).
-          extraCells[0][0].qCellId = qCellId
+          # not table separator cells for the root object).  Do not set qCellId
+          # as that would allow "Delete object", which would be a little
+          # surprising.
+          extraCells[0][0].ancestorQCellId = qCellId
         gridHorizExtend(grid, extraCells)
       subsectionGrid = subsection.renderVlist(hlist.vlists[i], height)
       gridHorizExtend(grid, subsectionGrid)
@@ -323,10 +332,7 @@ selectedCell = null
 
 class StateEdit
 
-  @PLACEHOLDER = {}
-  
   @parseValue: (qFamilyId, text) ->
-    if text == @PLACEHOLDER then return "-"  # placeholder. TODO use a special object as placeholder
     type = getColumn(qFamilyId.columnId).type
     if typeIsReference(type)
       #if (m = /^@(\d+)$/.exec(text))
@@ -374,18 +380,18 @@ class StateEdit
       alert('Invalid value: ' + e.message)
       null
 
-  @addCell: (qFamilyId, enteredValue, callback=->) ->
+  @addCell: (qFamilyId, enteredValue, callback=(->), consumePlaceholder=false) ->
     if (newValue = @parseValueUi qFamilyId, enteredValue)?
-      new FamilyId(qFamilyId).add(newValue, -> $$.call 'notify', callback)
+      new FamilyId(qFamilyId).add(newValue, (-> $$.call 'notify', callback), consumePlaceholder)
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
     cel = new CellId(qCellId)
     fam = cel.family()
     if (newValue = @parseValueUi(fam, enteredValue))?
-      cel.value(newValue, -> $$.call 'notify', callback)
+      cel.value(newValue, (-> $$.call 'notify', callback))
 
   @removeCell: (qCellId, callback=->) ->
-    new CellId(qCellId).remove(-> $$.call 'notify', callback)
+    new CellId(qCellId).remove((-> $$.call 'notify', callback))
 
   @canEdit: (columnId) ->
     col = getColumn(columnId)
@@ -549,12 +555,11 @@ class ClientView
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
         adjcol = col+cell.colspan
-        classes = if @colClasses[col] == 'tableSeparator' then ['tableSeparator'] else
-                  if @colClasses[col] == 'separator' then ['separator'] else
-                  if @colClasses[adjcol] == 'separator' then ['incomparable'] else []
+        classes = if @colClasses[adjcol] == 'separator' then ['incomparable'] else []
         if cell.qCellId? && cell.isObjectCell && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
-        ancestors = if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
+        ancestors = if cell.ancestorQCellId? then new CellId(cell.ancestorQCellId).ancestors()  \
+                    else if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
                     else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).ancestors() \
                     else []
         for ancestor in ancestors
@@ -563,10 +568,12 @@ class ClientView
         {
           renderer: if col == 0 && row == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
-          # Only column header "top", "below", and "type" cells can be edited,
-          # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
-          readOnly: !(cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
+          readOnly: !(
+                      # Only column header "top", "below", and "type" cells can be edited,
+                      # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
+                      cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
                       cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
+                      # Add case.  For a state keyed object, you add by typing the key in the padding cell.
                       cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
       autoColumnSize: {
@@ -624,13 +631,15 @@ class ClientView
               Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
                           standardServerCallback
           if cell.qCellId? && !cell.isObjectCell
-            if newVal
-              StateEdit.modifyCell cell.qCellId, newVal
+            # XXX Once we validate values, we should replace the hard-coded
+            # check for 'text' with an attempt to validate the input.
+            if newVal || getColumn(cell.qCellId.columnId).type == 'text'
+              StateEdit.modifyCell cell.qCellId, newVal, standardServerCallback
             else
-              StateEdit.removeCell cell.qCellId
+              StateEdit.removeCell cell.qCellId, standardServerCallback
           else if cell.qFamilyId? && !cell.isObjectCell
-            if newVal
-              StateEdit.addCell cell.qFamilyId, newVal
+            if newVal || getColumn(cell.qFamilyId.columnId).type == 'text'
+              StateEdit.addCell cell.qFamilyId, newVal, standardServerCallback, cell.isPlaceholder
         # Don't apply the changes directly; let them come though the Meteor
         # stubs.  This ensures that they get reverted by Meteor if the server
         # call fails.
@@ -691,24 +700,8 @@ class ClientView
             else
               items.addField = addFieldItem
               items.addObjectTypeItem = addObjectTypeItem
-            if (ci != rootColumnId && col.isObject &&
-                col.children.length == (if col.type == '_token' then 1 else 0))
-              #parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
-              #flattenFieldName =
-              #  (if col.type == '_token'
-              #    getColumn(col.children[0]).fieldName
-              #  else
-              #    col.fieldName) ? '(unnamed)'
-              items.demote = {
-                name:
-                  if col.type == '_token'
-                    "Flatten out '#{objectName}' objects"
-                  else
-                    "Remove generated '#{objectName}' objects"
-                callback: () =>
-                  Meteor.call('changeColumnIsObject', $$, ci, false,
-                              standardServerCallback)
-              }
+            if (demoteCommand = @getDemoteCommandForColumn(col))
+              items.demote = demoteCommand
 
             # Don't allow a keyed object column and its key column to be deleted
             # with a single command, since I couldn't find a label for the
@@ -736,25 +729,10 @@ class ClientView
                 callback: () =>
                   @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
               }
-            # TODO: Support adding values too.  We just have to figure out the
-            # flow to temporarily create a cell for the new value and then
-            # remove it again if the user doesn't end up adding a value.
-            if c.qFamilyId? && columnIsState(col = getColumn(c.qFamilyId.columnId)) && col.isObject
-              objectName = objectNameWithFallback(col) ? '(unnamed)'
-              items.add = {
-                name: "Add '#{objectName}' object here"
-                callback: () =>
-                  StateEdit.addCell(c.qFamilyId, standardServerCallback)
-              }
-            if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
-              items.delete = {
-                # This currently gives 'Delete object' for the key of a keyed object
-                # (deprecated).  If we wanted that case to say 'Delete value', we
-                # would test c.isObjectCell instead.
-                name: if col.isObject then 'Delete object' else 'Delete value'
-                callback: () =>
-                  StateEdit.removeCell(c.qCellId, standardServerCallback)
-              }
+            if (addCommand = @getAddCommandForCell(c))?
+              items.add = addCommand
+            if (deleteCommand = @getDeleteCommandForCell(c))?
+              items.delete = deleteCommand
 
           haveSomething = false
           for k, v of items
@@ -818,25 +796,6 @@ class ClientView
     @highlightReferent(selectedCell?.referent)
     @highlightObject(if selectedCell?.isObjectCell then selectedCell.qCellId else null)
     # _id: Hacks to get the #each to clear the forms when the cell changes.
-    ActionBar.addStateCellArgs.set(
-      if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-        [{
-          _id: EJSON.stringify(qf)
-          qFamilyId: qf
-          canAddValue: col.type not in ['_token', '_unit'] && !selectedCell.isObjectCell
-          # A token column has only the object UI-column, though we don't set
-          # isObject on family padding cells.  So don't check it.
-          canAddToken: col.type == '_token'
-          # Adding a duplicate value has no effect, but disallow it as a
-          # hint to the user.  !selectedCell.isObjectCell is in principle a
-          # requirement, though it ends up being redundant because the only way
-          # to select an object cell is to already have a unit value present.
-          canAddUnit: (col.type == '_unit' && !selectedCell.isObjectCell &&
-                       !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
-        }]
-      else
-        []
-    )
     ActionBar.changeColumnArgs.set(
       if selectedCell? &&
          (ci = selectedCell.columnId)? && ci != rootColumnId
@@ -845,26 +804,104 @@ class ClientView
         []
     )
 
+  # get*CommandForCell return a context menu item, but onKeyDown also uses
+  # just the callback, so we maintain consistency in what command is offered.
+
+  getAddCommandForCell: (c) ->
+    if c.qFamilyId? && columnIsState(col = getColumn(c.qFamilyId.columnId))
+      objectName = objectNameWithFallback(col) ? '(unnamed)'
+      if col.type == '_token'
+        # A token column has only the object UI-column, though we don't set
+        # isObjectCell on family padding cells.  So don't check it.
+        return {
+          name: "Add '#{objectName}' object here"
+          callback: () =>
+            StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+        }
+      else if col.type == '_unit'
+        # Adding a duplicate value has no effect, but disallow it as a
+        # hint to the user.  !selectedCell.isObjectCell is in principle a
+        # requirement, though it ends up being redundant because the only way
+        # to select an object cell is to already have a unit value present.
+        if (!selectedCell.isObjectCell &&
+            !Cells.findOne({column: qf.columnId, key: qf.cellId})?.values?.length)
+          return {
+            name: 'Add X here'
+            callback: () =>
+              StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+          }
+      else
+        if !selectedCell.isObjectCell
+          return {
+            # I'd like to make clear that this doesn't actually add the value yet
+            # (e.g., "Make room to add a value here"), but Daniel won't like that.
+            # ~ Matt 2015-11-22
+            name: 'Add value here'
+            callback: () =>
+              new FamilyId(c.qFamilyId).addPlaceholder(standardServerCallback)
+          }
+    return null
+
+  getDeleteCommandForCell: (c) ->
+    if c.isPlaceholder  # Should only exist in state value columns.
+      return {
+        name: 'Remove placeholder'
+        callback: () =>
+          new FamilyId(c.qFamilyId).removePlaceholder(standardServerCallback)
+      }
+    else if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
+      return {
+        # This currently gives 'Delete object' for the key of a keyed object
+        # (deprecated).  If we wanted that case to say 'Delete value', we
+        # would test c.isObjectCell instead.
+        name: if col.isObject then 'Delete object' else 'Delete value'
+        callback: () =>
+          StateEdit.removeCell(c.qCellId, standardServerCallback)
+      }
+    else
+      return null
+
+  getDemoteCommandForCell: (col) ->
+    if (col._id != rootColumnId && col.isObject &&
+        col.children.length == (if col.type == '_token' then 1 else 0))
+      #parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
+      #flattenFieldName =
+      #  (if col.type == '_token'
+      #    getColumn(col.children[0]).fieldName
+      #  else
+      #    col.fieldName) ? '(unnamed)'
+      return {
+        name:
+          if col.type == '_token'
+            "Flatten out '#{objectName}' objects"
+          else
+            "Remove generated '#{objectName}' objects"
+        callback: () =>
+          Meteor.call('changeColumnIsObject', $$, col._id, false,
+                      standardServerCallback)
+      }
+    return null
+
   onKeyDown: (event) ->
+    selectedCell = @getSingleSelectedCell()
     if event.altKey && event.metaKey
       Handsontable.Dom.stopImmediatePropagation(event)
     else if !event.altKey && !event.ctrlKey && !event.metaKey 
       if event.which == 13    # Enter
-        selectedCell = @getSingleSelectedCell()
-        if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-          if col.type == '_token'
-            StateEdit.addCell qf, '*'
-      else if event.which == 46 || event.which == 8   # Delete / Backspace
-        selectedCell = @getSingleSelectedCell()
-        if (qc = selectedCell?.qCellId)? && columnIsState(col = getColumn(qc.columnId))
-          if col.type == '_token'
-            StateEdit.removeCell qc
-    else if event.ctrlKey && !event.altKey && !event.metaKey
-      if event.which == 13    # Enter
-        selectedCell = @getSingleSelectedCell()
-        if (qf = selectedCell?.qFamilyId)? && columnIsState(col = getColumn(qf.columnId))
-          StateEdit.addCell qf, (if col.type == '_token' then '*' else StateEdit.PLACEHOLDER)
+        # Like the "add by editing" case of hotConfig.readOnly but handles the rest of the types.
+        if ((qf = selectedCell?.qFamilyId)? &&
+            columnIsState(col = getColumn(qf.columnId)) && col.type in ['_token', '_unit'])
           Handsontable.Dom.stopImmediatePropagation(event)
+          @getAddCommandForCell(selectedCell).callback()
+      else if event.which == 46 || event.which == 8   # Delete / Backspace
+        Handsontable.Dom.stopImmediatePropagation(event)
+        if selectedCell?
+          @getDeleteCommandForCell(selectedCell)?.callback()
+    else if event.ctrlKey && !event.altKey && !event.metaKey
+      if event.which == 13    # Ctrl+Enter
+        Handsontable.Dom.stopImmediatePropagation(event)
+        if selectedCell?
+          @getAddCommandForCell(selectedCell)?.callback()
     else if event.altKey && !event.ctrlKey && !event.metaKey
       # Use Alt + Left/Right to reorder columns inside parent
       #     Alt + Up/Down to make column into object/value
@@ -872,21 +909,20 @@ class ClientView
         Handsontable.Dom.stopImmediatePropagation(event)
         event.stopPropagation()
         event.preventDefault()
-        selectedCell = @getSingleSelectedCell()
         if selectedCell? && (ci = selectedCell.columnId)? && 
             (col = getColumn(ci))? && col.parent? && (parentCol = getColumn(col.parent))
           n = parentCol.children.length
           index = parentCol.children.indexOf(ci)
           if event.which == 37 && index > 0                # Left
-            $$.call 'reorderColumn', ci, index-1
+            $$.call 'reorderColumn', ci, index-1, standardServerCallback
           else if event.which == 39 && index < n - 1       # Right
-            $$.call 'reorderColumn', ci, index+1
+            $$.call 'reorderColumn', ci, index+1, standardServerCallback
           else if event.which == 38 && !col.isObject       # Up
-            $$.call 'changeColumnIsObject', ci, true
-          else if event.which == 40 && col.isObject        # Down
-            $$.call 'changeColumnIsObject', ci, false
-
-    ActionBar.keydownHook? event
+            $$.call 'changeColumnIsObject', ci, true, standardServerCallback
+          else if event.which == 40                        # Down
+            # Check whether this should be possible (i.e., right children)
+            # before attempting it so we can detect real errors from the server.
+            @getDemoteCommandForCell(selectedCell)?.callback()
           
   
   selectSingleCell: (r1, c1) ->

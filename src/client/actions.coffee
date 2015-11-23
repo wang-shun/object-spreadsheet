@@ -4,27 +4,7 @@ isLoading = new ReactiveVar(true)
 Template.formulaValueBar.helpers
   loading: -> isLoading.get()
   fullTextToShow: -> fullTextToShow.get()
-  addStateCellArgs: -> addStateCellArgs.get()
   changeColumnArgs: -> changeColumnArgs.get()
-
-#
-# Template addStateCell
-#
-addStateCellArgs = new ReactiveVar([], EJSON.equals)
-
-Template.addStateCell.events({
-  'submit form': (event, template) ->
-    try
-      inputField = template.find('input[name=value]')
-      valueStr = inputField?.value
-      StateEdit.addCell @qFamilyId, valueStr,
-      # Clear the field on successful submission (only)
-      standardServerCallbackThen((error, result) ->
-        if !error? && inputField? then inputField.value = '')
-    catch e
-      console.error e
-    false # prevent clear
-})
 
 #
 # Template changeColumn
@@ -464,4 +444,4 @@ Meteor.methods({
 
 
 
-exported {ActionBar: {fullTextToShow, isLoading, addStateCellArgs, changeColumnArgs, isExpanded}}
+exported {ActionBar: {fullTextToShow, isLoading, changeColumnArgs, isExpanded}}

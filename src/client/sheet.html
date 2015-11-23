@@ -26,27 +26,9 @@
   {{#if fullTextToShow}}
     <div>{{fullTextToShow}}</div>
   {{/if}}
-  {{#each addStateCellArgs}}
-    {{> addStateCell}}
-  {{/each}}
   {{#each changeColumnArgs}}
     {{> changeColumn}}
   {{/each}}
-</template>
-
-<template name="addStateCell">
-  {{#if canAddValue}}
-  <form>
-    <label for="addStateCell-value">Add value:</label>
-    <input id="addStateCell-value" type="text" name="value" size="40"/>
-    <input type="submit" value="Add"/>
-  </form>
-  {{/if}}
-  {{#if canAddUnit}}
-  <form>
-    <input type="submit" value="Add X"/>
-  </form>
-  {{/if}}
 </template>
 
 <template name="changeColumn">
