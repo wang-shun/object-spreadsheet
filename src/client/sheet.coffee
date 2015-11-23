@@ -861,7 +861,7 @@ class ClientView
     else
       return null
 
-  getDemoteCommandForCell: (col) ->
+  getDemoteCommandForColumn: (col) ->
     if (col._id != rootColumnId && col.isObject &&
         col.children.length == (if col.type == '_token' then 1 else 0))
       #parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
@@ -922,7 +922,7 @@ class ClientView
           else if event.which == 40                        # Down
             # Check whether this should be possible (i.e., right children)
             # before attempting it so we can detect real errors from the server.
-            @getDemoteCommandForCell(selectedCell)?.callback()
+            @getDemoteCommandForColumn(col)?.callback()
           
   
   selectSingleCell: (r1, c1) ->
