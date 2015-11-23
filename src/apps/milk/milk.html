@@ -3,11 +3,11 @@
     div.header { background: rgba(0,60,60,0.2); padding: 9px; }
     div.content { position: relative; }
     div.Gauge { position: absolute; right: 0; top: 0;  margin: 9px; }
-    div.Cycle { margin: 9px; }
+    div.Team { margin: 9px; }
     table { border-collapse: collapse; }
     table td { border: 1px solid #CCC; padding: 6px; }
-    div.Cycle tr[data-isNext] td { background: rgba(0,0,255,0.2); }
-    div.Cycle .names span:not(:first-child):before { content: " and "; color: #888; }
+    div.Team tr[data-isNext] td { background: rgba(0,0,255,0.2); }
+    div.Team .names span:not(:first-child):before { content: " and "; color: #888; }
     div.Gauge tr[data-selected] td { outline: 3px solid black; }
     div.Gauge tr td { cursor: pointer; }
     div.Gauge tr td:hover { background: rgba(0,0,255,0.2); }
@@ -16,9 +16,9 @@
   <div class="header">Milkmaid</div>
   
   <div class="content">
-    <div class="Cycle">
+    <div class="Team">
       <table>
-        {{#each milk.Cycle}}
+        {{#each milk.Team}}
         <tr data-isNext="{{isNext}}">
           <td class="names">{{#each members}}<span>{{name}}</span>{{/each}}</td>
           <td>{{#if isNext}}{{quota}} <button>Supply 2gal</button>{{/if}}</td></tr>
