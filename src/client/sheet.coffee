@@ -649,7 +649,11 @@ class ClientView
             fieldName = col.fieldName ? '(unnamed)'
             if !col.isObject
               items.promote = {
-                name: "Add section around #{fieldName}"
+                name:
+                  if columnIsState(col)
+                    "Wrap '#{fieldName}' values in objects"
+                  else
+                    "Generate objects for '#{fieldName}' values"
                 callback: () =>
                   Meteor.call('changeColumnIsObject', $$, ci, true,
                               standardServerCallback)
@@ -660,53 +664,65 @@ class ClientView
             addFieldItem = {
               name:
                 if ci == rootColumnId
-                  "Add global field to sheet"
+                  "Add global value column to sheet"
                 else if col.isObject
-                  "Add field to #{objectName}"
+                  "Add value column to '#{objectName}'"
                 else
-                  "...and add a field"
+                  "...and add another value column"
               callback: () =>
                 index = col.children.length
                 insertBlankColumn(ci, index, false, @view)
             }
-            addSubsectionItem = {
+            addObjectTypeItem = {
               name:
                 if ci == rootColumnId
-                  "Add section to sheet"
+                  "Add object column to sheet"
                 else if col.isObject
-                  "Add subsection to #{objectName}"
+                  "Add nested object column to '#{objectName}'"
                 else
-                  "...and add a subsection"
+                  "...and add a nested object column"
               callback: () =>
                 index = col.children.length
                 insertBlankColumn(ci, index, true, @view)
             }
             if ci == rootColumnId  # order tweak for common case
-              items.addSubsectionItem = addSubsectionItem
+              items.addObjectTypeItem = addObjectTypeItem
               items.addField = addFieldItem
             else
               items.addField = addFieldItem
-              items.addSubsectionItem = addSubsectionItem
+              items.addObjectTypeItem = addObjectTypeItem
             if (ci != rootColumnId && col.isObject &&
                 col.children.length == (if col.type == '_token' then 1 else 0))
-              parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
-              flattenFieldName =
-                (if col.type == '_token'
-                  getColumn(col.children[0]).fieldName
-                else
-                  col.fieldName) ? '(unnamed)'
+              #parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
+              #flattenFieldName =
+              #  (if col.type == '_token'
+              #    getColumn(col.children[0]).fieldName
+              #  else
+              #    col.fieldName) ? '(unnamed)'
               items.demote = {
-                name: "Flatten #{flattenFieldName} into #{parentName}"
+                name:
+                  if col.type == '_token'
+                    "Flatten out '#{objectName}' objects"
+                  else
+                    "Remove generated '#{objectName}' objects"
                 callback: () =>
                   Meteor.call('changeColumnIsObject', $$, ci, false,
                               standardServerCallback)
               }
 
-            # It's OK to perform this command on a keyed object type now that it
-            # is clearly labeled "Delete section".
-            if ci != rootColumnId && col.children.length == 0
+            # Don't allow a keyed object column and its key column to be deleted
+            # with a single command, since I couldn't find a label for the
+            # command that wasn't confusing.  Hopefully it's clear that "Remove
+            # generated objects" is the first step toward deleting a keyed
+            # object column.
+            if (ci != rootColumnId && col.children.length == 0 &&
+                (!col.isObject || col.type == '_token'))
               items.delete = {
-                name: if col.isObject then "Delete section #{objectName}" else "Delete field #{fieldName}"
+                name:
+                  if col.isObject
+                    "Delete '#{objectName}' object column"
+                  else
+                    "Delete '#{fieldName}' value column"
                 callback: () =>
                   @hot.deselectCell() # <- Otherwise changeColumn form gets hosed.
                   Meteor.call('deleteColumn', $$, ci,
@@ -716,7 +732,7 @@ class ClientView
           else
             if c.referent? && (coords = @qCellIdToGridCoords.get(c.referent))?
               items.jumpToReferent = {
-                name: "Jump to block #{c.display}"
+                name: "Jump to object '#{c.display}'"
                 callback: () =>
                   @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
               }
@@ -726,16 +742,16 @@ class ClientView
             if c.qFamilyId? && columnIsState(col = getColumn(c.qFamilyId.columnId)) && col.isObject
               objectName = objectNameWithFallback(col) ? '(unnamed)'
               items.add = {
-                name: "Add #{objectName} block here"
+                name: "Add '#{objectName}' object here"
                 callback: () =>
                   StateEdit.addCell(c.qFamilyId, standardServerCallback)
               }
             if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
               items.delete = {
-                # This currently gives 'Delete block' for the key of a keyed object
-                # (deprecated).  If we wanted that case to say 'Delete cell', we
+                # This currently gives 'Delete object' for the key of a keyed object
+                # (deprecated).  If we wanted that case to say 'Delete value', we
                 # would test c.isObjectCell instead.
-                name: if col.isObject then 'Delete block' else 'Delete cell'
+                name: if col.isObject then 'Delete object' else 'Delete value'
                 callback: () =>
                   StateEdit.removeCell(c.qCellId, standardServerCallback)
               }

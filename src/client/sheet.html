@@ -60,15 +60,14 @@
       {{#unless isComputed}}
         editable
       {{/unless}}
-      section
+      objects
       {{#if keyColumnName}}
         generated for {{keyColumnName}}
       {{/if}}
     {{else}}
-      field of type
       <select id="changeColumn-type">
         {{> html_select_content typeMenu}}
-      </select>,
+      </select>
       {{! Disallowed state transitions are rejected in code. }}
       <select id="changeColumn-backend">
         {{! Doesn't buy us much in this case. }}
