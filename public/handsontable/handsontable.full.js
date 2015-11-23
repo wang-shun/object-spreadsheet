@@ -10798,7 +10798,13 @@ var $AutoColumnSize = AutoColumnSize;
         }
       }
     });
-    if (this.firstCalculation && this.getSyncCalculationLimit()) {
+    // For a one-column table such as one used to implement a context menu,
+    // this.getSyncCalculationLimit() defaults to 0.  But we want to auto-size
+    // context menus and asynchronous sizing doesn't seem to work for them, so
+    // we have to interpret 0 as "column 0 is the only one to be sized".  -1 can
+    // be used to disable synchronous sizing.  Maybe the interpretation of the
+    // limit should change to be the number of columns sized synchronously.
+    if (this.firstCalculation && this.getSyncCalculationLimit() >= 0) {
       this.calculateColumnsWidth({
         from: 0,
         to: this.getSyncCalculationLimit()
@@ -12793,7 +12799,10 @@ var $Menu = Menu;
     var settings = {
       data: this.menuItems,
       colHeaders: false,
-      colWidths: [200],
+      // For Object Spreadsheets, always auto-size.
+      // TODO: Make this configurable as part of
+      // https://github.com/handsontable/handsontable/issues/1895.
+      //colWidths: [200],
       autoRowSize: false,
       readOnly: true,
       copyPaste: false,
