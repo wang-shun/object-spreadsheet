@@ -426,7 +426,7 @@ insertBlankColumn = (parentId, index, isObject, view) ->
 
 
 headerExpanded = new ReactiveVar(true)
-@toggleHeaderExpanded = () ->
+toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
 
 class ClientView
@@ -479,9 +479,15 @@ class ClientView
       if headerHeight > 2
         # This is terrible but it will take ten times as long to do properly...
         # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
-        toggleHtml = ("<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-                      "#{if headerExpanded.get() then '-' else '+'}</button>")
+        toggleHtml = 
+            """<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">
+                 <path style="stroke: black; fill: black" d="#{if headerExpanded.get() then 'M 0 5 l 10 0 l -5 5 z' else 'M 3 1 l 5 5 l -5 5 z'}"/>
+               </svg>"""
+ 
+          #"<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
+          #            "#{if headerExpanded.get() then '-' else '+'}</button>")
         grid[0][0].value = toggleHtml
+        grid[0][0].cssClasses.push('rsRoot')
         #gridVertExtend(gridCaption,
         #               gridMergedCell(headerHeight - 2, 1, toggleHtml + ' Obj', ['htBottom', 'rsCaption']))
       #gridCaption.push(
@@ -523,7 +529,7 @@ class ClientView
         colCls = null
         for row in [0...grid.length]
           for cls in grid[row][col].cssClasses
-            if cls in ['rsCaption', 'separator', 'tableSeparator']
+            if cls in ['rsCaption', 'rsRoot', 'separator', 'tableSeparator']
               # assert (!colCls? || colCls == cls)
               colCls = cls
         colCls
@@ -540,6 +546,7 @@ class ClientView
           switch @colClasses[i]
             when 'tableSeparator' then 20
             when 'separator' then 10
+            when 'rsRoot' then 18
             else undefined
       rowHeights:
         # Specify all the row heights (24 pixels is the Handsontable default),
@@ -991,10 +998,13 @@ Template.Spreadsheet.rendered = ->
   Relsheets.open(sheet)
   Tracker.autorun(guarded -> rebuildView viewId)
 
-Template.Spreadsheet.helpers({
+Template.Spreadsheet.events =
+  'click .toggleHeaderExpanded': -> toggleHeaderExpanded()
+
+Template.Spreadsheet.helpers
   # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
   actionBarClass: -> if ActionBar.isExpanded() then 'actionBarExpanded' else ''
-})
+
 
 
 $ ->
