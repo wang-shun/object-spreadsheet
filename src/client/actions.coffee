@@ -288,7 +288,7 @@ class TracingView
           # referent-related features.  Or do we like this better?
           # We could at least base the curly braces on
           # type-checking-level singular-ness once we have it.
-          '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(',') + '}'
+          '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(', ') + '}'
       else outcome.error
     # Exclude subformulas with additional bound variables, e.g., filter
     # predicate.  Currently, the only way to debug them is to select them

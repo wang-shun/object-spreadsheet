@@ -213,11 +213,15 @@ right and a bottom border:
   box-shadow: inset 0px 0px 1px 2px #EEE;
 }
 
-.handsontable td.dataPadding:not(.selected-object) {
-  background: #F7F7F7;
+.handsontable td.dataPadding:not(.area):not(.selected-object) {
+  background: #FBFBFB;
 }
 .handsontable td.dataPadding {
-  box-shadow: inset 0px 0px 2px 3px #DDD;
+  box-shadow: inset 0px 0px 3px 2px #DDD;
+}
+
+.handsontable td.dataError {
+  color: #F00;
 }
 
 .handsontable button.headerCollapse {

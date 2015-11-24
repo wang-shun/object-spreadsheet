@@ -312,7 +312,7 @@ tsetToText = (model, tset, refsSeen=new EJSONKeyedSet()) ->
   if elements.length == 1
     valueToText(model, type, elements[0], refsSeen)
   else
-    '{' + (valueToText(model, type, e, refsSeen) for e in elements).join(',') + '}'
+    '{' + (valueToText(model, type, e, refsSeen) for e in elements).join(', ') + '}'
 
 annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, expectedFmla) ->
   if !targetName?

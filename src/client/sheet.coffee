@@ -147,7 +147,7 @@ class ViewSection
           bottomGrid[0][0].qFamilyId = qFamilyId
           gridVertExtend(grid, bottomGrid)
     else
-      grid = gridMergedCell(height, @width, '!')
+      grid = gridMergedCell(height, @width, 'error', ['dataError'])
       grid[0][0].fullText = 'Error: ' + vlist.error
       grid[0][0].qFamilyId = qFamilyId
     grid
@@ -183,7 +183,7 @@ class ViewSection
       gridHorizExtend(grid, gridObject)
     if @col.type != '_token'
       # Value
-      gridValue = gridMergedCell(height, 1, hlist.value ? '!')
+      gridValue = gridMergedCell(height, 1, hlist.value ? '<?>')
       if @subsections.length == 0
         gridValue[0][0].cssClasses.push('leaf')
       if hlist.value?
@@ -191,6 +191,7 @@ class ViewSection
         if typeIsReference(@col.type)
           gridValue[0][0].cssClasses.push('reference')
       if hlist.error?
+        gridValue[0][0].cssClasses.push('dataError')
         gridValue[0][0].fullText = 'Error converting to text: ' + hlist.error
       gridValue[0][0].qCellId = qCellId
       gridValue[0][0].qFamilyId = qFamilyId
@@ -836,7 +837,7 @@ class ClientView
             # I'd like to make clear that this doesn't actually add the value yet
             # (e.g., "Make room to add a value here"), but Daniel won't like that.
             # ~ Matt 2015-11-22
-            name: 'Add value here'
+            name: 'Add cell here'
             callback: () =>
               new FamilyId(c.qFamilyId).addPlaceholder(standardServerCallback)
           }
@@ -845,16 +846,16 @@ class ClientView
   getDeleteCommandForCell: (c) ->
     if c.isPlaceholder  # Should only exist in state value columns.
       return {
-        name: 'Remove placeholder'
+        name: 'Delete cell'
         callback: () =>
           new FamilyId(c.qFamilyId).removePlaceholder(standardServerCallback)
       }
     else if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
       return {
         # This currently gives 'Delete object' for the key of a keyed object
-        # (deprecated).  If we wanted that case to say 'Delete value', we
+        # (deprecated).  If we wanted that case to say 'Delete cell', we
         # would test c.isObjectCell instead.
-        name: if col.isObject then 'Delete object' else 'Delete value'
+        name: if col.isObject then 'Delete object' else 'Delete cell'
         callback: () =>
           StateEdit.removeCell(c.qCellId, standardServerCallback)
       }
@@ -864,6 +865,7 @@ class ClientView
   getDemoteCommandForColumn: (col) ->
     if (col._id != rootColumnId && col.isObject &&
         col.children.length == (if col.type == '_token' then 1 else 0))
+      objectName = objectNameWithFallback(col) ? '(unnamed)'
       #parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
       #flattenFieldName =
       #  (if col.type == '_token'
