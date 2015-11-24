@@ -254,7 +254,8 @@ class Model
     # Don't bother with further validation here because we have to be prepared
     # anyway for the choice of reference display column to become invalid as a
     # result of modifications to the sheet.
-    check(referenceDisplayColumn, Match.Optional(String))
+    # We use a different convention than Match.Optional...
+    check(referenceDisplayColumn, Match.OneOf(String, null))
     Columns.update(columnId, {$set: {referenceDisplayColumn}})
 
   reorderColumn: (columnId, newIndex) ->
@@ -622,7 +623,7 @@ Meteor.methods
       @model.evaluateAll()
   changeColumnReferenceDisplayColumn: (cc, columnId, referenceDisplayColumn) ->
     cc.run ->
-      @model.changeColumnReferenceDisplay(columnId, referenceDisplayColumn)
+      @model.changeColumnReferenceDisplayColumn(columnId, referenceDisplayColumn)
   reorderColumn: (cc, columnId, newIndex) ->
     cc.run -> @model.reorderColumn(columnId, newIndex)
   deleteColumn: (cc, columnId) ->
