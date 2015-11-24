@@ -90,6 +90,11 @@ right and a bottom border:
   border-bottom: none;
 }
 
+.handsontable td.rsRoot {
+  vertical-align: top;
+  padding-left: 3px;
+}
+
 .handsontable td.rsHeaderFieldNameLeaf {
   border-top: 1px solid #CCC;
 }
@@ -298,6 +303,14 @@ right and a bottom border:
   width: 1px;
   vertical-align: bottom;
   padding-left: 1em;
+}
+
+svg.formulaDebuggerToggle.closed {
+  stroke: slategrey;
+}
+
+svg.formulaDebuggerToggle.open {
+  stroke: white;
 }
 
 /*-------------------*/
