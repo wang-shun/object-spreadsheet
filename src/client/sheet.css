@@ -259,8 +259,10 @@ right and a bottom border:
 
 .formulaBand {
   position: absolute;
-  background-color: #AAF;
   z-index: 1;
+  box-sizing: border-box;
+  border: 1px solid #FFF;
+  background-color: #AAF;
 }
 
 .formulaBand:hover, .formulaBandSelected {

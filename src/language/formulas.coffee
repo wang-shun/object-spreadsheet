@@ -15,10 +15,17 @@
 # cells to generate in a "family" in the formula column.  Some operations may
 # evaluate subformulas with additional variable bindings.
 
+# Support delayed evaluation of messages that might fail to evaluate in cases
+# where the assertion passes.
 @valAssert = (cond, message) ->
-  throw new FormulaValidationError(message) unless cond
+  unless cond
+    throw new FormulaValidationError(
+      if _.isString(message) then message else message())
+
 evalAssert = (cond, message) ->
-  throw new EvaluationError(message) unless cond
+  unless cond
+    throw new EvaluationError(
+      if _.isString(message) then message else message())
 
 readFamilyForFormula = (model, qFamilyId) ->
   tset = model.evaluateFamily(qFamilyId)
@@ -27,7 +34,9 @@ readFamilyForFormula = (model, qFamilyId) ->
   else
     # Includes the case of a newly detected cycle.
     # Future: Specifically state that there was a cycle.
-    throw new EvaluationError("Reference to column #{qFamilyId.columnId} family #{JSON.stringify(qFamilyId.cellId)}, which failed to evaluate")
+    targetTset = new TypedSet(getColumn(qFamilyId.columnId).parent, set([qFamilyId.cellId]))
+    throw new EvaluationError("Reference to column '#{stringifyColumnRef([qFamilyId.columnId, true])}' of " +
+                              "object '#{tsetToTextIgnoreErrors(targetTset)}', which failed to evaluate")
 
 # Based on model.evaluateFamily{,1}.
 # TODO: Assuming we do want the client to be able to evaluate formulas (for now
@@ -53,12 +62,12 @@ readColumnTypeForFormula = (model, columnId) ->
   if type != TYPE_ERROR
     return type
   else
-    throw new FormulaValidationError("Reference to column #{stringifyColumnRef([columnId, true])} of unknown type.  " +
-                                     "Fix its formula or manually specify the type if needed to break a cycle.")
+    throw new FormulaValidationError("Reference to column '#{stringifyColumnRef([columnId, true])}' of unknown type.  " +
+                                     "Correct its formula or manually specify the type if needed to break a cycle.")
 
 @valExpectType = (what, actualType, expectedType) ->
   valAssert(commonSupertype(actualType, expectedType) == expectedType,
-            "#{what} has type #{actualType}, wanted #{expectedType}")
+            "#{what} has type '#{actualType}', wanted '#{expectedType}'")
 
 @singleElement = (set) ->
   elements = set.elements()
@@ -117,7 +126,8 @@ EagerSubformulaCells = {
   validate: EagerSubformula.validate
   typecheck: (model, vars, arg) ->
     type = typecheckFormula(model, vars, arg)
-    valAssert(typeIsReference(type), "Expected a set of cells, got set of '#{type}'")
+    # stringifyType(type) fails if type is the root.
+    valAssert(typeIsReference(type), () -> "Expected a set of cells, got set of '#{stringifyType(type)}'")
     type
   evaluate: EagerSubformula.evaluate
   stringify: EagerSubformula.stringify
@@ -135,7 +145,7 @@ HomogeneousEagerSubformulaList = {
       termType = typecheckFormula(model, vars, fmla)
       newType = commonSupertype(typeSoFar, termType)
       valAssert(newType != TYPE_ERROR,
-                "Mismatched types in list (#{typeSoFar} and #{termType})")
+                "Mismatched types in list: '#{stringifyType(typeSoFar)}' and '#{stringifyType(termType)}'")
       typeSoFar = newType
     typeSoFar
   evaluate: (model, vars, termFmlas) ->
@@ -159,10 +169,10 @@ Lambda = {
               'Lambda subformula must be a two-element array')
     [varName, body] = arg
     valAssert(_.isString(varName),
-              'Lambda variable must be a string')
+              'Bound variable must be a string')
     # Try to save users from themselves.
     valAssert(!vars.has(varName),
-              'Lambda shadows variable #{varName}')
+              "Bound variable '#{varName}' shadows an outer variable of the same name")
     newVars = vars.shallowClone()
     newVars.add(varName)
     validateSubformula(newVars, body)
@@ -189,7 +199,7 @@ ColumnId = {
     valAssert(_.isString(arg), 'Column ID must be a string')
   typecheck: (model, vars, arg) ->
     # XXX: Disallow the root column and add a special case for '$'?
-    valAssert(model.getColumn(arg)?, "No column exists with ID #{arg}")
+    valAssert(model.getColumn(arg)?, "No column exists with ID '#{arg}'")
     arg
 }
 String = {
@@ -285,7 +295,7 @@ goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
       # C.f. readFamilyForFormula
       throw new EvaluationError(
         "Circular dependency while converting object of type " +
-        "#{stringifyType(type)}, ID #{JSON.stringify(value)}, to text")
+        "'#{stringifyType(type)}', ID #{JSON.stringify(value)}, to text")
     newRefsSeen = refsSeen.shallowClone()
     newRefsSeen.add(qCellId)
     col = model.getColumn(type)
@@ -299,20 +309,38 @@ goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
     else if displayColId in col.children && !model.getColumn(displayColId).isObject
       displayTset = readFamilyForFormula(model, {columnId: displayColId, cellId: value})
     else
-      throw new EvaluationError("Invalid reference display column for type #{stringifyType(type)}")
+      throw new EvaluationError("Invalid reference display column for type '#{stringifyType(type)}'")
     tsetToText(model, displayTset, newRefsSeen)
   else if typeof value == 'string' then value
   else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
   # Reasonable fallback
   else JSON.stringify(value)
 
-tsetToText = (model, tset, refsSeen=new EJSONKeyedSet()) ->
-  type = tset.type
-  elements = tset.elements()
+@genericSetToText = (elements, formatOne) ->
   if elements.length == 1
-    valueToText(model, type, elements[0], refsSeen)
+    formatOne(elements[0])
   else
-    '{' + (valueToText(model, type, e, refsSeen) for e in elements).join(', ') + '}'
+    '{' + (formatOne(e) for e in elements).join(', ') + '}'
+
+tsetToText = (model, tset, refsSeen=new EJSONKeyedSet()) ->
+  genericSetToText(tset.elements(), (e) -> valueToText(model, tset.type, e, refsSeen))
+
+# The ignoreErrors versions must not be used in formula evaluation, because the
+# ability to catch errors makes evaluation of cyclic dependencies
+# nondeterministic in the current implementation.
+#
+# Note: Callers for major tool features should rather catch the error themselves
+# and display it.  Ignoring it is OK for niche purposes like referring to values
+# in an error message.
+
+@valueToTextIgnoreErrors = (type, value) ->
+  try
+    valueToText(liteModel, tset.type, value)
+  catch e
+    '<?>'
+
+@tsetToTextIgnoreErrors = (tset) ->
+  genericSetToText(tset.elements(), (e) -> valueToTextIgnoreErrors(tset.type, e))
 
 annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, expectedFmla) ->
   if !targetName?
@@ -330,6 +358,7 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
     catch e
       # Notice: this happens regularly in the client when column
       # type information is wiped
+      console.log(e)
       stringifyNavigationStep(targetName) + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
@@ -420,7 +449,7 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, par
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
     valAssert(commonSupertype(lhsType, rhsType) != TYPE_ERROR,
-              "Mismatched types to '#{symbol}' operator (#{lhsType} and #{rhsType})")
+              "Mismatched types to '#{symbol}' operator: '#{stringifyType(lhsType)}' and '#{stringifyType(rhsType)}'")
     'bool'
   evaluate: (model, vars, lhs, rhs) ->
     new TypedSet('bool', new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)]))
@@ -430,7 +459,7 @@ sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, par
 #   overloaded(paramNames,
 #              [[argument-types...], handler],
 #              [[argument-types...], handler], ...)
-overloaded = (paramNames, alternatives...) ->
+overloaded = (operator, paramNames, alternatives...) ->
   arities = (a[0].length for a in alternatives)
   minArity = Math.min(arities...)
   maxArity = Math.max(arities...)
@@ -444,12 +473,14 @@ overloaded = (paramNames, alternatives...) ->
     argAdapters: (EagerSubformula for i in [0...minArity]).concat(OptionalEagerSubformula for i in [minArity...maxArity])
     typecheck: (model, vars, argtypes...) ->
       handler = getHandler(argtypes)
-      valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+      valAssert(handler?, "No valid alternative of '#{operator}' " +
+                "for argument types #{("'" + stringifyType(t) + "'" for t in argtypes).join(', ')}")
       handler.typecheck(model, vars, argtypes...)
     evaluate: (model, vars, args...) ->
       argtypes = (ts.type for ts in args)
       handler = getHandler(argtypes)
-      valAssert(handler?, "No valid alternative for argument types #{argtypes}")
+      valAssert(handler?, "No valid alternative of '#{operator}' " +
+                "for argument types #{("'" + stringifyType(t) + "'" for t in argtypes).join(', ')}")
       handler.evaluate(model, vars, args...)
     stringify: (model, vars, sinfos...) ->
       # Does it even make sense to have different stringifies for different alternatives?
@@ -459,7 +490,7 @@ overloaded = (paramNames, alternatives...) ->
 
 compareInfixOperator = (symbol, precedence, associativity, evaluateFn) ->
   overloaded(
-        ['left', 'right'],
+        symbol, ['left', 'right'],
         [['number', 'number'], singletonInfixOperator(symbol, precedence, associativity, 'number', 'number', 'bool', evaluateFn)],
         [['date', 'date'],     singletonInfixOperator(symbol, precedence, associativity, 'date',   'date',   'bool', evaluateFn)]
   )
@@ -578,7 +609,7 @@ dispatch = {
       valExpectType('if condition', conditionType, 'bool')
       type = commonSupertype(thenType, elseType)
       valAssert(type != TYPE_ERROR,
-                "Mismatched types in if branches (#{thenType} and #{elseType})")
+                "Mismatched types in if branches: '#{stringifyType(thenType)}' and '#{stringifyType(elseType)}'")
       type
     evaluate: (model, vars, conditionTset, thenFmla, elseFmla) ->
       evaluateFormula(model, vars,
@@ -695,7 +726,7 @@ dispatch = {
       outerPrecedence: PRECEDENCE_NEG
 
   '+' : overloaded(
-    ['left', 'right'],
+    '+', ['left', 'right'],
     [['number', 'number'], singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x + y)],
     [['text', 'text'],     singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'text'  , 'text'  , 'text'  , (x, y) -> x + y)]
   )
@@ -860,12 +891,13 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
       # Fall through to navigation interpretations.
     else  # i.e., in procedures
       # Easier than trying to generalize the error message below.
-      valAssert(vars.get(targetName)?, "Undefined variable #{targetName}")
+      valAssert(vars.get(targetName)?, "Undefined variable '#{targetName}'")
       return ['var', targetName]
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.
   startCellsType = validateAndTypecheckFormula(model, vars, startCellsFmla)
-  valAssert(startCellsType && typeIsReference(startCellsType), "Expected a set of cells, got set of '#{startCellsType}'")
+  valAssert(startCellsType && typeIsReference(startCellsType),
+            () -> "Expected a set of cells, got set of '#{stringifyType(startCellsType)}'")
 
   # Check logical ancestor objects (no keys).
   # Note, it's impossible to navigate to the root column since it has no field name or
@@ -882,7 +914,7 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
   # Future: Enforce uniqueness of interpretations in any scope?
   valAssert(interpretations.length == 1,
             "#{interpretations.length} possible interpretations for " +
-            "<type #{startCellsType}>.#{targetName}, wanted one.")
+            "<type #{stringifyType(startCellsType)}>.#{targetName}, wanted one.")
   formula = interpretations[0]
 
   if formula[0] == 'down'
@@ -966,7 +998,7 @@ stringifyIdentCommon = (entryPoint, ident) ->
       # fall through
   # Currently I think this only happens if the identifier contains `, but it's
   # nice for the code to be future-proof. ~ Matt 2015-10-16
-  throw new FormulaValidationError("Cannot stringify identifier #{ident}")
+  throw new FormulaValidationError("Cannot stringify identifier '#{ident}'")
 
 # Special version that won't unnecessarily backquote the [key] fallback object
 # name syntax.

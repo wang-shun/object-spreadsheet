@@ -177,7 +177,7 @@ class ViewSection
       gridObject[0][0].qFamilyId = qFamilyId
       gridObject[0][0].isObjectCell = true
       # For debugging and calling canned transactions from the console.
-      gridObject[0][0].fullText = 'Object ID: ' + JSON.stringify(hlist.cellId)
+      #gridObject[0][0].fullText = 'Object ID: ' + JSON.stringify(hlist.cellId)
       if @col.type != '_token'
         gridObject[0][0].cssClasses.push('rsKeyedObject')
       gridHorizExtend(grid, gridObject)
@@ -354,12 +354,13 @@ class StateEdit
         if matchingCells.length == 1
           return matchingCells[0]
         else if matchingCells.length > 1
-          throw new Error('The given reference display string matches ' + matchingCells.length + ' cells.  ' +
-                          'Fix the reference display strings to be unique.')  # "or enter the @n notation instead"
+          throw new Error("The given string matches #{matchingCells.length} objects.  " +
+                          "Choose a reference display column for '#{stringifyType(type)}' that has unique values, " +
+                          "or define a new computed column if necessary.")  # "or enter the @n notation instead"
         else
-          throw new Error('The given reference display string does not match any cells.')
+          throw new Error('The given string does not match any object.')
       else
-        throw new Error('Malformed cell reference.')
+        throw new Error('Malformed object reference.')
     else if type == '_unit'
       'X'
     else if type == '_token'
@@ -370,7 +371,7 @@ class StateEdit
     else if type == 'text'
       text
     else if type == 'date'
-      Date.parse(text) || throw new Error("Invalid date, '#{text}'")
+      Date.parse(text) || throw new Error("Invalid date: '#{text}'")
     else
       JSON.parse text
 

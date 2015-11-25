@@ -11,12 +11,6 @@ Template.formulaValueBar.helpers
 #
 changeColumnArgs = new ReactiveVar([], EJSON.equals)
 
-stringifyType = (type) ->
-  if typeIsReference(type)
-    stringifyColumnRef([type, false])
-  else
-    type
-
 NESTED_UNDERLINING_PX_PER_LEVEL = 4
 NESTED_UNDERLINING_MAX_DEPTH = 5
 
@@ -240,17 +234,17 @@ updateFormulaView = (template) ->
         if isNavigationLhs
           node.ch1 = childInfo.node.ch2
         node.height = Math.max(node.height, childInfo.node.height + !isNavigationLhs)
-    top = 4 + template.codeMirror.defaultTextHeight() + 1 + NESTED_UNDERLINING_PX_PER_LEVEL * node.height
+    top = 4 + template.codeMirror.defaultTextHeight() + NESTED_UNDERLINING_PX_PER_LEVEL * node.height
     # Tweak for gaps in navigation chains.
-    x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left + 1
-    x2 = template.codeMirror.cursorCoords({line: 0, ch: node.ch2}, 'local').left - 1
+    x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left
+    x2 = template.codeMirror.cursorCoords({line: 0, ch: node.ch2}, 'local').left
     bands.push({
       node: node
       selected: false
       left: x1
       width: x2 - x1
       top: top
-      height: 2
+      height: NESTED_UNDERLINING_PX_PER_LEVEL
       })
   layoutSubtree(root)
   newFormulaInfo.set({root: root, bands: bands, selectedBand: null, haveTraced: false})
@@ -271,24 +265,13 @@ class TracingView
       })
   show: (node) ->
     formula = node.formula
-    formatOne = (val, type) ->
-      try
-        valueToText(liteModel, type, val)
-      catch e
-        # TODO: Make error message viewable like in the sheet.
-        '<toText failed>'
     formatOutcome = (outcome) ->
       if outcome.result?
-        # XXX Code duplication with tsetToText, currently needed to catch
-        # exceptions for each element of the tset independently.
-        if outcome.result.set.size() == 1
-          formatOne(outcome.result.elements()[0], outcome.result.type)
-        else
-          # TODO: Display in individual cells so we can support the
-          # referent-related features.  Or do we like this better?
-          # We could at least base the curly braces on
-          # type-checking-level singular-ness once we have it.
-          '{' + (formatOne(e, outcome.result.type) for e in outcome.result.elements()).join(', ') + '}'
+        # TODO: Display in individual cells so we can support the
+        # referent-related features.  Or do we like this better?
+        # We could at least base the curly braces on
+        # type-checking-level singular-ness once we have it.
+        tsetToTextIgnoreErrors(outcome.result)
       else outcome.error
     # Exclude subformulas with additional bound variables, e.g., filter
     # predicate.  Currently, the only way to debug them is to select them
@@ -321,7 +304,7 @@ class TracingView
       line =
         for [name, _] in varsAndTypesList
           val = varValues.get(name).elements()[0]
-          new ViewCell(formatOne(val, varValues.get(name).type))
+          new ViewCell(valueToTextIgnoreErrors(varValues.get(name).type, val))
       for childInfo in childrenToShow
         childOutcome = childInfo.node.formula.traces.get(varValues)
         # XXX Would we rather just evaluate cases that weren't originally reached?

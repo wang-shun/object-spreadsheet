@@ -361,7 +361,9 @@ class Model
             throw new Error('typecheckFormula returned null/undefined')
           if col.specifiedType?
             valAssert(commonSupertype(col.specifiedType, type) == col.specifiedType,
-                      "Column #{columnId} formula returns #{type}, which is not a subtype of specified type #{col.specifiedType}")
+                      "Column '#{stringifyColumnRef([columnId, true])}' " +
+                      "formula returns '#{stringifyType(type)}', " +
+                      "which is not convertible to the specified type '#{col.specifiedType}'")
           else
             @_changeColumnType(columnId, type)
           if @settings.compiler && !($$.formulaEngine.compiled[columnId])?
@@ -463,7 +465,7 @@ class Model
   executeCannedTransaction: (name, argsObj) ->
     proc = Procedures.findOne({name: name})
     unless proc?
-      throw new Meteor.Error('no-such-procedure', "No such procedure #{name}.")
+      throw new Meteor.Error('no-such-procedure', "No such procedure '#{name}'.")
     # Typecheck the procedure.  TODO: Cache this like for column formulas.
     try
       typecheckProcedure(this, proc)
@@ -473,7 +475,7 @@ class Model
       console.log(e.stack)
       throw new Meteor.Error(
         'procedure-ill-typed',
-        "Procedure #{name} is ill-typed with respect to the current schema and cannot be executed.")
+        "Procedure '#{name}' is ill-typed with respect to the current schema and cannot be executed.")
     # Future: Validate argument types!
     # Future: Add built-in parameters (clientUser, currentTime) here.
     args = new EJSONKeyedMap(
@@ -536,7 +538,7 @@ class Model
         catch e
           unless e instanceof Meteor.Error && e.error == 'invalid-formula'
             throw e
-          console.log("Column #{stringifyColumnRef([col._id, true])} contains invalid formula " +
+          console.log("Column '#{stringifyColumnRef([col._id, true])}' contains invalid formula " +
                       "#{JSON.stringify(col.formula)}: #{e.message}.  Resetting.")
           col.formula = DUMMY_FORMULA
           col.specifiedType = null

@@ -83,6 +83,12 @@
       visit(physChildCol.fieldName, [physChildCol._id, true, 'down'])
   return ret
 
+@stringifyType = (type) ->
+  if typeIsReference(type)
+    stringifyColumnRef([type, false])
+  else
+    type
+
 @parseTypeStr = (s) ->
   # This is an abuse of typeIsReference, since s is a UI-level (not internal)
   # type string, but it will work to check whether s is recognized as the name
@@ -95,7 +101,7 @@
 @parseObjectTypeRef = (s) ->
   colId2 = parseColumnRef(s)
   if colId2[1]
-    throw new SemanticError("#{s} refers to a value column, not an object type.")
+    throw new SemanticError("'#{s}' refers to a value column, not an object type.")
   return colId2[0]
 
 # Compare to resolveNavigation.
@@ -108,7 +114,7 @@
   colId2 = [rootColumnId, false]
   for n in s.split(':')
     if colId2[1]
-      throw new SemanticError("Looking up child #{n} of a value column.")
+      throw new SemanticError("Looking up child '#{n}' of a value column.")
     interpretations = columnLogicalChildrenByName(colId2[0], n)
     if interpretations.length != 1
       throw new SemanticError(
@@ -120,7 +126,9 @@
 # Compare to stringifyNavigation.
 @stringifyColumnRef = ([columnId, isValues]) ->
   if columnId == rootColumnId
-    throw new SemanticError('We currently do not support references to the root column.')
+    # XXX Consider reenabling the error after more testing. ~ Matt 2015-11-25
+    #throw new SemanticError('We currently do not support references to the root column.')
+    return '$'
   names = []
   while columnId != rootColumnId
     col = getColumn(columnId)
