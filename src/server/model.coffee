@@ -139,13 +139,16 @@ class Model
     if isObject == col.isObject
       return
     
+    updates = {isObject: isObject}
     if isObject
-      # When making a state column into an object column: 
-      # column type becomes "_token", existing values are moved to a 
-      # newly created child column
-      if !col.formula?
+      if col.formula?
+        # Do not generate a new object name: [fieldName] is good enough.
+      else
+        # When making a state column into an object column:
+        # column type becomes "_token", a new object name is generated,
+        # and existing values are moved to a newly created child column
         @invalidateSchemaCache()
-        Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: null, fieldName: null}})
+        Columns.update(columnId, {$set: {specifiedType: '_token', isObject: true, objectName: nextAvailableColumnName('Object'), fieldName: null}})
         childId = @defineColumn(columnId, 0, col.fieldName, col.specifiedType, false, null, null, {})
         Cells.find({column: columnId}).forEach (family) ->
           tokens = (Random.id() for value in family.values)
@@ -154,7 +157,8 @@ class Model
             key = cellIdChild(family.key, token)
             Cells.insert({column: childId, key, values: [value]})
     else
-      # When making a state column into a value column:
+      updates.objectName = null
+      # When making a column into a value column:
       # - If column type is "_token", values are copied from the column's only child,
       #   and that child is removed.
       # - Otherwise, column must have no children.
@@ -166,14 +170,16 @@ class Model
         childCol = @getColumn(childId)
         if childCol.isObject || childCol.children?.length
           throw new Meteor.Error('remove-object-complex-value',
-                                 "Child '#{childCol.objectName ? childCol.fieldName}' is not a simple value.")
+                                 "Child '#{childCol.objectName ? childCol.fieldName ? '(unnamed)'}' is not a simple value.")
         Cells.find({column: columnId}).forEach (family) ->
           newValues = []
           for value in family.values
             Cells.find({column: childId, key: value}).forEach (family) ->
               newValues.push(family.values...)
           Cells.update(family._id, {$set: {values: newValues}})
-        Columns.update(columnId, {$set: {specifiedType: childCol.type, children: []}})
+        updates.specifiedType = childCol.type
+        updates.fieldName = childCol.fieldName
+        updates.children = []
         Columns.remove(childId)
         Cells.remove({column: childId})
         @invalidateSchemaCache()
@@ -181,9 +187,7 @@ class Model
         if col.children?.length
           throw new Meteor.Error('remove-object-has-children',
                                  'Please delete all child columns first.')
-      if col.objectName?
-        Columns.update(columnId, {$set: {objectName: null, fieldName: col.objectName}})
-    Columns.update(columnId, {$set: {isObject: isObject}})
+    Columns.update(columnId, {$set: updates})
     @invalidateColumnCache()
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->

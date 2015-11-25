@@ -66,6 +66,13 @@
   if columnId == rootColumnId then 0
   else 1 + columnDepth(getColumn(columnId).parent)
 
+@nextAvailableColumnName = (prefix) ->
+  i = 1
+  while Columns.find({$or: [{fieldName: "#{prefix}#{i}"},
+                            {objectName: "#{prefix}#{i}"}]}).count() > 0
+    i++
+  return "#{prefix}#{i}"
+
 # This implements the user-facing conceptual model in which a key is a child of the object.
 # Precondition: getColumn(id).isObject == true
 # Returns: list of [child id, isValues, direction]

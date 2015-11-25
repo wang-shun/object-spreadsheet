@@ -409,8 +409,8 @@ insertBlankColumn = (parentId, index, isObject, view) ->
     $$.call('insertUnkeyedStateObjectTypeWithField',
             parentId,
             index,
-            null,  # objectName
-            null,  # fieldName
+            nextAvailableColumnName('Object'),
+            nextAvailableColumnName('value'),
             DEFAULT_STATE_FIELD_TYPE,  # specifiedType
             view?.id,
             standardServerCallback)
@@ -418,10 +418,10 @@ insertBlankColumn = (parentId, index, isObject, view) ->
     $$.call('defineColumn',
             parentId,
             index,
-            null,  # fieldName
+            nextAvailableColumnName('value'),
             if formula? then null else DEFAULT_STATE_FIELD_TYPE,  # specifiedType
             isObject,  # isObject
-            null,  # objectName
+            null,  # objectName: when it is applicable, [fieldName] is OK
             formula,  # formula
             view?.id,
             standardServerCallback)
