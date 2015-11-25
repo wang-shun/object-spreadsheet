@@ -12430,6 +12430,9 @@ var $ContextMenu = ContextMenu;
     if (build) {
       // Copy relevant parts from enablePlugin
       var dynamicSettings = build();
+      if (dynamicSettings === false) {
+        return;
+      }
       var menuItems = this.itemsFactory.getVisibleItems(dynamicSettings);
       this.menu.setMenuItems(menuItems);
       this.commandExecutor = new CommandExecutor(this.hot);
