@@ -335,7 +335,7 @@ tsetToText = (model, tset, refsSeen=new EJSONKeyedSet()) ->
 
 @valueToTextIgnoreErrors = (type, value) ->
   try
-    valueToText(liteModel, tset.type, value)
+    valueToText(liteModel, type, value)
   catch e
     '<?>'
 
