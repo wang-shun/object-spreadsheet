@@ -432,17 +432,24 @@ binaryOperationStringify = (symbol, precedence, associativity) ->
           rhsSinfo.strFor(precedence + (associativity != ASSOCIATIVITY_RIGHT)))
     outerPrecedence: precedence
 
-singletonInfixOperator = (symbol, precedence, associativity,
-                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
+# Just enough of a generalization of singletonInfixOperator for '+' string
+# concatenation operator that automatically calls toText.
+infixOperator = (symbol, precedence, associativity,
+                 lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
   paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
     valExpectType("Left operand of '#{symbol}'", lhsType, lhsExpectedType)
     valExpectType("Right operand of '#{symbol}'", rhsType, rhsExpectedType)
     resultType
-  evaluate: (model, vars, lhs, rhs) ->
-    new TypedSet(resultType, set([evaluateFn(singleElement(lhs.set), singleElement(rhs.set))]))
+  evaluate: (model, vars, lhsTset, rhsTset) ->
+    new TypedSet(resultType, set([evaluateFn(model, lhsTset, rhsTset)]))
   stringify: binaryOperationStringify(symbol, precedence, associativity)
+
+singletonInfixOperator = (symbol, precedence, associativity,
+                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
+  evaluateFn2 = (model, lhs, rhs) -> evaluateFn(singleElement(lhs.set), singleElement(rhs.set))
+  infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn2, paramNames)
 
 sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, paramNames) ->
   paramNames: paramNames ? ['left', 'right']
@@ -494,6 +501,10 @@ compareInfixOperator = (symbol, precedence, associativity, evaluateFn) ->
         [['number', 'number'], singletonInfixOperator(symbol, precedence, associativity, 'number', 'number', 'bool', evaluateFn)],
         [['date', 'date'],     singletonInfixOperator(symbol, precedence, associativity, 'date',   'date',   'bool', evaluateFn)]
   )
+
+# The definition in common.coffee is not guaranteed to load first.  I think this
+# is the least evil for now. ~ Matt 2015-11-25
+TYPE_ERROR = 'error'
 
 dispatch = {
 
@@ -728,7 +739,18 @@ dispatch = {
   '+' : overloaded(
     '+', ['left', 'right'],
     [['number', 'number'], singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x + y)],
-    [['text', 'text'],     singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'text'  , 'text'  , 'text'  , (x, y) -> x + y)]
+    # XXX Since we look at one binary operation at a time and '+' is left
+    # associative, "foo" + 3 + 5 is "foo35" but 3 + 5 + "foo" is "8foo".  Java
+    # is the same way, but we could do better for users who are unaware of this
+    # subtlety by making '+' variadic in the abstract syntax.  This is a rare
+    # case because string concatenations will usually include a delimiter.  Or
+    # we could just use a different operator for string concatenation.
+    #
+    # XXX TYPE_ERROR is a misnomer in this context: it means we accept tsets of
+    # any valid type.  (There's no way to write a subexpression that actually
+    # returns TYPE_ERROR; instead it will cause a FormulaValidationError.)
+    [[TYPE_ERROR, TYPE_ERROR], infixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, TYPE_ERROR, TYPE_ERROR, 'text',
+                                             (model, tsetX, tsetY) -> tsetToText(model, tsetX) + tsetToText(model, tsetY))]
   )
   '-' : singletonInfixOperator('-' , PRECEDENCE_PLUS   , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x -  y)
   '*' : singletonInfixOperator('*' , PRECEDENCE_TIMES  , ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x *  y)
