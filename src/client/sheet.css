@@ -68,7 +68,7 @@ will always match, just to get higher priority.
   otherwise, the borders would be slightly misaligned.  This is used for
   rsHeaderCorner.
   */
-  border-collapse: collapse;
+  /*border-collapse: collapse;*/
 }
 .handsontable table.htCore {
   /* Adding div.htContainer to the above selector results in incorrect column widths
@@ -92,7 +92,13 @@ right and a bottom border:
 
 .handsontable td.rsRoot {
   vertical-align: top;
-  padding-left: 3px;
+  text-align: center;
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
+.handsontable td.rsSentinel {
+  border: 0px none !important;  /* !important is required because of "tr:first-child td" rule in handsontable */
 }
 
 .handsontable td.rsHeaderFieldNameLeaf {

@@ -479,15 +479,10 @@ class ClientView
     #gridCaption = []
     if @options.headerExpandable
       if headerHeight > 2
-        # This is terrible but it will take ten times as long to do properly...
-        # Fix the width so the columns don't move when '+' becomes '-' or vice versa.
         toggleHtml = 
             """<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">
-                 <path style="stroke: black; fill: black" d="#{if headerExpanded.get() then 'M 0 5 l 10 0 l -5 5 z' else 'M 3 1 l 5 5 l -5 5 z'}"/>
+                 <path style="stroke: black; fill: black" d="#{if headerExpanded.get() then 'M 1 4 l 8 0 l -4 4 z' else 'M 3 1 l 4 4 l -4 4 z'}"/>
                </svg>"""
- 
-          #"<button class='headerCollapse' onclick='toggleHeaderExpanded();'>" +
-          #            "#{if headerExpanded.get() then '-' else '+'}</button>")
         grid[0][0].value = toggleHtml
         grid[0][0].cssClasses.push('rsRoot')
         #gridVertExtend(gridCaption,
@@ -509,6 +504,12 @@ class ClientView
     #gridHorizExtend(gridCaption, grid)
     #grid = gridCaption
 
+    # Add last column that will stretch horizontally
+    sentinel = ([new ViewCell('',1,1,['rsSentinel'])] for row in grid)
+    sentinel[0][0].columnId = rootColumnId
+    sentinel[0][0].rowspan = sentinel.length
+    gridHorizExtend(grid, sentinel)
+    
     # Resolve cell cross-references.
     # @ notation disabled; relevant code commented out. ~ Matt 2015-11-10
     @qCellIdToGridCoords = new EJSONKeyedMap()
@@ -560,6 +561,7 @@ class ClientView
             if i < headerHeight - (2 + @options.showTypes) then 11 else 24
         else
           24 for i in [0...@grid.length]
+      stretchH: 'last'
       cells: (row, col, prop) =>
         cell = @grid[row]?[col]
         if !cell then return {}  # may occur if grid is changing
@@ -655,10 +657,9 @@ class ClientView
         return false
 
       contextMenu: {
-        build: (() =>
-          c = @getSingleSelectedCell()
-          unless c?
-            return false
+        build: =>
+          c = @getSingleSelectedCell() ? {}
+
           items = {}
 
           if (ci = c.columnId)?
@@ -743,16 +744,14 @@ class ClientView
             if (deleteCommand = @getDeleteCommandForCell(c))?
               items.delete = deleteCommand
 
-          haveSomething = false
-          for k, v of items
-            haveSomething = true
-          unless haveSomething
+          isEmpty = (o) -> ( for k of o then return false ) ; true
+          if isEmpty(items)
             items.nothing = {
               name: 'No actions available here'
               disabled: () -> true
             }
 
-          {items: items})  # build callback
+          {items: items}   # end of build callback
       }  # contextMenu
     }  # Handsontable config object
 
