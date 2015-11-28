@@ -224,11 +224,21 @@ right and a bottom border:
   box-shadow: inset 0px 0px 1px 2px #EEE;
 }
 
-.handsontable td.dataPadding:not(.area):not(.selected-object) {
+.handsontable td.dataPadding:not(.area):not(.selected-object):not(.parent-root) {
   background: #FBFBFB;
 }
-.handsontable td.dataPadding {
+.handsontable td.dataPadding:not(.parent-root) {
   box-shadow: inset 0px 0px 3px 2px #DDD;
+}
+.handsontable td.dataPadding.area:not(.parent-root) {
+  box-shadow: inset 0px 0px 3px 2px #CCF;
+}
+.handsontable td.dataPadding.selected-object:not(.parent-root) {
+  box-shadow: inset 0px 0px 3px 2px #E8E8A0;
+}
+.handsontable td.dataPadding.parent-root {
+  border-right: 1px dashed #CCC;
+  border-bottom: 1px dashed #CCC;
 }
 
 .handsontable td.dataError {

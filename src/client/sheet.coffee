@@ -102,7 +102,8 @@ class ViewSection
       if @col.formula?
         throw new NotReadyError("Cell #{@columnId}:#{JSON.stringify parentCellId}")
       else
-        new ViewVlist(parentCellId, 0, null, null, "internal error: missing family")
+        # Ignore missing state families (treat as if it were empty)
+        new ViewVlist(parentCellId, 0, [], 0) #null, null, "internal error: missing family")
 
   prerenderHlist: (cellId, value) ->
     minHeight = 1
@@ -569,13 +570,15 @@ class ClientView
         classes = if @colClasses[adjcol] == 'separator' then ['incomparable'] else []
         if cell.qCellId? && cell.isObjectCell && (refc = @refId(cell.qCellId))?
           classes.push("ref-#{refc}")
+        if cell.qFamilyId?.cellId.length == 0  # seems to work; == undefined if qFamilyId doesn't exist
+          classes.push("parent-root")
         ancestors = if cell.ancestorQCellId? then new CellId(cell.ancestorQCellId).ancestors()  \
                     else if cell.qCellId? then new CellId(cell.qCellId).ancestors()  \
                     else if cell.qFamilyId? then new FamilyId(cell.qFamilyId).ancestors() \
                     else []
         for ancestor in ancestors
           if (refc = @refId(ancestor.q()))?
-            classes.push("parent-#{refc}")
+            classes.push("ancestor-#{refc}")
         {
           renderer: if col == 0 && row == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
@@ -767,7 +770,6 @@ class ClientView
     cfg = @hotConfig()
     @hot.updateSettings {colWidths: cfg.colWidths, rowHeights: cfg.rowHeights, mergeCells: cfg.mergeCells}
     @hot.loadData cfg.data
-    #@hot.render()
 
   getSingleSelectedCell: =>
     s = @hot.getSelected()
@@ -784,6 +786,9 @@ class ClientView
       return null
 
   refId: (qCellId) ->
+    #if qCellId.columnId == rootColumnId
+    #  "root"
+    #else
     loc = @qCellIdToGridCoords.get(qCellId)
     if loc?
       "#{loc.row}-#{loc.col}"
@@ -796,7 +801,7 @@ class ClientView
   highlightObject: (obj) ->
     $(".selected-object").removeClass("selected-object")
     if obj? && (refc = @refId(obj))?
-      $(".parent-#{refc}").addClass("selected-object")
+      $(".ancestor-#{refc}").addClass("selected-object")
         
   onSelection: ->
     selectedCell = @getSingleSelectedCell()
