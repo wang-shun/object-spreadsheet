@@ -7,13 +7,13 @@ body {
   box-sizing: border-box;
   padding: 5px 5px 0 5px;
   width: 100%;
-  height: calc(100% - 90px);
+  height: calc(100% - 100px);
 }
 /* This is terrible, but I tried flexbox and tables and wasn't able to get the
    correct scrolling behavior (and the table not bleeding into the padding when
    it scrolls) any other way. ~ Matt 2015-10-29 */
 #ViewWrapper.actionBarExpanded {
-  height: calc(100% - 290px);
+  height: calc(100% - 300px);
 }
 #View {
   width: 100%;
@@ -296,7 +296,7 @@ right and a bottom border:
 #ActionBar {
   box-sizing: border-box;
   /* NOTE: Keep the #ViewWrapper height rule consistent with all overrides of this. */
-  height: 90px;
+  height: 100px;
   padding: 9px;
   font-family: Verdana, Helvetica, Arial, FreeSans, sans-serif;
   font-size: 10pt;
@@ -307,7 +307,7 @@ right and a bottom border:
 }
 
 #ActionBar.actionBarExpanded {
-  height: 290px;
+  height: 300px;
 }
 
 #ActionBar label { color: #006; }

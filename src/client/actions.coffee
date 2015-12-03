@@ -122,7 +122,7 @@ Template.changeColumn.helpers
       # Note: Inferred type should match c.type if c.specifiedType is null and
       # there are no unsaved changes to the formula.
       info = newFormulaInfo.get()
-      inferredTypeDesc = if info? then stringifyType(info.root.formula.type) else 'error'
+      inferredTypeDesc = if info?.root? then stringifyType(info.root.formula.type) else 'error'
       items.push(new HtmlOption('auto', "auto (#{inferredTypeDesc})"))
     items.push(typeMenuCommonItems.get()...)
     new HtmlSelect(items, col.specifiedType ? 'auto')
@@ -219,7 +219,7 @@ updateFormulaView = (template) ->
     unless e instanceof FormulaValidationError
       throw e
     # TODO: More graceful error handling
-    newFormulaInfo.set(null)
+    newFormulaInfo.set({error: e.message})
     return
   root = getSubformulaTree(formula)
   bands = []

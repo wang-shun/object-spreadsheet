@@ -90,6 +90,13 @@
           <button class="revertFormula" disabled={{not isFormulaModified}}>Cancel</button>
         </div>
       </div>
+      {{#if newFormulaInfo.error}}
+        {{! Quick and dirty display of the error before saving.
+            TODO: Distinguish between parse and typecheck errors, have parse
+            errors block saving, and show the error position.  The full formula
+            builder will eventually supersede this. }}
+        <div style="color: #800;">{{newFormulaInfo.error}}</div>
+      {{/if}}
       {{#if isFormulaDebuggerOpen}}
       {{! May as well let this exist empty when no band is selected to save an afterFlush in the template. }}
       <div id="TracingView" style="width: 100%; height: 180px; overflow: auto;"></div>
