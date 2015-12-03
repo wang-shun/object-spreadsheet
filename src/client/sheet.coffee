@@ -583,12 +583,17 @@ class ClientView
         {
           renderer: if col == 0 && row == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
+          # Edge case: renaming the column whose formula is currently being edited could change
+          # the string representation of the original formula, which would trigger a reactive
+          # update that would lose the unsaved changes.
+          # XXX Remove when we have better handling of changes to the original formula in general.
+          #
+          # Make this nonreactive: Handsontable will requery it when the user
+          # starts editing, and we don't want to rebuild the table when it
+          # changes.  Don't use readOnly because that would dim the cells, which
+          # we think is more than is appropriate.
+          editor: if Tracker.nonreactive(() -> ActionBar.hasUnsavedData()) then false else 'text'
           readOnly: !(
-                      # Edge case: renaming the column whose formula is currently being edited could change
-                      # the string representation of the original formula, which would trigger a reactive
-                      # update that would lose the unsaved changes.
-                      # XXX Remove when we have better handling of changes to the original formula in general.
-                      !Tracker.nonreactive(() -> ActionBar.hasUnsavedData()) &&
                       # Only column header "top", "below", and "type" cells can be edited,
                       # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
                       cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
@@ -746,7 +751,7 @@ class ClientView
               items.jumpToReferent = {
                 name: "Jump to object '#{c.display}'"
                 callback: () =>
-                  @hot.selectCell(coords.row, coords.col, coords.row, coords.col)
+                  @selectSingleCell(coords.row, coords.col)
               }
             if (addCommand = @getAddCommandForCell(c))?
               items.add = addCommand
