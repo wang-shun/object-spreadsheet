@@ -273,6 +273,14 @@ right and a bottom border:
   background-color: #FF0;
 }
 
+/* Something quick and dirty to clue users in to why we don't let them change
+   the selection when they have unsaved formula changes.  Toss in enough
+   selectors to have higher priority than the normal background for the palette.
+*/
+.selectionLock .handsontable td.rsHeader.current {
+  background-color: #FF0;
+}
+
 .formulaBand {
   position: absolute;
   z-index: 1;

@@ -1,7 +1,7 @@
 fullTextToShow = new ReactiveVar(null)
 isLoading = new ReactiveVar(true)
 
-Template.formulaValueBar.helpers
+Template.actionBar.helpers
   loading: -> isLoading.get()
   fullTextToShow: -> fullTextToShow.get()
   changeColumnArgs: -> changeColumnArgs.get()
@@ -20,6 +20,12 @@ origFormulaStrForData = (data) ->
   col = getColumn(data.columnId)
   formula = col?.formula
   formula && stringifyFormula(col.parent, formula)
+
+origFormulaStr = new ReactiveVar(null)
+Tracker.autorun(() ->
+  cca = changeColumnArgs.get()[0]
+  origFormulaStr.set(if cca? then origFormulaStrForData(cca) else null)
+  )
 newFormulaStr = new ReactiveVar(null)
 newFormulaInfo = new ReactiveVar(null)
 
@@ -30,7 +36,7 @@ tracingView = null
 Template.changeColumn.rendered = () ->
   # XXX What if there are unsaved changes when the formula changes externally?
   @autorun(() ->
-    newFormulaStr.set(origFormulaStrForData(Template.currentData()))
+    newFormulaStr.set(origFormulaStr.get())
     )
   @autorun(() ->
     unless isFormulaDebuggerOpen.get()
@@ -103,7 +109,7 @@ Relsheets.onOpen(() ->
 Template.changeColumn.helpers
   #col: -> getColumn(@columnId)
   isFormulaModified: ->
-    newFormulaStr.get() != origFormulaStrForData(this)
+    newFormulaStr.get() != origFormulaStr.get()
   columnName: ->
     stringifyColumnRef([@columnId, !@onObjectHeader])
   keyColumnName: ->
@@ -159,7 +165,7 @@ Template.changeColumn.helpers
     new HtmlSelect(items, col.referenceDisplayColumn ? 'auto')
 
 changeColumnInitFormulaBar = (template) ->
-  formula = origFormulaStrForData(template.data)
+  formula = origFormulaStr.get()
   template.codeMirror = CodeMirror(template.find('#changeFormula-formula'), {
     value: ''  # filled in by autorun below
     extraKeys: {
@@ -328,6 +334,9 @@ updateTracingView = (template) ->
     tracingView = new TracingView(template.find('#TracingView'))
   tracingView.show(formulaInfo.selectedBand.node)
 
+hasUnsavedData = () ->
+  newFormulaStr.get() != origFormulaStr.get()
+
 isExpanded = () ->
   isFormulaDebuggerOpen.get()
 
@@ -404,7 +413,7 @@ Template.changeColumn.events
                 formula,
                 standardServerCallback)
   'click .revertFormula': (event, template) ->
-    newFormulaStr.set(origFormulaStrForData(this))
+    newFormulaStr.set(origFormulaStr.get())
   'click .formulaDebuggerToggle': (event, template) ->
     isFormulaDebuggerOpen.set(!isFormulaDebuggerOpen.get())
   'click .formulaBand': (event, template) ->
@@ -427,4 +436,4 @@ Meteor.methods({
 
 
 
-exported {ActionBar: {fullTextToShow, isLoading, changeColumnArgs, isExpanded}}
+exported {ActionBar: {fullTextToShow, isLoading, changeColumnArgs, isExpanded, hasUnsavedData}}

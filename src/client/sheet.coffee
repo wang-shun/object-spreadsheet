@@ -448,6 +448,7 @@ class ClientView
       # Show children of the root as separate tables.
       separateTables: true
     @hot = null
+    @savedSelection = null
 
     @reload()
 
@@ -583,6 +584,11 @@ class ClientView
           renderer: if col == 0 && row == 0 then 'html' else 'text'
           className: (cell.cssClasses.concat(classes)).join(' ')
           readOnly: !(
+                      # Edge case: renaming the column whose formula is currently being edited could change
+                      # the string representation of the original formula, which would trigger a reactive
+                      # update that would lose the unsaved changes.
+                      # XXX Remove when we have better handling of changes to the original formula in general.
+                      !Tracker.nonreactive(() -> ActionBar.hasUnsavedData()) &&
                       # Only column header "top", "below", and "type" cells can be edited,
                       # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
                       cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
@@ -804,6 +810,17 @@ class ClientView
       $(".ancestor-#{refc}").addClass("selected-object")
         
   onSelection: ->
+    selection = @hot.getSelected()
+    if EJSON.equals(selection, @savedSelection)
+      return
+    if ActionBar.hasUnsavedData()
+      if @savedSelection?
+        @hot.selectCell(@savedSelection...)
+      else
+        # I don't think this should happen, but don't crash. ~ Matt
+        @hot.deselectCell()
+      return
+    @savedSelection = selection
     selectedCell = @getSingleSelectedCell()
     ActionBar.fullTextToShow.set(selectedCell?.fullText)
     @highlightReferent(selectedCell?.referent)
@@ -965,24 +982,30 @@ rebuildView = (viewId) ->
     view.reload() #viewDef
     view.hotReconfig()
   exported {view}  # for debugging
-  # Try to select a cell similar to the one previously selected.
-  if selectedCell?
-    ((selectedCell.qCellId? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId) &&
-                                     selectedCell.isObjectCell == c.isObjectCell)) ||
-     (selectedCell.qFamilyId? &&
-      view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
-     (selectedCell.qFamilyId? &&
-      view.selectMatchingCell((c) -> c.kind in ['below', 'tokenObject-below'] &&
-                                     EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) ||
-     (selectedCell.kind? &&
-      view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
-                                     selectedCell.columnId == c.columnId)) ||
-     false)
-  # Make sure various things are consistent with change in table data or
-  # selection (view.selectMatchingCell doesn't seem to trigger this).
-  view.onSelection()
-  ActionBar.isLoading.set(false)
+
+  Tracker.nonreactive(() ->
+    # Nothing below should trigger rebuilding of the view if it reads reactive
+    # data sources.  (Ouch!)
+
+    # Try to select a cell similar to the one previously selected.
+    if selectedCell?
+      ((selectedCell.qCellId? &&
+        view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qCellId, c.qCellId) &&
+                                       selectedCell.isObjectCell == c.isObjectCell)) ||
+       (selectedCell.qFamilyId? &&
+        view.selectMatchingCell((c) -> EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) ||
+       (selectedCell.qFamilyId? &&
+        view.selectMatchingCell((c) -> c.kind in ['below', 'tokenObject-below'] &&
+                                       EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) ||
+       (selectedCell.kind? &&
+        view.selectMatchingCell((c) -> selectedCell.kind == c.kind &&
+                                       selectedCell.columnId == c.columnId)) ||
+       false)
+    # Make sure various things are consistent with change in table data or
+    # selection (view.selectMatchingCell doesn't always seem to trigger this).
+    view.onSelection()
+    ActionBar.isLoading.set(false)
+  )
 
 # Helper decorator for use with Tracker.autorun
 guarded = (op) ->
@@ -1011,6 +1034,7 @@ Template.Spreadsheet.events =
 Template.Spreadsheet.helpers
   # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
   actionBarClass: -> if ActionBar.isExpanded() then 'actionBarExpanded' else ''
+  selectionLockClass: -> if ActionBar.hasUnsavedData() then 'selectionLock' else ''
 
 
 
