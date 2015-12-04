@@ -86,7 +86,7 @@
           {{/if}}
         </div>
         <div style="margin-left: 4px;">
-          <button class="saveFormula" disabled={{not isFormulaModified}}>Save</button>
+          <button class="saveFormula" disabled={{not canSave}}>Save</button>
           <button class="revertFormula" disabled={{not isFormulaModified}}>Cancel</button>
         </div>
       </div>

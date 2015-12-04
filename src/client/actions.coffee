@@ -65,6 +65,7 @@ Template.changeColumn.rendered = () ->
       for c in @formulaBarComputations
         c.stop()
       @formulaBarComputations = null
+      newFormulaInfo.set(null)
       # XXX Do we need to tear down the CodeMirror somehow?
       @codeMirror = null
     )
@@ -110,6 +111,9 @@ Template.changeColumn.helpers
   #col: -> getColumn(@columnId)
   isFormulaModified: ->
     newFormulaStr.get() != origFormulaStr.get()
+  canSave: ->
+    # Looks like this can be called before the autorun that sets newFormulaInfo.  Grr.
+    newFormulaStr.get() != origFormulaStr.get() && newFormulaInfo.get()?.formula?
   columnName: ->
     stringifyColumnRef([@columnId, !@onObjectHeader])
   keyColumnName: ->
@@ -122,6 +126,7 @@ Template.changeColumn.helpers
       # Note: Inferred type should match c.type if c.specifiedType is null and
       # there are no unsaved changes to the formula.
       info = newFormulaInfo.get()
+      # Note: Not info.formula, it might not have a .type field.
       inferredTypeDesc = if info?.root? then stringifyType(info.root.formula.type) else 'error'
       items.push(new HtmlOption('auto', "auto (#{inferredTypeDesc})"))
     items.push(typeMenuCommonItems.get()...)
@@ -208,21 +213,23 @@ updateFormulaView = (template) ->
   tracingView?.destroy()
   tracingView = null
   formulaStr = newFormulaStr.get()
+  formulaInfo = {}
   parentColumnId = getColumn(template.data.columnId).parent
   try
-    formula = parseFormula(parentColumnId, formulaStr)
+    formulaInfo.formula = parseFormula(parentColumnId, formulaStr)
     # Fill in vars expando field on all subformulas.  Obviously in the future
     # we want to be able to help troubleshoot ill-typed formulas, but we punt
     # all error tolerance until later rather than fight that complexity now.
-    typecheckFormula(liteModel, new EJSONKeyedMap([['this', parentColumnId]]), formula)
+    typecheckFormula(liteModel, new EJSONKeyedMap([['this', parentColumnId]]), formulaInfo.formula)
   catch e
     unless e instanceof FormulaValidationError
       throw e
     # TODO: More graceful error handling
-    newFormulaInfo.set({error: e.message})
+    formulaInfo.error = e.message
+    newFormulaInfo.set(formulaInfo)
     return
-  root = getSubformulaTree(formula)
-  bands = []
+  formulaInfo.root = getSubformulaTree(formulaInfo.formula)
+  formulaInfo.bands = []
   layoutSubtree = (node) ->
     # It looks silly to offer to debug a literal, though it's not harmful.  Open
     # to counterarguments. ~ Matt
@@ -244,7 +251,7 @@ updateFormulaView = (template) ->
     # Tweak for gaps in navigation chains.
     x1 = template.codeMirror.cursorCoords({line: 0, ch: node.ch1}, 'local').left
     x2 = template.codeMirror.cursorCoords({line: 0, ch: node.ch2}, 'local').left
-    bands.push({
+    formulaInfo.bands.push({
       node: node
       selected: false
       left: x1
@@ -252,8 +259,10 @@ updateFormulaView = (template) ->
       top: top
       height: NESTED_UNDERLINING_PX_PER_LEVEL
       })
-  layoutSubtree(root)
-  newFormulaInfo.set({root: root, bands: bands, selectedBand: null, haveTraced: false})
+  layoutSubtree(formulaInfo.root)
+  formulaInfo.selectedBand = null
+  formulaInfo.haveTraced = false
+  newFormulaInfo.set(formulaInfo)
 
 class TracingView
   constructor: (domElement) ->
@@ -396,15 +405,9 @@ Template.changeColumn.events
                 newReferenceDisplayColumn,
                 standardServerCallback)
   'click .saveFormula': (event, template) ->
-    formulaStr = newFormulaStr.get()
     contextColumnId = getColumn(@columnId).parent
-    try
-      formula = parseFormula(contextColumnId, formulaStr)
-    catch e
-      unless e instanceof FormulaValidationError
-        throw e
-      alert('Failed to parse formula: ' + e.message)
-      return
+    # canSave ensures that this is defined.
+    formula = newFormulaInfo.get().formula
     # Canonicalize the string in the field, otherwise the field might stay
     # yellow after successful submission.
     newFormulaStr.set(stringifyFormula(contextColumnId, formula))
