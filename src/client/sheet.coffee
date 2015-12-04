@@ -354,10 +354,10 @@ class ViewSection
 
   colorIndexForMatch: (matchIdx) ->
     switch @options.palette
-      # The cost example uses 8 so it repeats colors.  If we use more than 6
-      # different colors, they will start to look similar; would it still be
-      # worth doing compared to repeating colors?
-      when 'alternating' then matchIdx % 6
+      # The cost example uses 8 so it repeats colors.  If we use more different
+      # colors, they will start to look similar; would it still be worth doing
+      # compared to repeating colors?
+      when 'alternating' then matchIdx % 5
       else 0
 
 # This may hold a reference to a ViewCell object from an old View.  Weird but

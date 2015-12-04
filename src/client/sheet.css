@@ -204,9 +204,9 @@ right and a bottom border:
 .handsontable.pal-alternating td.rsHeaderMatch0:not(.area) { background-color: #FDD; }
 .handsontable.pal-alternating td.rsHeaderMatch1:not(.area) { background-color: #FFD; }
 .handsontable.pal-alternating td.rsHeaderMatch2:not(.area) { background-color: #DFD; }
-.handsontable.pal-alternating td.rsHeaderMatch3:not(.area) { background-color: #DFF; }
-.handsontable.pal-alternating td.rsHeaderMatch4:not(.area) { background-color: #DDF; }
-.handsontable.pal-alternating td.rsHeaderMatch5:not(.area) { background-color: #FDF; }
+/* This is what's distinguishable on my screen.  Sigh for superficial symmetry. ~ Matt 2015-12-04 */
+.handsontable.pal-alternating td.rsHeaderMatch3:not(.area) { background-color: #DEF; }
+.handsontable.pal-alternating td.rsHeaderMatch4:not(.area) { background-color: #FDF; }
 /*
 I tried this and it didn't look good. ~ Matt 2015-12-04
 .handsontable.pal-alternating td.rsHeaderDepth0Match0:not(.area) { background-color: #FDD; }
