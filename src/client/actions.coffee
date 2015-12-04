@@ -356,6 +356,9 @@ hasUnsavedData = () ->
 isExpanded = () ->
   isFormulaDebuggerOpen.get()
 
+stateColumnHasValues = (columnId) ->
+  Cells.find({column: columnId, values: {$not: {$size: 0}}}).count() > 0
+
 Template.changeColumn.events
   'change #changeColumn-backend': (event, template) ->
     newFormula =
@@ -369,7 +372,7 @@ Template.changeColumn.events
     # If we add the ability to undo this operation, we can probably remove the warnings
     # (except the numErroneousFamilies one, which Matt believes deserves more respect
     # in general).
-    if newFormula? && Cells.find({column: @columnId, values: {$not: {$size: 0}}}).count() &&
+    if newFormula? && stateColumnHasValues(@columnId) &&
         !window.confirm('This will delete all existing cells in the column.  Are you sure?')
       selectOptionWithValue(template, '#changeColumn-backend', 'state')
       return
@@ -396,9 +399,18 @@ Template.changeColumn.events
                 newFormula,
                 standardServerCallback)
   'change #changeColumn-type': (event, template) ->
+    col = getColumn(@columnId)
     newSpecifiedType = getValueOfSelectedOption(template, '#changeColumn-type')
     if newSpecifiedType == 'auto'
       newSpecifiedType = null
+    # If the new type is text, there is no risk of conversion failure, but I
+    # think it's still valuable to explain what's happening.  Right?
+    # ~ Matt 2015-12-04
+    if (!col.formula? && stateColumnHasValues(@columnId) && !window.confirm(
+          'This will attempt to reinterpret existing values as the new type.  ' +
+          'Any values that cannot be converted will be deleted.  Proceed?'))
+      selectOptionWithValue(template, '#changeColumn-type', col.specifiedType)
+      return
     Meteor.call('changeColumnSpecifiedType', $$,
                 @columnId,
                 newSpecifiedType,

@@ -264,5 +264,41 @@ EJSON.addType('TypedSet', TypedSet.fromJSONValue)
   allowed = allowedReferenceDisplayColumns(col)
   if allowed.length > 0 then allowed[0] else null
 
+# Used on the server to reparse values in changeColumnSpecifiedType.
+@parseValue = (type, text) ->
+  if typeIsReference(type)
+    #else
+    if true  # getColumn(type).referenceDisplay?
+      # Ignore erroneous families: they do not contain any objects we can match against.
+      # Also ignore references that fail to convert to text.
+      matchingCells = (cellId for cellId in allCellIdsInColumnIgnoreErrors(type) when (
+          try
+            text == valueToText(liteModel, type, cellId)
+          catch e
+            false))
+      if matchingCells.length == 1
+        return matchingCells[0]
+      else if matchingCells.length > 1
+        throw new Error("The entered text matches #{matchingCells.length} '#{stringifyType(type)}' objects.  " +
+                        "Choose a reference display column for '#{stringifyType(type)}' that has unique values, " +
+                        "or define a new computed column if necessary.")  # "or enter the @n notation instead"
+      else
+        throw new Error("The entered text does not match any existing '#{stringifyType(type)}' object.")
+    else
+      throw new Error('Malformed object reference.')
+  else if type == '_unit'
+    'X'
+  else if type == '_token'
+    # XXX: Is this OK or do we want the server to generate the token?  For
+    # unprivileged users, we probably want the server to generate it, but we
+    # may not reuse this code for unprivileged users anyway.
+    Random.id()
+  else if type == 'text'
+    text
+  else if type == 'date'
+    Date.parse(text) || throw new Error("Invalid date: '#{text}'")
+  else
+    JSON.parse text
+
 
 exported {TypedSet}

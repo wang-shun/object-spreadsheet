@@ -194,8 +194,42 @@ class Model
     if columnId == rootColumnId
       throw new Meteor.Error('modify-root-column',
                              'Cannot modify the root column.')
+    col = @getColumn(columnId)
+    if specifiedType == col.specifiedType
+      return
+    if (col.specifiedType == '_token') != (specifiedType == '_token')
+      throw new Meteor.Error('change-type-token',
+                             'Cannot change a column type to or from _token.')
+    if !col.formula?
+      if col.isObject
+        throw new Meteor.Error('change-type-state-keyed-object',
+                               "Oops... we haven't implemented changing the key type of a state object column " +
+                               "since we're deprecating state keyed objects.")
+      # If we get here, there should be no descendant data to worry about.
+      # Reparse existing data as the new type /before/ we invalidate computed
+      # reference display columns.
+      newFamilies =
+        for family in Cells.find({column: columnId}).fetch()
+          # Object newly allocated by fetch(), OK to mutate
+          family.values =
+            for v in family.values
+              try
+                # XXX: It's O(m*n) to parse m references to an object column with n objects.  Add caching.
+                parseValue(specifiedType, valueToText(liteModel, col.specifiedType, v))
+              catch e
+                # Yep, that omits it from the collected array.
+                continue
+          family
+
     @invalidateSchemaCache()
     Columns.update(columnId, {$set: {specifiedType}})
+    if !col.formula?
+      # XXX If we crash here, the database will be corrupt, but there are
+      # probably many other cases just as bad...
+      for family in newFamilies
+        # XXX _id should be stable for state families, but cleaner not to rely
+        # on it (or change _id to be column+key like we were discussing).
+        Cells.update(family._id, {$set: {values: family.values}})
 
   _changeColumnType: (columnId, type) ->
     Columns.update(columnId, {$set: {type}})
