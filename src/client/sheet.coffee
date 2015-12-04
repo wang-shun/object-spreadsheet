@@ -168,6 +168,20 @@ class ViewSection
     if @col._id == rootColumnId then ''
     else if @col.type == '_token' then '•' else '◦'
 
+  # typeColors: EJSONKeyedMap<string, int>
+  findTypesToColor: (typeColors) ->
+    if typeIsReference(@col.type)
+      typeColors.set(@col.type, 'TBD')
+    for subsection in @subsections
+      subsection.findTypesToColor(typeColors)
+
+  assignTypeColors: (nextColor, typeColors) ->
+    if typeColors.get(@columnId) == 'TBD'
+      typeColors.set(@columnId, nextColor++)
+    for subsection in @subsections
+      nextColor = subsection.assignTypeColors(nextColor, typeColors)
+    return nextColor
+
   renderHlist: (hlist, height) ->
     grid = ([] for i in [0...height])
     qCellId = {columnId: @columnId, cellId: hlist.cellId}
@@ -223,9 +237,15 @@ class ViewSection
   # based on depth.
   # If !expanded, then the requested height should always be 3.  Leaves render
   # at height 2 anyway.
-  renderHeader: (expanded, height, depth) ->
+  renderHeader: (expanded, height, depth, typeColors) ->
     # Part that is always the same.
-    myColorClass = 'rsHeaderColor' + @colorIndexForDepth(if @col.isObject then depth else depth-1)
+    myDepthClass = 'rsHeaderDepth' + @colorIndexForDepth(if @col.isObject then depth else depth-1)
+    # Currently matching-colored header cells don't depend on depth.  You could
+    # argue we should generate two classes and let the CSS deal with it.
+    myColorClass =
+      if (matchIdx = typeColors.get(@columnId))?
+        'rsHeaderMatch' + @colorIndexForMatch(matchIdx)
+      else myDepthClass
     grid = [[], []]  # c.f. renderHlist
     if @col.isObject
       fieldNameCell = new ViewCell(
@@ -253,10 +273,14 @@ class ViewSection
         typeCell.kind = 'keyedObject-type'
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
     if @col.type != '_token'
+      myFieldColorClass =
+        if (fieldMatchIdx = typeColors.get(@col.type))?
+          'rsHeaderMatch' + @colorIndexForMatch(fieldMatchIdx)
+        else myDepthClass
       fieldNameCell = new ViewCell(
         @col.fieldName ? '', 1, 1, [
           (if @col.isObject then 'rsHeaderFieldNameKey' else 'rsHeaderFieldNameLeaf'),
-          myColorClass])
+          myFieldColorClass])
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
       typeName = stringifyTypeForSheet(@col.type)
@@ -267,7 +291,7 @@ class ViewSection
         typeName,
         1, 1, [
           (if @col.isObject then 'rsHeaderTypeKey' else 'rsHeaderTypeLeaf'),
-          myColorClass].concat(@markDisplayClasses()))
+          myFieldColorClass].concat(@markDisplayClasses()))
       typeCell.columnId = @columnId
       typeCell.kind = 'type'
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
@@ -305,7 +329,7 @@ class ViewSection
         gridExtraCol = gridMergedCell(currentHeight, 1, '', cssClasses)
         gridHorizExtend(grid, gridExtraCol)
       subHeight = if expanded then @headerHeightBelow else 3
-      subsectionGrid = subsection.renderHeader(expanded, subHeight, depth+1)
+      subsectionGrid = subsection.renderHeader(expanded, subHeight, depth+1, typeColors)
       if currentHeight == 2 && subsectionGrid.length > 2
         makeCorner(false)  # may increase currentHeight so next condition holds
       if subsectionGrid.length < currentHeight
@@ -328,6 +352,13 @@ class ViewSection
       when 'alternating' then depth % 2
       else 0
 
+  colorIndexForMatch: (matchIdx) ->
+    switch @options.palette
+      # The cost example uses 8 so it repeats colors.  If we use more than 6
+      # different colors, they will start to look similar; would it still be
+      # worth doing compared to repeating colors?
+      when 'alternating' then matchIdx % 6
+      else 0
 
 # This may hold a reference to a ViewCell object from an old View.  Weird but
 # shouldn't cause any problem and not worth doing differently.
@@ -446,6 +477,8 @@ class ClientView
       headerExpandable: true
       # 'boring' for grey, 'alternating' for two greys, 'rainbow' for dazzling colors
       palette: 'alternating'
+      # Matching colors for fields of reference type and their target object columns.
+      colorReferences: true
       # Separator column between every pair of adjacent incomparable columns
       # (except ones that are in separate tables when separateTables is on).
       # Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
@@ -466,10 +499,15 @@ class ClientView
     # Display the root column for completeness.  However, it doesn't have a real
     # value.
     hlist = @mainSection.prerenderHlist([], '')
+    typeColors = new EJSONKeyedMap()
+    if @options.colorReferences
+      @mainSection.findTypesToColor(typeColors)
+      @mainSection.assignTypeColors(0, typeColors)
     grid = @mainSection.renderHeader(
       headerExpanded.get(),
       if headerExpanded.get() then @mainSection.headerMinHeight else 3,
-      0)
+      0,
+      typeColors)
     for row in grid
       for cell in row
         cell.cssClasses.push('htBottom', 'rsHeader')  # easiest to do here

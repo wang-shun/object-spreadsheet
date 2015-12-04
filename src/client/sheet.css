@@ -160,28 +160,28 @@ right and a bottom border:
   background-color: #EEE;
 }
 
-.handsontable.pal-rainbow td.rsHeaderColor0:not(.area),
-.handsontable.pal-rainbow .rsColor0 {
+.handsontable.pal-rainbow td.rsHeaderDepth0:not(.area),
+.handsontable.pal-rainbow .rsDepth0 {
   background-color: #FAA;
 }
-.handsontable.pal-rainbow td.rsHeaderColor1:not(.area),
-.handsontable.pal-rainbow .rsColor1 {
+.handsontable.pal-rainbow td.rsHeaderDepth1:not(.area),
+.handsontable.pal-rainbow .rsDepth1 {
   background-color: #FFA;
 }
-.handsontable.pal-rainbow td.rsHeaderColor2:not(.area),
-.handsontable.pal-rainbow .rsColor2 {
+.handsontable.pal-rainbow td.rsHeaderDepth2:not(.area),
+.handsontable.pal-rainbow .rsDepth2 {
   background-color: #AFA;
 }
-.handsontable.pal-rainbow td.rsHeaderColor3:not(.area),
-.handsontable.pal-rainbow .rsColor3 {
+.handsontable.pal-rainbow td.rsHeaderDepth3:not(.area),
+.handsontable.pal-rainbow .rsDepth3 {
   background-color: #AFF;
 }
-.handsontable.pal-rainbow td.rsHeaderColor4:not(.area),
-.handsontable.pal-rainbow .rsColor4 {
+.handsontable.pal-rainbow td.rsHeaderDepth4:not(.area),
+.handsontable.pal-rainbow .rsDepth4 {
   background-color: #AAF;
 }
-.handsontable.pal-rainbow td.rsHeaderColor5:not(.area),
-.handsontable.pal-rainbow .rsColor5 {
+.handsontable.pal-rainbow td.rsHeaderDepth5:not(.area),
+.handsontable.pal-rainbow .rsDepth5 {
   background-color: #FAF;
 }
 .handsontable.pal-rainbow td.rsCaption:not(.area) {
@@ -193,14 +193,35 @@ right and a bottom border:
   color: white;
 }
 
-.handsontable.pal-alternating td.rsHeaderColor0:not(.area),
-.handsontable.pal-alternating .rsColor0 {
+.handsontable.pal-alternating td.rsHeaderDepth0:not(.area),
+.handsontable.pal-alternating .rsDepth0 {
   background-color: #EEE;
 }
-.handsontable.pal-alternating td.rsHeaderColor1:not(.area),
-.handsontable.pal-alternating .rsColor1 {
+.handsontable.pal-alternating td.rsHeaderDepth1:not(.area),
+.handsontable.pal-alternating .rsDepth1 {
   background-color: #DDD;
 }
+.handsontable.pal-alternating td.rsHeaderMatch0:not(.area) { background-color: #FDD; }
+.handsontable.pal-alternating td.rsHeaderMatch1:not(.area) { background-color: #FFD; }
+.handsontable.pal-alternating td.rsHeaderMatch2:not(.area) { background-color: #DFD; }
+.handsontable.pal-alternating td.rsHeaderMatch3:not(.area) { background-color: #DFF; }
+.handsontable.pal-alternating td.rsHeaderMatch4:not(.area) { background-color: #DDF; }
+.handsontable.pal-alternating td.rsHeaderMatch5:not(.area) { background-color: #FDF; }
+/*
+I tried this and it didn't look good. ~ Matt 2015-12-04
+.handsontable.pal-alternating td.rsHeaderDepth0Match0:not(.area) { background-color: #FDD; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match0:not(.area) { background-color: #ECC; }
+.handsontable.pal-alternating td.rsHeaderDepth0Match1:not(.area) { background-color: #FFD; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match1:not(.area) { background-color: #EEC; }
+.handsontable.pal-alternating td.rsHeaderDepth0Match2:not(.area) { background-color: #DFD; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match2:not(.area) { background-color: #CEC; }
+.handsontable.pal-alternating td.rsHeaderDepth0Match3:not(.area) { background-color: #DFF; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match3:not(.area) { background-color: #CEE; }
+.handsontable.pal-alternating td.rsHeaderDepth0Match4:not(.area) { background-color: #DDF; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match4:not(.area) { background-color: #CCE; }
+.handsontable.pal-alternating td.rsHeaderDepth0Match5:not(.area) { background-color: #FDF; }
+.handsontable.pal-alternating td.rsHeaderDepth1Match5:not(.area) { background-color: #ECE; }
+*/
 
 .handsontable td.rsCaption:not(.area) {
   background-color: #DDD;
