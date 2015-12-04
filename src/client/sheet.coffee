@@ -356,11 +356,11 @@ class StateEdit
         if matchingCells.length == 1
           return matchingCells[0]
         else if matchingCells.length > 1
-          throw new Error("The given string matches #{matchingCells.length} objects.  " +
+          throw new Error("The entered text matches #{matchingCells.length} '#{stringifyType(type)}' objects.  " +
                           "Choose a reference display column for '#{stringifyType(type)}' that has unique values, " +
                           "or define a new computed column if necessary.")  # "or enter the @n notation instead"
         else
-          throw new Error('The given string does not match any object.')
+          throw new Error("The entered text does not match any existing '#{stringifyType(type)}' object.")
       else
         throw new Error('Malformed object reference.')
     else if type == '_unit'
