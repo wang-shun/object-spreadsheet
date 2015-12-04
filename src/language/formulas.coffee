@@ -358,7 +358,6 @@ annotateNavigationTarget = (model, vars, startCellsFmla, targetName, keysFmla, e
     catch e
       # Notice: this happens regularly in the client when column
       # type information is wiped
-      console.log(e)
       stringifyNavigationStep(targetName) + '(problem)'
 
 stringifyNavigation = (direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->

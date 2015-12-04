@@ -21,9 +21,16 @@ class @CellReference
   constructor: (@qCellId, @display) ->
 
 @stringifyTypeForSheet = (type) ->
-  if type == '_unit' then 'X'
-  else if typeIsReference(type) then Columns.findOne(type)?.objectName ? (""+type)[...4]
-  else type
+  if type == '_unit'
+    'X'
+  else if !typeIsReference(type)
+    type
+  else if (typeIsReference(type) && (col = Columns.findOne(type))? &&
+           (name = objectNameWithFallback(col))?)
+    # XXX May be ambiguous.
+    name
+  else
+    '<?>'
 
 @markDisplayClassesForType = (type) ->
   if type == '_unit' then ['centered'] else []
@@ -240,7 +247,7 @@ class ViewSection
         # normally be on the value UI-column is on the object UI-column instead.
         fieldNameCell.kind = 'tokenObject-below'
         typeCell.kind = 'tokenObject-type'
-        typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
+        #typeCell.fullText = 'Column ID ' + @columnId + ' (token)'
       else
         fieldNameCell.kind = 'keyedObject-below'
         typeCell.kind = 'keyedObject-type'
@@ -253,20 +260,14 @@ class ViewSection
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
       typeName = stringifyTypeForSheet(@col.type)
-      # XXX: The value in the cell is not consistent with what we allow the user
-      # to type in the cell!
       typeCell = new ViewCell(
-        (if @col.formula? then '=' else '') +
-        (if @col.specifiedType? then typeName else "(#{typeName})") +
-        (if @col.typecheckError? then '!' else ''),
+        # The type is essential to interpret values in the column.  The rest of
+        # the attributes are no more important than the formula itself, which we
+        # currently show only in the action bar, so don't show them here.
+        typeName,
         1, 1, [
           (if @col.isObject then 'rsHeaderTypeKey' else 'rsHeaderTypeLeaf'),
           myColorClass].concat(@markDisplayClasses()))
-      typeCell.fullText = (
-        'Column ID ' + @columnId + ': ' +
-        'type ' + (@col.type ? '') + (if @col.specifiedType? then ' (specified)' else '') +
-        (if @col.formula? then ' (formula)' else '') +
-        (if @col.typecheckError? then "; typecheck error: #{@col.typecheckError}" else ''))
       typeCell.columnId = @columnId
       typeCell.kind = 'type'
       gridHorizExtend(grid, [[fieldNameCell], [typeCell]])
@@ -437,13 +438,17 @@ class ClientView
   constructor: (@view) ->
     @options =
       # Show type row in header
-      showTypes: false
+      # Currently shown, otherwise users too often forget to set the type.
+      # Consider turning this off when we guess the type based on entered data.
+      # ~ Matt 2015-12-03
+      showTypes: true
       # Show '+' button to open hierarchical header
       headerExpandable: true
-      # 'boring' for grey, 'rainbow' for dazzling colors
+      # 'boring' for grey, 'alternating' for two greys, 'rainbow' for dazzling colors
       palette: 'alternating'
       # Separator column between every pair of adjacent incomparable columns
       # (except ones that are in separate tables when separateTables is on).
+      # Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
       sepcols: false
       # Show children of the root as separate tables.
       separateTables: true
@@ -594,9 +599,9 @@ class ClientView
           # we think is more than is appropriate.
           editor: if Tracker.nonreactive(() -> ActionBar.hasUnsavedData()) then false else 'text'
           readOnly: !(
-                      # Only column header "top", "below", and "type" cells can be edited,
-                      # for the purpose of changing the objectName, fieldName, and specifiedType respectively.
-                      cell.kind in ['top', 'below', 'type'] && cell.columnId != rootColumnId ||
+                      # Only column header "top" and "below" cells can be edited,
+                      # for the purpose of changing the objectName and fieldName respectively.
+                      cell.kind in ['top', 'below'] && cell.columnId != rootColumnId ||
                       cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
                       # Add case.  For a state keyed object, you add by typing the key in the padding cell.
                       cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
@@ -645,16 +650,17 @@ class ClientView
             name = if newVal == '' then null else newVal
             Meteor.call 'changeColumnFieldName', $$, cell.columnId, name,
                         standardServerCallback
-          if cell.kind == 'type'
-            parsed = false
-            try
-              type = if newVal == '' then null else parseTypeStr(newVal)
-              parsed = true
-            catch e
-              alert('Invalid type.')
-            if parsed
-              Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
-                          standardServerCallback
+          # Currently, types can only be changed via the action bar.
+          #if cell.kind == 'type'
+          #  parsed = false
+          #  try
+          #    type = if newVal == '' then null else parseTypeStr(newVal)
+          #    parsed = true
+          #  catch e
+          #    alert('Invalid type.')
+          #  if parsed
+          #    Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
+          #                standardServerCallback
           if cell.qCellId? && !cell.isObjectCell
             # XXX Once we validate values, we should replace the hard-coded
             # check for 'text' with an attempt to validate the input.
