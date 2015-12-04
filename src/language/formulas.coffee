@@ -792,6 +792,17 @@ dispatch = {
       str: '{' + (termSinfo.strFor(PRECEDENCE_LOWEST) for termSinfo in termSinfos).join(', ') + '}'
       outerPrecedence: PRECEDENCE_ATOMIC
 
+  dummy:
+    paramNames: []
+    argAdapters: []
+    typecheck: (model, vars) -> TYPE_EMPTY
+    evaluate: (model, vars) -> new TypedSet()
+    stringify: (model, vars) ->
+      # DUMMY_FORMULA is treated specially in the formula bar.  The following is
+      # in case it shows up somewhere else in the system.
+      str: 'dummy'
+      outerPrecedence: PRECEDENCE_ATOMIC
+
   toText:
     paramNames: ['expr']
     argAdapters: [EagerSubformula]
@@ -886,7 +897,9 @@ dispatchFormula = (action, formula, contextArgs...) ->
       else
         throw e
 
-@DUMMY_FORMULA = ['union', []]
+@DUMMY_FORMULA = ['dummy']
+Meteor.startup(() ->  # Load order for TYPE_EMPTY
+  typecheckFormula(null, null, DUMMY_FORMULA))  # Action bar looks for type field.
 
 # BELOW: Concrete syntax support.  However, this is used on the server, by
 # loadPTCData!

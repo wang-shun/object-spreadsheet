@@ -19,7 +19,12 @@ origFormulaStrForData = (data) ->
   if data.onObjectHeader then return null
   col = getColumn(data.columnId)
   formula = col?.formula
-  formula && stringifyFormula(col.parent, formula)
+  if !formula?
+    null
+  else if EJSON.equals(formula, DUMMY_FORMULA)
+    ''
+  else
+    stringifyFormula(col.parent, formula)
 
 origFormulaStr = new ReactiveVar(null)
 Tracker.autorun(() ->
@@ -126,8 +131,7 @@ Template.changeColumn.helpers
       # Note: Inferred type should match c.type if c.specifiedType is null and
       # there are no unsaved changes to the formula.
       info = newFormulaInfo.get()
-      # Note: Not info.formula, it might not have a .type field.
-      inferredTypeDesc = if info?.root? then stringifyType(info.root.formula.type) else 'error'
+      inferredTypeDesc = if info?.formula?.type? then stringifyType(info.formula.type) else 'error'
       items.push(new HtmlOption('auto', "auto (#{inferredTypeDesc})"))
     items.push(typeMenuCommonItems.get()...)
     new HtmlSelect(items, col.specifiedType ? 'auto')
@@ -198,7 +202,7 @@ changeColumnInitFormulaBar = (template) ->
       # back to the beginning.  Wish for a better two-way binding mechanism...
       if formulaStr != template.codeMirrorDoc.getValue()
         template.codeMirrorDoc.setValue(formulaStr)
-      updateFormulaView(template))
+      newFormulaInfo.set(generateFormulaInfo(template)))
     ]
   template.codeMirror.on('beforeChange', (cm, change) ->
     if change.update?
@@ -209,11 +213,15 @@ changeColumnInitFormulaBar = (template) ->
   template.codeMirror.on('changes', (cm) ->
     newFormulaStr.set(template.codeMirrorDoc.getValue()))
 
-updateFormulaView = (template) ->
+generateFormulaInfo = (template) ->
   tracingView?.destroy()
   tracingView = null
   formulaStr = newFormulaStr.get()
   formulaInfo = {}
+  if formulaStr == ''
+    formulaInfo.formula = DUMMY_FORMULA
+    # Do not construct a subformula tree.
+    return formulaInfo
   parentColumnId = getColumn(template.data.columnId).parent
   try
     formulaInfo.formula = parseFormula(parentColumnId, formulaStr)
@@ -226,8 +234,7 @@ updateFormulaView = (template) ->
       throw e
     # TODO: More graceful error handling
     formulaInfo.error = e.message
-    newFormulaInfo.set(formulaInfo)
-    return
+    return formulaInfo
   formulaInfo.root = getSubformulaTree(formulaInfo.formula)
   formulaInfo.bands = []
   layoutSubtree = (node) ->
@@ -262,7 +269,7 @@ updateFormulaView = (template) ->
   layoutSubtree(formulaInfo.root)
   formulaInfo.selectedBand = null
   formulaInfo.haveTraced = false
-  newFormulaInfo.set(formulaInfo)
+  return formulaInfo
 
 class TracingView
   constructor: (domElement) ->
