@@ -32,11 +32,11 @@ We're developing an application builder, based on a spreadsheet-like developer i
     #meteor
 
 ### Docker Image ###
-You can build docker image by yourself.
-or
-Pull from docker hub
-    #docker pull edwarddoong/objsheet
-    #docker run -d -p 3000:3000 $(YOUR_IMAGE_ID) meteor run
+You can build docker image by yourself or Pull from docker hub
+
+    
+        #docker pull edwarddoong/objsheet
+        #docker run -d -p 3000:3000 $(YOUR_IMAGE_ID) meteor run
 
 ### How to Check it? ###
 
