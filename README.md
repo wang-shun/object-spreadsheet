@@ -31,6 +31,13 @@ We're developing an application builder, based on a spreadsheet-like developer i
     #cd $(Local_Object_Spread_Sheets_PATH)
     #meteor
 
+### Docker Image ###
+You can build docker image by yourself or Pull from docker hub
+
+    
+        #docker pull edwarddoong/objsheet
+        #docker run -d -p 3000:3000 $(YOUR_IMAGE_ID) meteor run
+
 ### How to Check it? ###
 
 You can use browser(http://localhost:3000) to access the default web page setting.
