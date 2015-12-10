@@ -124,7 +124,7 @@
   sampleData = {
     Person: T([
       {
-      name: V('Daniel Jackson')
+      name: V('Severus Snape')
       Teacher: U({
         Slot: T([
           {time: V('2014-12-16 13:00')}
@@ -135,7 +135,7 @@
       })
       }
       {
-      name: V('Jonathan Edwards')
+      name: V('Filius Flitwick')
       Teacher: U({
         Slot: T([
           {time: V('2014-12-16 13:00')}
@@ -144,34 +144,34 @@
       })
       }
       {
-      name: V('Matt McCutchen')
+      name: V('Ronald Weasley')
       Student: U({
         'parent': V(I(5))
       })
       }
       {
-      name: V('Michael McCutchen')
+      name: V('Ginevra Weasley')
       Student: U({
         'parent': V(I(5))
       })
       }
       {
-      name: V('Shachar Itzhaky')
+      name: V('Seamus Finnigan')
       Student: U({
         'parent': V(I(6))
       })
       }
       {
-      name: V('Rosemary McCutchen')
+      name: V('Molly Weasley')
       }
       {
-      name: V('Yoram Itzhaky')
+      name: V('Augustus Finnigan')
       }
     ])
     Class: T([
       {
       code: V('6.170')
-      name: V('Software Studio')
+      name: V('Potions')
       Section: T([
         {
         teacher: V(I(0, 'X'))
@@ -180,8 +180,8 @@
       ])
       }
       {
-      code: V('6.*+~')
-      name: V('Alloy')
+      code: V('6.820')
+      name: V('Defence Against the Dark Arts')
       Section: T([
         {
         teacher: V(I(0, 'X'))
@@ -190,8 +190,8 @@
       ])
       }
       {
-      code: V('6.:::')
-      name: V('Managed Time')
+      code: V('6.005')
+      name: V('Charms')
       Section: T([
         {
         teacher: V(I(1, 'X'))
@@ -371,12 +371,13 @@
 
 @loadDumpIfExists = (model, appName) ->
   try
-    for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells']]
+    for [coll, collName] in [[Columns, 'columns'], [Cells, 'cells'], [Views, 'views']]
       try
         dump = Assets.getText("dump/#{appName}_#{collName}.json")
+        console.log "reading dump/#{appName}_#{collName}.json"
       catch e
         # Assume there's no dump to load for this appName.  XXX: Be stricter?
-        return
+        continue
       docs = EJSON.parse(dump)
       for doc in docs
         coll.upsert(doc._id, doc)  # upsert needed to overwrite root column

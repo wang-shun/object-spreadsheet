@@ -604,12 +604,13 @@ class Model
 Meteor.startup () ->
   Tablespace.onCreate ->
     @do ->
+      console.log "creating model of [#{@id}]"
       @model = new Model
       @formulaEngine = new FormulaEngine
       appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
       if @model.wasEmpty
-        if appName == 'ptc' then loadPTCData(@model)
-        else
+        #if appName == 'ptc' then loadPTCData(@model)
+        #else
           loadDumpIfExists(@model, appName)
           # TO MAKE A DUMP:
           # ./private/scripts/mkdump APPNAME
