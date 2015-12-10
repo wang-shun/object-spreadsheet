@@ -392,6 +392,30 @@ iframe.demo-linked-sheet {
   left: 0;
 }
 
+.demo-ptc-sheet-selector {
+  position: absolute;
+  width: 100%;
+  height: 40px;
+  top: 50%;
+  left: 0;
+}
+
+iframe.demo-linked-sheet-ptc,
+iframe.demo-linked-sheet-ptc-hidden
+{
+  border: none;
+  margin: 0;
+  position: absolute;
+  width: 100%;
+  height: calc(50% - 40px);
+  bottom: 0;
+  left: 0;
+}
+
+iframe.demo-linked-sheet-ptc-hidden {
+  /* Keep it loaded */
+  visibility: hidden;
+}
 
 /*-------------------*/
 /* Presentation Mode */

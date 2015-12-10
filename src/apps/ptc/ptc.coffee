@@ -15,6 +15,12 @@ if Meteor.isClient
     @render "Demos"
   Router.route "/ptc/apps/split-view", ->
     @render "PTC_Demo", data: {sheet: 'ptc'}
+  ptcDemoShowingMasterData = new ReactiveVar(false)
+  Template.PTC_Demo.helpers
+    showingMasterData: -> ptcDemoShowingMasterData.get()
+  Template.PTC_Demo.events
+    'click .demo-ptc-switch-to-view-model': -> ptcDemoShowingMasterData.set(false)
+    'click .demo-ptc-switch-to-master-data': -> ptcDemoShowingMasterData.set(true)
 
   Template.PTC_Parent.created = ->
     Relsheets.open(@data?.sheet, 'ptc')

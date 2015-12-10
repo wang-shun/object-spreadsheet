@@ -9,10 +9,19 @@
 
 <template name="PTC_Demo">
   <iframe class="demo-ui" src="/{{sheet}}/apps/ptc/parent"></iframe>
-  <iframe class="demo-linked-sheet" src="/{{sheet}}/views/1"></iframe>
+  <div class="demo-ptc-sheet-selector">
+    Show: {{#if showingMasterData}}
+      <a class="demo-ptc-switch-to-view-model" href="#">View model</a> | <strong>Master data</strong>
+    {{else}}
+      <strong>View model</strong> | <a class="demo-ptc-switch-to-master-data" href="#">Master data</a>
+    {{/if}}
+  </div>
+  <iframe class="demo-linked-sheet-ptc{{#unless showingMasterData}}-hidden{{/unless}}" src="/{{sheet}}"></iframe>
+  <iframe class="demo-linked-sheet-ptc{{#if showingMasterData}}-hidden{{/if}}" src="/{{sheet}}/views/1"></iframe>
 </template>
 
 <template name="PTC_Parent">
+  <div><a href="../parent">Back to login</a></div>
   {{#with viewData}}
   <h1>Parent view for {{name}}</h1>
   <ul>
