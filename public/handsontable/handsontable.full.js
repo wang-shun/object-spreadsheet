@@ -19073,7 +19073,10 @@ var $SamplesGenerator = SamplesGenerator;
   enumerable: true,
   writable: true
 }), $__7), {get SAMPLE_COUNT() {
-    return 3;
+    // Make this effectively unlimited for Object Spreadsheets.  It won't be the
+    // bottleneck (for now at least), and I was seeing unsampled items wrap and
+    // distort the table structure in the PTC sheet. ~ Matt 2015-12-10
+    return 1000000;
   }});
 ;
 Handsontable.utils = Handsontable.utils || {};
