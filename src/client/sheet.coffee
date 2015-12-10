@@ -63,7 +63,7 @@ class ViewSection
     # @headerHeightBelow and @headerMinHeight refer to the expanded header.
     @headerHeightBelow = 2  # fieldName, type
     @amRootWithSeparateTables =
-      options.separateTables && @columnId == rootColumnId
+      @options.separateTables && @columnId == rootColumnId
     for sublayout, i in @layoutTree.subtrees
       subsection = new ViewSection(sublayout, @options)
       @subsections.push(subsection)
@@ -442,7 +442,7 @@ class ClientView
       # Consider turning this off when we guess the type based on entered data.
       # ~ Matt 2015-12-03
       showTypes: true
-      # Show '+' button to open hierarchical header
+      # Show arrow button to open hierarchical header
       headerExpandable: true
       # 'boring' for grey, 'alternating' for two greys, 'rainbow' for dazzling colors
       palette: 'alternating'
@@ -460,7 +460,7 @@ class ClientView
     @reload()
 
   reload: () ->
-    @layoutTree = @view?.def()?.layout || View.rootLayout()
+    @layoutTree = @view.def().layout
     @mainSection = new ViewSection(@layoutTree, @options)
 
   hotConfig: ->
@@ -671,10 +671,13 @@ class ClientView
           if cell.qCellId? && !cell.isObjectCell
             # XXX Once we validate values, we should replace the hard-coded
             # check for 'text' with an attempt to validate the input.
-            if newVal || getColumn(cell.qCellId.columnId).type == 'text'
+            # Currently not allowing empty strings as this is the only way to catch
+            # cell deletion keystroke (see comment in onKeyDown).
+            if newVal # || getColumn(cell.qCellId.columnId).type == 'text'
               StateEdit.modifyCell cell.qCellId, newVal, standardServerCallback
             else
-              StateEdit.removeCell cell.qCellId, standardServerCallback
+              @getDeleteCommandForCell(cell)?.callback()
+              #StateEdit.removeCell cell.qCellId, standardServerCallback
           else if cell.qFamilyId? && !cell.isObjectCell
             if newVal || getColumn(cell.qFamilyId.columnId).type == 'text'
               StateEdit.addCell cell.qFamilyId, newVal, standardServerCallback, cell.isPlaceholder
@@ -943,9 +946,14 @@ class ClientView
           Handsontable.Dom.stopImmediatePropagation(event)
           @getAddCommandForCell(selectedCell).callback()
       else if event.which == 46 || event.which == 8   # Delete / Backspace
-        Handsontable.Dom.stopImmediatePropagation(event)
-        if selectedCell?
-          @getDeleteCommandForCell(selectedCell)?.callback()
+        # This has to be disabled on editable cells for the time being because there
+        # is no (obvious) way to know whether an editor is currently open ~~~~
+        if ((qf = selectedCell?.qFamilyId)? &&
+            columnIsState(col = getColumn(qf.columnId)) && col.type in ['_token', '_unit']) ||
+           selectedCell.isPlaceholder
+          Handsontable.Dom.stopImmediatePropagation(event)
+          if selectedCell?
+            @getDeleteCommandForCell(selectedCell)?.callback()
     else if event.ctrlKey && !event.altKey && !event.metaKey
       if event.which == 13    # Ctrl+Enter
         Handsontable.Dom.stopImmediatePropagation(event)
@@ -958,20 +966,35 @@ class ClientView
         Handsontable.Dom.stopImmediatePropagation(event)
         event.stopPropagation()
         event.preventDefault()
+        
         if selectedCell? && (ci = selectedCell.columnId)? && 
             (col = getColumn(ci))? && col.parent? && (parentCol = getColumn(col.parent))
-          n = parentCol.children.length
-          index = parentCol.children.indexOf(ci)
-          if event.which == 37 && index > 0                # Left
-            $$.call 'reorderColumn', ci, index-1, standardServerCallback
-          else if event.which == 39 && index < n - 1       # Right
-            $$.call 'reorderColumn', ci, index+1, standardServerCallback
-          else if event.which == 38 && !col.isObject       # Up
-            $$.call 'changeColumnIsObject', ci, true, standardServerCallback
-          else if event.which == 40                        # Down
-            # Check whether this should be possible (i.e., right children)
-            # before attempting it so we can detect real errors from the server.
-            @getDemoteCommandForColumn(col)?.callback()
+          if @view.id?
+            t = @view.def().layout
+            console.log t.find(ci)
+            console.log t.find(col.parent)
+            console.log t.find(col.parent).subtrees.length
+            console.log t.find(col.parent).subtrees.indexOf(t.find(ci))
+            parentNode = t.find(col.parent)
+            n = parentNode.subtrees.length
+            index = parentNode.subtrees.indexOf(t.find(ci))
+            if event.which == 37 && index > 0                # Left
+              @view.reorderColumn ci, index-1
+            else if event.which == 39 && index < n - 1       # Right
+              @view.reorderColumn ci, index+1
+          else
+            n = parentCol.children.length
+            index = parentCol.children.indexOf(ci)
+            if event.which == 37 && index > 0                # Left
+              $$.call 'reorderColumn', ci, index-1, standardServerCallback
+            else if event.which == 39 && index < n - 1       # Right
+              $$.call 'reorderColumn', ci, index+1, standardServerCallback
+            else if event.which == 38 && !col.isObject       # Up
+              $$.call 'changeColumnIsObject', ci, true, standardServerCallback
+            else if event.which == 40                        # Down
+              # Check whether this should be possible (i.e., right children)
+              # before attempting it so we can detect real errors from the server.
+              @getDemoteCommandForColumn(col)?.callback()
           
   
   selectSingleCell: (r1, c1) ->

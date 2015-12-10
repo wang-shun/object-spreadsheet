@@ -22,6 +22,8 @@ class Tablespace extends ControlContext
       # creating Mongo.Collections during that process causes various errors.
       # Defer until the control context is actually activated as part of the
       # Meteor method call.
+      # Notice that model.coffee uses @do to initialize the model. @setupCollections
+      # must happen before that. Hence this is a hack.
       @do(@setupCollections)
     if Meteor.isClient
       # This is safe, and the client does not activate control contexts.
@@ -31,6 +33,8 @@ class Tablespace extends ControlContext
 
   setupCollections: () ->
     console.log "created Tablespace[#{@id}]"
+    # PROBLEM! Creating Mongo.Collection yields execution, which makes all sorts
+    # of race conditions.
     @Columns    = new Mongo.Collection "#{@id}:columns"
     @Cells      = new Mongo.Collection "#{@id}:cells"
     @Views      = new Mongo.Collection "#{@id}:views"
@@ -38,7 +42,8 @@ class Tablespace extends ControlContext
     if Meteor.isServer
       for collection in [@Columns,@Cells,@Views,@Procedures]
         @publish collection
-      @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }  # @@@ Matt will kill me
+      @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }
+      @Views.allow { insert: (-> true), update: (-> true), remove: (-> true) }
 
   publish: (collection) ->
     # Do not inline this into the same function as the loop over collections, or

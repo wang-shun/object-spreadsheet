@@ -25,6 +25,20 @@ class View
     def = @def()
     def.layout = def.layout.filter((x) -> x != columnId)
     Views.update(@id, def)
+    
+  reorderColumn: (columnId, newIndex) ->
+    def = @def()
+    parentId = Columns.findOne(columnId)?.parent
+    if parentId?
+      layoutTree = def.layout
+      layoutSubtreeParent = layoutTree.find(parentId)
+      layoutSubtreeChild = layoutTree.find(columnId)
+      if layoutSubtreeParent? && layoutSubtreeChild?
+        layoutSubtreeParent.subtrees = (x for x in layoutSubtreeParent.subtrees when x.root != columnId)
+        layoutSubtreeParent.subtrees.splice(newIndex, 0, layoutSubtreeChild)
+        Views.update(@id, {$set: {layout: layoutTree}})
+        # Cannot use upsert or update(@id, def) if calling from client
+        # "update failed: Access denied. Upserts not allowed in a restricted collection."
 
   @rootLayout: -> @drillDown(rootColumnId).filter (x) => !@ownerOf(x)?
 
