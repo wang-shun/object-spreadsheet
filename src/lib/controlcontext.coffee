@@ -19,14 +19,22 @@ class OnDemand extends Announce
 class ControlContext extends OnDemand
   constructor: ->
     @scheduled = []
+    @lock = 0
     super()
   @get: (id) ->
     if !id? then (Meteor.isServer && CallingContext.get()) || @.default else super(id)
   run: (func=->) ->
+    #Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
     CallingContext.set @, =>
-      while @scheduled.length > 0
-        @scheduled.pop().apply @
-      func.apply @
+      if @lock then @scheduled.push func  # HACK
+      else
+        try
+          @lock = 1
+          while @scheduled.length > 0
+            @scheduled.pop().apply @
+        finally
+          @lock = 0
+        func.apply @
   do: (task) -> @scheduled.push task
 
   # Convenience method;
