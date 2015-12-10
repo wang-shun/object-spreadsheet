@@ -2,6 +2,8 @@
 if Meteor.isClient
   Router.route "/:sheet/apps/beta", ->
     @render "DearBeta", data: {sheet: @params.sheet}
+  Router.route "/beta/apps/split-view", ->
+    @render "DearBeta_Demo", data: {sheet: 'beta'}
 
   Template.DearBeta.created = ->
     Relsheets.open(@data?.sheet, 'beta')

@@ -11,6 +11,10 @@ if Meteor.isClient
       sheet: @params.sheet,
       # XXX: validate (not to mention authentication)
       clientUser: [@params.clientUser]}
+  Router.route "/demos", ->
+    @render "Demos"
+  Router.route "/ptc/apps/split-view", ->
+    @render "PTC_Demo", data: {sheet: 'ptc'}
 
   Template.PTC_Parent.created = ->
     Relsheets.open(@data?.sheet, 'ptc')
@@ -79,20 +83,20 @@ if Meteor.isServer
                ['enr', 'Class:Section:Enrollment'],
                ['slot', 'Person:Teacher:Slot']]
       body: '''
-  check clientUser in enr.student.parent
   let m = new $Meeting
   m.enrollment := enr
   m.slot := slot
-  check $valid
   '''
+  #check clientUser in enr.student.parent
+  #check $valid
     parentCancelMeeting:
       params: [['clientUser', 'Person'],
                ['meeting', 'Meeting']]
       body: '''
-  check clientUser in meeting.enrollment.student.parent
   delete meeting
-  check $valid
   '''
+  #check clientUser in meeting.enrollment.student.parent
+  #check $valid
 
     # This is just a test of a make statement, not something that actually belongs
     # in the PTC application.

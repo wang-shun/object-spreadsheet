@@ -1,3 +1,8 @@
+<template name="DearBeta_Demo">
+  <iframe class="demo-ui" src="/{{sheet}}/apps/beta"></iframe>
+  <iframe class="demo-linked-sheet" src="/{{sheet}}"></iframe>
+</template>
+
 <template name="DearBeta">
   <ul>
   {{#each files}}
@@ -7,7 +12,7 @@
         <li>{{id}}
           <ul>
             {{#each Time}}
-            <li>{{ns}}   
+            <li>{{ns}}<i>ns</i>
               <span class="Request">
                 <button class="up">+</button>{{Request.length}}<button class="down">-</button>
               </span>

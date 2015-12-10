@@ -6,6 +6,9 @@ if Meteor.isClient
   Router.route "/:sheet/apps/005q/staff", ->
     @render "DoubleOhFiveQueueStaff", data: {sheet: @params.sheet}
     
+  Router.route "/005q/apps/split-view", ->
+    @render "DoubleOhFiveQueue_Demo", data: {sheet: '005q'}
+
   Template.DoubleOhFiveQueue.created = ->
     Relsheets.open(@data?.sheet, '005q')
 

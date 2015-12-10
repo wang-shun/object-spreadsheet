@@ -1,3 +1,8 @@
+<template name="DoubleOhFiveQueue_Demo">
+  <iframe class="demo-ui" src="/{{sheet}}/apps/005q"></iframe>
+  <iframe class="demo-linked-sheet" src="/{{sheet}}"></iframe>
+</template>
+
 <template name="DoubleOhFiveQueue">
   {{> DoubleOhFive_nav}}
   {{> DoubleOhFiveQueueStylesheet}}
@@ -87,6 +92,7 @@
     <ul>
       {{#each calls}}
       <li>{{name}} ({{#each issue}}{{name}}{{/each}})
+        <i style="font-size: smaller">in {{location}}</i>
         {{#with call=this user=..}}
         {{#if call.assign.length}}
         <button class="done">Done</button>
