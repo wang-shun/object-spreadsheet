@@ -794,6 +794,8 @@ class ClientView
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
 
   hotReconfig: () ->
+    # @savedSelection is not meaningful after we update the table.
+    @savedSelection = null
     cfg = @hotConfig()
     @hot.updateSettings {colWidths: cfg.colWidths, rowHeights: cfg.rowHeights, mergeCells: cfg.mergeCells}
     @hot.loadData cfg.data
