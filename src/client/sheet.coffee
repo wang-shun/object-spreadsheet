@@ -950,9 +950,10 @@ class ClientView
       else if event.which == 46 || event.which == 8   # Delete / Backspace
         # This has to be disabled on editable cells for the time being because there
         # is no (obvious) way to know whether an editor is currently open ~~~~
+        # Note: This is wrong for state keyed objects, but they are deprecated
+        # and the way they are edited is already bizarre. ~ Matt 2015-12-12
         if ((qf = selectedCell?.qFamilyId)? &&
-            columnIsState(col = getColumn(qf.columnId)) && col.type in ['_token', '_unit']) ||
-           selectedCell.isPlaceholder
+            columnIsState(col = getColumn(qf.columnId)) && col.type in ['_token', '_unit'])
           Handsontable.Dom.stopImmediatePropagation(event)
           if selectedCell?
             @getDeleteCommandForCell(selectedCell)?.callback()
