@@ -59,11 +59,12 @@ evaluateFamilyReadOnly = (qFamilyId) ->
 readColumnTypeForFormula = (model, columnId) ->
   type = model.typecheckColumn(columnId)
   valAssert(type?, "column '${columnId}': type missing")
-  if type != TYPE_ERROR
-    return type
-  else
-    throw new FormulaValidationError("Reference to column '#{stringifyColumnRef([columnId, true])}' of unknown type.  " +
-                                     "Correct its formula or manually specify the type if needed to break a cycle.")
+  valAssert(type != TYPE_ERROR,
+            "Reference to column '#{stringifyColumnRef([columnId, true])}' of unknown type.  " +
+            "Correct its formula or manually specify the type if needed to break a cycle.")
+  valAssert(type != '_token',
+            "Attempted to access keys of unkeyed object type '#{stringifyColumnRef([columnId, false])}'.")
+  type
 
 @valExpectType = (what, actualType, expectedType) ->
   valAssert(commonSupertype(actualType, expectedType) == expectedType,
@@ -242,7 +243,7 @@ typecheckDown = (model, vars, startCellsType, targetColId, keysType, wantValues)
             'Target column has no object type to navigate to.')
   if keysType?
     valAssert(!wantValues, 'Can only specify keys when navigating to objects.')
-    valExpectType('Key set', keysType, model.typecheckColumn(targetColId))
+    valExpectType('Key set', keysType, readColumnTypeForFormula(model, targetColId))
   if wantValues then readColumnTypeForFormula(model, targetColId) else targetColId
 
 goUp = (model, vars, startCellsTset, targetColId, wantValues) ->
