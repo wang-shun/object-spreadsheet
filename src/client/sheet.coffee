@@ -688,6 +688,9 @@ class ClientView
 
       contextMenu: {
         build: =>
+          if ActionBar.hasUnsavedData()
+            return false
+
           c = @getSingleSelectedCell() ? {}
 
           items = {}
@@ -937,6 +940,8 @@ class ClientView
     return null
 
   onKeyDown: (event) ->
+    if ActionBar.hasUnsavedData()
+      return
     selectedCell = @getSingleSelectedCell()
     if event.altKey && event.metaKey
       Handsontable.Dom.stopImmediatePropagation(event)
