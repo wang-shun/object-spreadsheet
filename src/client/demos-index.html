@@ -1,4 +1,4 @@
-<template name="Demos">
+<template name="Index">
   <style>
     h1 { font-family: sans-serif; margin-bottom: 9px; }
     ul.apps { font-family: sans-serif; }
@@ -10,47 +10,83 @@
   </style>
   
   <div class="header">
-    <h1>Object Spreadsheets Demo Server</h1>
+    <h1>Object Spreadsheets Server</h1>
   </div>
   
   <div class="contents">
-  <p>
-    This server holds instances of several example applications developed using Object Spreadsheets.
-    Follow the links below to see the applications in action. Each link will open a split view
-    of the application's user-facing UI and its underlying spreadsheet. Try clicking the buttons
-    in the UI, which trigger <em>transactions</em> that make changes to the data. You will see
-    data being updated both in the UI and in the spreadsheet below. You can also make changes
-    by typing in the spreadsheet area and see how the UI responds.
-  </p>
-  
-  <ul class="apps">
-    <li><a href="/ptc/apps/split-view">Parent-teacher conference</a></li>
-    <li><a href="/beta/apps/split-view">Dear Beta</a></li>
-    <li><a href="/005q/apps/split-view">Hack-q</a></li>
-    <li><a href="/milk/apps/split-view">Got Milk</a></li>
-    <li><a href="/ptc-simple">Simplified parent-teacher conference (no application UI)</a></li>
-  </ul>
-    
-  <p>
-    To try defining your own formula on an object type, 
-    right-click the object name in the header and choose "<span class="ui">Add value column</span>" from the pop-up menu; 
-    then select the header of the new column (created with the default name "<span class="ui">value1</span>"), 
-    and change "<span class="ui">editable</span>" to "<span class="ui">computed by formula</span>" in the action bar.
-    Then enter an expression below.
-    Once you have a sense of how the spreadsheet works, you can start a new, empty spreadsheet by
-    navigating to <span class="ui">{{absUrl ''}}</span><em>sheet-name</em>.
-  </p>
-    
-  <p>More information:</p>
-  <ul>
-    <li><a href="https://docs.google.com/presentation/d/1w0E3J1QdQ6PgjDhcAP0s3KfkRFxfz2oUzfAi1i4vkeo/pub?start=false&loop=false&delayms=3000">
-      Developer UI structure</a></li>
-    <li><a href="https://docs.google.com/document/d/1RXz99So_SNRJkubOCXuAWsxv5tTpJO1E99gRBBjQCPw/pub">
-      Commands and formulas reference</a></li>
-  </ul>
-    
-  <p>Have fun!</p>
+    <p>
+      This server includes several example applications developed using Object Spreadsheets,
+      and you can also create your own spreadsheets.
+    </p>
 
-    <p><i>~ The anonymous authors</i></p>
+    <h2>Example applications</h2>
+    <p>
+      Follow the links below to see the applications in action. Each link will open a split view
+      of the application's user-facing UI and its underlying spreadsheet. Try clicking the buttons
+      in the UI, which trigger <em>transactions</em> that make changes to the data. You will see
+      data being updated both in the UI and in the spreadsheet below. You can also make changes
+      by typing in the spreadsheet area and see how the UI responds.
+    </p>
+    
+    <p>
+      {{#if indexMultiuser}}
+      <strong>Since multiple people may be using this server, each new visitor
+        receives their own instances of the example applications under a
+        randomly generated name.</strong>  You can choose a different name here if you wish:
+      <input id="examplesNamePrefix" type="text" value="{{examplesNamePrefix}}">
+      If you want to come back to your instances later, be sure to record the
+      name or the URL of this page.
+      {{else}}
+      If one of the applications gets messed up, you can enter a name here to get a new instance:
+      <input id="examplesNamePrefix" type="text" value="{{examplesNamePrefix}}">
+      If you want to come back to the new instance later, be sure to record the
+      name or the URL of this page.
+      {{/if}}
+    </p>
+
+    <ul class="apps">
+      <li>{{#Index_ConditionalExampleLink path="ptc/apps/split-view/ptc"}}Parent-teacher conference{{/Index_ConditionalExampleLink}}</li>
+      <li>{{#Index_ConditionalExampleLink path="beta/apps/split-view/beta"}}Dear Beta{{/Index_ConditionalExampleLink}}</li>
+      <li>{{#Index_ConditionalExampleLink path="005q/apps/split-view/005q"}}Hack-q{{/Index_ConditionalExampleLink}}</li>
+      <li>{{#Index_ConditionalExampleLink path="milk/apps/split-view/milk"}}Got Milk{{/Index_ConditionalExampleLink}}</li>
+      <li>{{#Index_ConditionalExampleLink path="ptc-simple"}}Simplified parent-teacher conference (no application UI){{/Index_ConditionalExampleLink}}</li>
+    </ul>
+
+    <p>
+      To try defining your own formula on an object type, 
+      right-click the object name in the header and choose "<span class="ui">Add value column</span>" from the pop-up menu; 
+      then select the header of the new column (created with the default name "<span class="ui">value1</span>"), 
+      and change "<span class="ui">editable</span>" to "<span class="ui">computed by formula</span>" in the action bar.
+      Then enter an expression below.
+    </p>
+
+    <h2>Creating your own spreadsheet</h2>
+    <p>
+      Once you have a sense of how the spreadsheet works, you can start a new, empty spreadsheet by
+      navigating to <span class="ui">{{absUrl ''}}</span><em>sheet-name</em> for a name of your choice.
+    </p>
+
+    <h2>Reference materials</h2>
+    <ul>
+      <li><a href="https://docs.google.com/presentation/d/1w0E3J1QdQ6PgjDhcAP0s3KfkRFxfz2oUzfAi1i4vkeo/pub?start=false&loop=false&delayms=3000">
+        Developer UI structure</a></li>
+      <li><a href="https://docs.google.com/document/d/1RXz99So_SNRJkubOCXuAWsxv5tTpJO1E99gRBBjQCPw/pub">
+        Commands and formulas reference</a></li>
+      <li><a href="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/view">Video</a>
+        (9 minutes) demonstrating how to build the simplified parent-teacher conference sheet above</li>
+    </ul>
+
+    <p>Have fun!</p>
+
+    <p><i>~ The Object Spreadsheets team (<a href="http://web.mit.edu/rmccutch/www/relsheet/">project web site</a>; <a href="mailto:relsheet@mit.edu">contact</a>)</i></p>
   </div>
+</template>
+
+<template name="Index_ConditionalExampleLink">
+  {{#if shouldEnableExampleLinks}}
+    <a href="/{{examplesNamePrefixWithDot}}{{path}}">{{> Template.contentBlock}}</a>
+  {{else}}
+    {{! Happens if the user manually clears the name box.}}
+    {{> Template.contentBlock}}
+  {{/if}}
 </template>

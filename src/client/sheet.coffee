@@ -1,8 +1,3 @@
-
-# Is this where we want routes to be?
-
-Router.route "/", -> @render "Spreadsheet"  # @deprecated (should show list of avail sheets)
-
 Router.route "/:sheet", ->
   @render "Spreadsheet", data: {sheet: @params.sheet}
 Router.route "/:sheet/views/:_id", ->

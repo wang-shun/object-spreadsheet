@@ -11,8 +11,8 @@ if Meteor.isClient
       sheet: @params.sheet,
       # XXX: validate (not to mention authentication)
       clientUser: [@params.clientUser]}
-  Router.route "/ptc/apps/split-view", ->
-    @render "PTC_Demo", data: {sheet: 'ptc'}
+  Router.route "/:sheet/apps/split-view/ptc", ->
+    @render "PTC_Demo", data: {sheet: @params.sheet}
   ptcDemoShowingMasterData = new ReactiveVar(false)
   Template.PTC_Demo.helpers
     showingMasterData: -> ptcDemoShowingMasterData.get()

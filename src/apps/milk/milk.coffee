@@ -3,8 +3,8 @@ if Meteor.isClient
   Router.route "/:sheet/apps/maid", ->
     @render "MilkMaid", data: {sheet: @params.sheet}
 
-  Router.route "/milk/apps/split-view", ->
-    @render "MilkMaid_Demo", data: {sheet: 'milk'}
+  Router.route "/:sheet/apps/split-view/milk", ->
+    @render "MilkMaid_Demo", data: {sheet: @params.sheet}
 
   Template.MilkMaid.created = ->
     Relsheets.open(@data?.sheet, 'milk')
