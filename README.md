@@ -2,7 +2,7 @@
 
 # Object Spreadsheets #
 
-Object Spreadsheets (formerly Relational Spreadsheets) is an end-user development tool for web applications backed by entity-relationship data.  It combines the richly interactive all-in-one interface of a spreadsheet with a more powerful data model, seeking to make it as easy as possible for end-user developers to build the custom logic they need to automate multi-user data manipulation processes of low to medium complexity.
+Object Spreadsheets (formerly Relational Spreadsheets) is an end-user development tool for web applications backed by entity-relationship data.  It combines the richly interactive all-in-one interface of a spreadsheet with a more powerful data model, seeking to make it as easy as possible for end-user developers to build the custom logic they need to automate business processes of low to medium complexity.
 
 This is a research prototype and we do not recommend relying on it for anything important at this point.
 
