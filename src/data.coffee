@@ -102,7 +102,7 @@ class CellId
     ancestors
     
   value: (set, callback=->) -> 
-    if set? then @remove(); @family().add(set, callback)
+    if set? then @remove => @family().add(set, callback)
     else cellIdLastStep(@cellId)
   
   family: (columnId) ->
