@@ -102,7 +102,7 @@ class CellId
     ancestors
     
   value: (set, callback=->) -> 
-    if set? then @remove => @family().add(set, callback)
+    if set? then @remove() ; @family().add(set, callback)
     else cellIdLastStep(@cellId)
   
   family: (columnId) ->
@@ -158,10 +158,14 @@ class FamilyId
     @child(value)
 
   remove: (value, callback=->) ->
-    # Why was updateOne needed? ~ Matt 2015-10-19
-    #updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
-    Meteor.call('recursiveDeleteStateCellNoInvalidate', $$,
-                @columnId, cellIdChild(@cellId, value), callback)
+    if getColumn(@columnId).isObject
+      Meteor.call('recursiveDeleteStateCellNoInvalidate', $$,
+                  @columnId, cellIdChild(@cellId, value), callback)
+    else
+      # optimization: deleting a single value is faster that way
+      # Use updateOne instead of update, since client is not allowed
+      # to update documents via selector, only by id
+      updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
 
   addPlaceholder: (callback=->) ->
     # If the field is initially absent, $inc treats it as 0.
@@ -278,7 +282,7 @@ class CellsInMemory
     if options? then throw Error "unimplemented upsert(..., options)"
     @update(query, modifier, {upsert: true})
 
-  remove: (query) ->
+  remove: (query, callback=->) ->
     if (column = query.column)?
       byKey = @byColumn[column]
       if (key = query.key)?
@@ -297,6 +301,8 @@ class CellsInMemory
       else
         @byColumn = {}
         @byId = {}
+
+    callback()
 
   stash: (doc) ->
     #console.log "  stash[doc=#{JSON.stringify doc}]"
