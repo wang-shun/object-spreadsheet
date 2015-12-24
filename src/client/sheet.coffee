@@ -798,19 +798,31 @@ class ClientView
     @hot.updateSettings {colWidths: cfg.colWidths, rowHeights: cfg.rowHeights, mergeCells: cfg.mergeCells}
     @hot.loadData cfg.data
 
+  getSelected: =>
+    if (s = @hot.getSelected())?
+      [r1, c1, r2, c2] = s
+      [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)]
+      [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)]
+      [r1, c1, r2, c2]
+
   getSingleSelectedCell: =>
-    s = @hot.getSelected()
+    s = @getSelected()
     unless s?
-      # Unsure under what circumstances this can happen.  Whatever.
+      # This can happen if no selection was made since page was loaded
       return null
     [r1, c1, r2, c2] = s
-    [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)]
-    [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)]
     cell = @grid[r1][c1]
     if r2 == r1 + cell.rowspan - 1 && c2 == c1 + cell.colspan - 1
       return cell
     else
       return null
+
+  getMultipleSelectedCells: =>
+    cells = []
+    for coord in @hot.getSelectedRange().getAll()
+      cell = @grid[coord.row][coord.col]
+      if cell.value? then cells.push cell
+    cells
 
   refId: (qCellId) ->
     #if qCellId.columnId == rootColumnId
@@ -948,15 +960,13 @@ class ClientView
           Handsontable.Dom.stopImmediatePropagation(event)
           @getAddCommandForCell(selectedCell).callback()
       else if event.which == 46 || event.which == 8   # Delete / Backspace
-        # This has to be disabled on editable cells for the time being because there
-        # is no (obvious) way to know whether an editor is currently open ~~~~
-        # Note: This is wrong for state keyed objects, but they are deprecated
-        # and the way they are edited is already bizarre. ~ Matt 2015-12-12
-        if ((qf = selectedCell?.qFamilyId)? &&
-            columnIsState(col = getColumn(qf.columnId)) && col.type in ['_token', '_unit'])
+        # Be careful not to hijack focus when an editor is open
+        if @hot.getActiveEditor().state != 'STATE_EDITING'
           Handsontable.Dom.stopImmediatePropagation(event)
-          if selectedCell?
-            @getDeleteCommandForCell(selectedCell)?.callback()
+          for cell in @getMultipleSelectedCells()
+            if ((qf = cell?.qFamilyId)? &&
+                columnIsState(col = getColumn(qf.columnId)))
+              @getDeleteCommandForCell(cell)?.callback()
     else if event.ctrlKey && !event.altKey && !event.metaKey
       if event.which == 13    # Ctrl+Enter
         Handsontable.Dom.stopImmediatePropagation(event)

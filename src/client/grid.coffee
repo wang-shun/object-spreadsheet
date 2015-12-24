@@ -1,7 +1,7 @@
 # Grid utilities
 
 class @ViewCell
-  constructor: (@value = '', @rowspan = 1, @colspan = 1, @cssClasses = []) ->
+  constructor: (@value = null, @rowspan = 1, @colspan = 1, @cssClasses = []) ->
     @qFamilyId = null
     @qCellId = null
     @columnId = null
@@ -27,7 +27,7 @@ class @ViewCell
   grid =
     for i in [0...height]
       for j in [0...width]
-        new ViewCell()
+        new ViewCell(null)
   grid[0][0].rowspan = height
   grid[0][0].colspan = width
   grid[0][0].value = value

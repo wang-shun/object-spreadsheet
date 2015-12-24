@@ -617,7 +617,7 @@ Meteor.startup () ->
       @model.repair()
       @model.evaluateAll()
 
-  if Meteor.isServer
+  if Meteor.isServer   # this condition is here to allow standalone mode
     Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
     #tspace.run()  # Slows down server startup.
 

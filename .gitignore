@@ -3,4 +3,4 @@ dump/meteor/ptc:*
 dump/meteor/system*
 *.coffee.js
 *.ls.js
-
+*.jison.js
