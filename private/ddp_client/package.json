@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "ddp": "^0.11.0",
+    "pcap": "git+ssh://git@github.com/mranney/node_pcap.git"
+  }
+}
