@@ -1,4 +1,5 @@
 <template name="Index">
+  <title>Object Spreadsheets</title>
   <style>
     h1 { font-family: sans-serif; margin-bottom: 9px; }
     ul.apps { font-family: sans-serif; }
@@ -7,6 +8,8 @@
     div.contents { position: relative; padding: 9px; }
     .ui { font-family: sans-serif; font-size: 90%; }
     p { text-align: justify; padding-right: .5em; }
+    iframe.video { float: right;  width: 480px; height: 270px; margin-left: 1em; }
+    #newSheetName::-webkit-input-placeholder { font-style: italic; }
   </style>
   
   <div class="header">
@@ -44,6 +47,8 @@
       {{/if}}
     </p>
 
+    <iframe class="video" src="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/preview"></iframe>
+
     <ul class="apps">
       <li>{{#Index_ConditionalExampleLink path="ptc/apps/split-view/ptc"}}Parent-teacher conference{{/Index_ConditionalExampleLink}}</li>
       <li>{{#Index_ConditionalExampleLink path="beta/apps/split-view/beta"}}Dear Beta{{/Index_ConditionalExampleLink}}</li>
@@ -58,12 +63,14 @@
       then select the header of the new column (created with the default name "<span class="ui">value1</span>"), 
       and change "<span class="ui">editable</span>" to "<span class="ui">computed by formula</span>" in the action bar.
       Then enter an expression below.
+      Watch the video on the right for a demonstration of data and
+      formula editing in a nutshell.
     </p>
 
     <h2>Creating your own spreadsheet</h2>
     <p>
       Once you have a sense of how the spreadsheet works, you can start a new, empty spreadsheet by
-      navigating to <span class="ui">{{absUrl ''}}</span><em>sheet-name</em> for a name of your choice.
+      navigating to <a class="ui" href="/{{newSheetName}}">{{absUrl ''}}</a><input id="newSheetName" placeholder="sheet-name" type="text"> for a name of your choice.
     </p>
 
     <h2>Reference materials</h2>
@@ -72,8 +79,8 @@
         Developer UI structure</a></li>
       <li><a href="https://docs.google.com/document/d/1RXz99So_SNRJkubOCXuAWsxv5tTpJO1E99gRBBjQCPw/pub">
         Commands and formulas reference</a></li>
-      <li><a href="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/view">Video</a>
-        (9 minutes) demonstrating how to build the simplified parent-teacher conference sheet above</li>
+      <li><a href="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/view">A link to the vide</a>
+        (9 minutes), demonstrating how to build the simplified parent-teacher conference sheet above</li>
     </ul>
 
     <p>Have fun!</p>

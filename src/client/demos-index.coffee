@@ -21,11 +21,13 @@ Router.route(
       examplesNamePrefix ?= ''
       @render "Index", {data: {examplesNamePrefix: examplesNamePrefix}}
   ),
-  {name: 'index'})
+  name: 'index', 
+  onAfterAction: -> document.title = "Object Spreadsheets")
 
 Template.Index.helpers
   absUrl: (path) -> Meteor.absoluteUrl(path)
   indexMultiuser: () -> indexMultiuser
+  newSheetName: () -> Session.get('newSheetName')
 
 Template.Index_ConditionalExampleLink.helpers
   examplesNamePrefixWithDot: () ->
@@ -38,3 +40,8 @@ Template.Index_ConditionalExampleLink.helpers
 Template.Index.events
   'input #examplesNamePrefix': (event, template) ->
     Router.go(indexPathForExamplesNamePrefix(event.target.value))
+  'input #newSheetName': (event, template) ->
+    Session.set('newSheetName', event.target.value)
+  'keypress #newSheetName': (event, template) ->
+    if event.which == 13
+      Router.go("/" + Session.get('newSheetName'))
