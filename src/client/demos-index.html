@@ -8,8 +8,12 @@
     div.contents { position: relative; padding: 9px; }
     .ui { font-family: sans-serif; font-size: 90%; }
     p { text-align: justify; padding-right: .5em; }
-    .video { float: right; width: 500px; margin-left: 1em; border: medium ridge; padding: .3em; text-align: center; }
+    .video { float: right; width: 480px; margin-left: 1em; margin-bottom: 1em; border: medium ridge; padding: .3em; text-align: center; }
+    /* different placeholder selectors for different browsers.
+     * for some reason, separating them with commas doesn't work */
     #newSheetName::-webkit-input-placeholder { font-style: italic; }
+    #newSheetName::-moz-placeholder { font-style: italic; }
+    #newSheetName:placeholder-shown { font-style: italic; }
   </style>
   
   <div class="header">
