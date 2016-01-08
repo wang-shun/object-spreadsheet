@@ -8,7 +8,7 @@
     div.contents { position: relative; padding: 9px; }
     .ui { font-family: sans-serif; font-size: 90%; }
     p { text-align: justify; padding-right: .5em; }
-    iframe.video { float: right;  width: 480px; height: 270px; margin-left: 1em; }
+    .video { float: right; width: 500px; margin-left: 1em; border: medium ridge; padding: .3em; text-align: center; }
     #newSheetName::-webkit-input-placeholder { font-style: italic; }
   </style>
   
@@ -23,6 +23,16 @@
     </p>
 
     <h2>Example applications</h2>
+
+    <div class="video">
+      <!-- Underlining the entire caption makes it too hard to read. ~ Matt 2016-01-08 -->
+      <a href="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/view" target="_blank" style="text-decoration: none;">
+        <div><img src="/objsheets-demo-final.png" width="480" height="270"/></div>
+        <div>Video demonstrating how to build the simplified parent-teacher conference sheet
+        (9 minutes, opens in a new window).</div>
+      </a>
+    </div>
+
     <p>
       Follow the links below to see the applications in action. Each link will open a split view
       of the application's user-facing UI and its underlying spreadsheet. Try clicking the buttons
@@ -47,8 +57,6 @@
       {{/if}}
     </p>
 
-    <iframe class="video" src="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/preview"></iframe>
-
     <ul class="apps">
       <li>{{#Index_ConditionalExampleLink path="ptc/apps/split-view/ptc"}}Parent-teacher conference{{/Index_ConditionalExampleLink}}</li>
       <li>{{#Index_ConditionalExampleLink path="beta/apps/split-view/beta"}}Dear Beta{{/Index_ConditionalExampleLink}}</li>
@@ -70,7 +78,11 @@
     <h2>Creating your own spreadsheet</h2>
     <p>
       Once you have a sense of how the spreadsheet works, you can start a new, empty spreadsheet by
-      navigating to <a class="ui" href="/{{newSheetName}}">{{absUrl ''}}</a><input id="newSheetName" placeholder="sheet-name" type="text"> for a name of your choice.
+      navigating to a URL of the following form:
+    </p>
+
+    <p>
+      <span class="ui">{{absUrl ''}}</span><input id="newSheetName" placeholder="sheet-name" type="text"> <button id="newSheetGo" disabled={{#unless newSheetName}}true{{/unless}}>Go</button>
     </p>
 
     <h2>Reference materials</h2>
@@ -79,8 +91,6 @@
         Developer UI structure</a></li>
       <li><a href="https://docs.google.com/document/d/1RXz99So_SNRJkubOCXuAWsxv5tTpJO1E99gRBBjQCPw/pub">
         Commands and formulas reference</a></li>
-      <li><a href="https://drive.google.com/file/d/0B8oi3hbhFCrpZEhtMEZSSm9wLVU/view">A link to the vide</a>
-        (9 minutes), demonstrating how to build the simplified parent-teacher conference sheet above</li>
     </ul>
 
     <p>Have fun!</p>

@@ -21,8 +21,10 @@ Router.route(
       examplesNamePrefix ?= ''
       @render "Index", {data: {examplesNamePrefix: examplesNamePrefix}}
   ),
-  name: 'index', 
-  onAfterAction: -> document.title = "Object Spreadsheets")
+  {
+    name: 'index',
+    onAfterAction: -> document.title = "Object Spreadsheets"
+  })
 
 Template.Index.helpers
   absUrl: (path) -> Meteor.absoluteUrl(path)
@@ -42,6 +44,8 @@ Template.Index.events
     Router.go(indexPathForExamplesNamePrefix(event.target.value))
   'input #newSheetName': (event, template) ->
     Session.set('newSheetName', event.target.value)
+  'click #newSheetGo': (event, template) ->
+    Router.go("/" + Session.get('newSheetName'))
   'keypress #newSheetName': (event, template) ->
     if event.which == 13
       Router.go("/" + Session.get('newSheetName'))
