@@ -27,7 +27,13 @@ Router.route(
   })
 
 Template.Index.helpers
-  absUrl: (path) -> Meteor.absoluteUrl(path)
+  # Since we aren't restricting what domain names can point to our hosted demo
+  # servers, it's easiest to just base this on the URL of the current page.  To
+  # use Meteor.absoluteUrl, we'd have to set the ROOT_URL environment variable
+  # on each server.
+  #
+  # XXX: Is there a library that does the following in a more robust way?
+  absUrl: (path) -> location.protocol + '//' + location.host + path
   indexMultiuser: () -> indexMultiuser
   newSheetName: () -> Session.get('newSheetName')
 
