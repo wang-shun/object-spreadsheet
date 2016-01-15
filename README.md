@@ -6,7 +6,7 @@ Object Spreadsheets (formerly Relational Spreadsheets) is an end-user developmen
 
 This is a research prototype and we do not recommend relying on it for anything important at this point.
 
-[Project web site](http://web.mit.edu/rmccutch/www/relsheet/)
+[Project web site](http://sdg.csail.mit.edu/projects/objsheets/)
 
 ### Dependencies Packages ###
 
