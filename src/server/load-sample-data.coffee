@@ -109,7 +109,7 @@
   # Shorthands:
 
   # Simple value(s)
-  V = () -> ([val, {}] for val in arguments)
+  V = (args...) -> ([val, {}] for val in args)
 
   # Type _unit
   U = (cell) -> [['X', cell]]
@@ -117,8 +117,8 @@
   # Type _token: successive integer tokens for now.
   T = (cellList) -> ([i.toString(), cell] for cell, i in cellList)
 
-  I = () ->
-    for x in arguments
+  I = (args...) ->
+    for x in args
       if typeof x == 'number' then x.toString() else x
 
   sampleData = {

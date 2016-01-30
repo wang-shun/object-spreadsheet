@@ -4,16 +4,16 @@ Router.route "/:sheet/views/:_id", ->
   @render "Spreadsheet", data: {sheet: @params.sheet, viewId: @params._id}
 
 
-NotReadyError = Meteor.makeErrorType('NotReadyError',
-  class NotReadyError
-    constructor: (@message) ->
-)
+class NotReadyError
+  constructor: (@message) ->
+NotReadyError = Meteor.makeErrorType('NotReadyError', NotReadyError)
 
 # Object that can be used as ViewCell.value or ViewHlist.value to defer the
 # resolution of the target cell ID to a row number.  I'm a terrible person for
 # taking advantage of heterogeneous fields in JavaScript... ~ Matt
-class @CellReference
+class CellReference
   constructor: (@qCellId, @display) ->
+exported {CellReference}
 
 @stringifyTypeForSheet = (type) ->
   if type == '_unit'
@@ -204,7 +204,8 @@ class ViewSection
       if @subsections.length == 0
         gridValue[0][0].cssClasses.push('leaf')
       if hlist.value?
-        gridValue[0][0].cssClasses.push(@markDisplayClasses()...)
+        for displayClass in @markDisplayClasses()
+          gridValue[0][0].cssClasses.push(displayClass)
         if typeIsReference(@col.type)
           gridValue[0][0].cssClasses.push('reference')
       if hlist.error?
@@ -1063,9 +1064,9 @@ rebuildView = (viewId) ->
 
 # Helper decorator for use with Tracker.autorun
 guarded = (op) ->
-  ->
+  (args...) ->
     try
-      op arguments...
+      op(args...)
     catch e
       if e instanceof NotReadyError
         window.why = e

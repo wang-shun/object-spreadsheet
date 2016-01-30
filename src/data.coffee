@@ -69,7 +69,7 @@ class Tablespace extends ControlContext
     
   typeName: -> 'Tablespace'
   toJSONValue: -> {@id}
-  @fromJSONValue: (json) => @get json.id
+  @fromJSONValue: (json) -> Tablespace.get json.id
 
 EJSON.addType('Tablespace', Tablespace.fromJSONValue)
 
@@ -314,58 +314,58 @@ class CellsInMemory
 # Cells collection in memory, manipulating it and then storing the
 # changes back to the Mongo collection.
 #
-class Transaction
+class TransactionCells
   
-  class @Cells
+  constructor: (@dbCells) ->
+    #@mem = new Mongo.Collection(null)
+    @mem = new CellsInMemory
     
-    constructor: (@dbCells) ->
-      #@mem = new Mongo.Collection(null)
-      @mem = new CellsInMemory
+  prefetch: ->
+    @mem.insert(doc) for doc in @dbCells.find().fetch()
       
-    prefetch: ->
-      @mem.insert(doc) for doc in @dbCells.find().fetch()
-        
-    insert: (doc) ->
-      doc = _.clone(doc)
-      doc.dirty = true
-      @mem.insert(doc)
-      
-    update: (query, values, upsert=false) ->
-      if _.size(values) != 1
-        throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
-      if values.$set?
-        values = _.clone(values)
-        values.$set.dirty = true
-      else if values.$pull? || values.$addToSet?
-        values = _.clone(values)
-        values.$set = {dirty: true}
-      else
-        throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
-      if upsert
-        @mem.upsert(query, values)
-      else
-        @mem.update(query, values)
-        
-    upsert: (query, values) ->
-      @update(query, values, true)
-      
-    remove:  (query={})  ->  @mem.remove(query) # nothing fancy here...
-    find:    (query={})  ->  @mem.find(query)
-    findOne: (query={})  ->  @mem.findOne(query)
+  insert: (doc) ->
+    doc = _.clone(doc)
+    doc.dirty = true
+    @mem.insert(doc)
     
-    commit: ->
-      raw = @dbCells.rawCollection()
-      @dbCells.find().forEach (doc) =>
-        if ! @mem.findOne(doc._id)
-          raw.remove({_id: doc._id}, (err) -> if err? then console.log "remove: #{err}")
-          #@dbCells.remove(doc._id)
-      @mem.find({dirty: true}).forEach (doc) =>
-        delete doc.dirty
-        raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> if err? then console.log "remove: #{err}")
-        #@dbCells.upsert(doc._id, doc)
+  update: (query, values, upsert=false) ->
+    if _.size(values) != 1
+      throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+    if values.$set?
+      values = _.clone(values)
+      values.$set.dirty = true
+    else if values.$pull? || values.$addToSet?
+      values = _.clone(values)
+      values.$set = {dirty: true}
+    else
+      throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+    if upsert
+      @mem.upsert(query, values)
+    else
+      @mem.update(query, values)
+      
+  upsert: (query, values) ->
+    @update(query, values, true)
     
+  remove:  (query={})  ->  @mem.remove(query) # nothing fancy here...
+  find:    (query={})  ->  @mem.find(query)
+  findOne: (query={})  ->  @mem.findOne(query)
+  
+  commit: ->
+    raw = @dbCells.rawCollection()
+    @dbCells.find().forEach (doc) =>
+      if ! @mem.findOne(doc._id)
+        raw.remove({_id: doc._id}, (err) -> if err? then console.log "remove: #{err}")
+        #@dbCells.remove(doc._id)
+    @mem.find({dirty: true}).forEach (doc) =>
+      delete doc.dirty
+      raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> if err? then console.log "remove: #{err}")
+      #@dbCells.upsert(doc._id, doc)
+
+class Transaction
+      
   constructor: (dbCells) ->
-    @Cells = new Transaction.Cells(dbCells ? Cells)
+    @Cells = new TransactionCells(dbCells ? Cells)
     
   begin: ->
     @Cells.prefetch()
@@ -379,7 +379,7 @@ class Transaction
     @Cells.commit()
     $$.Cells = @Cells.dbCells
     undefined
-
         
+
 
 exported {Tablespace, CellId, FamilyId, rootCell, allCellIdsInColumnIgnoreErrors, Transaction, CellsInMemory}

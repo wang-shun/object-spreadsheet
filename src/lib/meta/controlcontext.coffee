@@ -22,7 +22,7 @@ class ControlContext extends OnDemand
     @lock = 0
     super()
   @get: (id) ->
-    if !id? then (Meteor.isServer && CallingContext.get()) || @.default else super(id)
+    if !id? then (Meteor.isServer && CallingContext.get()) || @.default else OnDemand.get.call(this, id)
   run: (func=->) ->
     #Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
     CallingContext.set @, =>

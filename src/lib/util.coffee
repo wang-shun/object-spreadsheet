@@ -3,7 +3,7 @@
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...
 
-class @EJSONKeyedMap
+class EJSONKeyedMap
   constructor: (ents = []) ->
     # Future: Change to ECMAScript 6 Map when supported by all relevant JS
     # engines and CoffeeScript.
@@ -28,8 +28,9 @@ class @EJSONKeyedMap
     m.obj = EJSON.fromJSONValue(json)
     m
 EJSON.addType('EJSONKeyedMap', EJSONKeyedMap.fromJSONValue)
+exported {EJSONKeyedMap}
 
-class @EJSONKeyedSet
+class EJSONKeyedSet
   constructor: (els = []) ->
     @map = new EJSONKeyedMap()
     for x in els
@@ -48,8 +49,9 @@ class @EJSONKeyedSet
     s.map = EJSONKeyedMap.fromJSONValue(json)
     s
 EJSON.addType('EJSONKeyedSet', EJSONKeyedSet.fromJSONValue)
+exported {EJSONKeyedSet}
 
-class @EJSONSmallSet
+class EJSONSmallSet
   constructor: (els = [], _trustMeDistinct=false) ->
     if _trustMeDistinct
       @els = els[..]
@@ -67,11 +69,12 @@ class @EJSONSmallSet
   toJSONValue: -> @els
   @fromJSONValue: (json) -> new EJSONSmallSet(json, true)
 EJSON.addType('EJSONSmallSet', EJSONSmallSet.fromJSONValue)
+exported {EJSONSmallSet}
 
 #@EJSONKeyedSet = EJSONSmallSet
 
 
-class @EJSONKeyedMapToSet
+class EJSONKeyedMapToSet
   constructor: ->
     @map = new EJSONKeyedMap()
   add: (k, v) ->
@@ -89,6 +92,7 @@ class @EJSONKeyedMapToSet
   keys: -> @map.keys()
   has: (k, v) -> (s = @map.get(k))? && s.has(v)
   elementsFor: (k) -> @map.get(k)?.elements() ? []
+exported {EJSONKeyedMapToSet}
 
 class Tree
   constructor: (@root, @subtrees=[]) ->
@@ -118,77 +122,6 @@ class Tree
 EJSON.addType('Tree', Tree.fromJSONValue)
 
 
-class Digraph
-  class @Node
-    constructor: (@label) ->
-      @in = []
-      @out = []
-  class @Edge
-    constructor: (@from, @to, @label=null) ->
-
-  constructor: ->
-    @nodes = []
-    @edges = []
-
-  add: (el) ->
-    if el instanceof Digraph.Node
-      @nodes.push el
-    else if el instanceof Digraph.Edge
-      @edges.push el
-      el.from.out.push el
-      el.to.in.push el
-    else
-      throw new Error("expected Digraph.Node or Digraph.Edge, got #{el}")
-
-  remove: (el) ->
-    if el instanceof Digraph.Node
-      for e in el.in.concat el.out
-        @remove e
-      @nodes = without @nodes, el
-    else if el instanceof Digraph.Edge
-      el.from.out = without el.from.out, el
-      el.to.in = without el.to.in, el
-      @edges = without @edges, el
-
-  disconnectIn: (node) ->
-    for e in node.in
-      e.from.out = without e.from.out, e
-    node.in = []
-
-  has: (el) ->
-    el in @nodes || el in @edges
-
-  findNode: (label, force=false) ->
-    for u in @nodes
-      if u.label == label then return u
-    if force
-      u = new Digraph.Node label
-      @add u
-      u
-
-  fromPairs: (listOfPairs) ->
-    node = (x) => @findNode(x, force: true)
-    for e in listOfPairs
-      @add new Digraph.Edge (node e[0]), (node e[1])
-
-  @fromPairs: (listOfPairs) ->
-    g = new @ ; g.fromPairs(listOfPairs)
-    g
-
-  topologicalSort: ->
-    visited = []
-    stack = []
-    visit = (u) ->
-      visited.push u
-      for e in u.out
-        v = e.to
-        if v not in visited then visit v
-      stack.push u
-    for u in @nodes
-      if u not in visited then visit u
-    stack.reverse()
-
-
 class Memo
   constructor: -> @values = {}
   clear: -> @values = {}
@@ -208,13 +141,13 @@ exists = (list, pred) ->
   false
 without = (list, item) -> list.filter (x) -> x != item
 
-zip = () ->
-  lengthArray = (arr.length for arr in arguments)
+zip = (args...) ->
+  lengthArray = (arr.length for arr in args)
   length = Math.min(lengthArray...)
   for i in [0...length]
-    arr[i] for arr in arguments
+    arr[i] for arr in args
 
 set = (x) -> new EJSONKeyedSet(x)
-T = -> new Tree(arguments...)
+T = (args...) -> new Tree(args...)
 
-exported {set, Tree, T, Digraph, Memo, forall, exists, without, zip}
+exported {set, Tree, T, Memo, forall, exists, without, zip}

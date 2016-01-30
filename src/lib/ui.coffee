@@ -8,7 +8,7 @@ if Meteor.isClient
 
   standardServerCallbackThen = (callback) ->
     (error, result) ->
-      standardServerCallback(arguments...)
-      callback?(arguments...)
+      standardServerCallback(error, result)
+      callback?(error, result)
 
   exported {standardServerCallback, standardServerCallbackThen}

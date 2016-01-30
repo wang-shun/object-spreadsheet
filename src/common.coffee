@@ -16,26 +16,22 @@
 # Careful: with "class EvaluationError", the original class gets assigned to a
 # file-scope variable that shadows the exported wrapped class seen by the rest
 # of the application, and instanceof breaks.
-@EvaluationError = Meteor.makeErrorType('EvaluationError',
-  class @EvaluationError
-    constructor: (@message) ->
-)
+class EvaluationError
+  constructor: (@message) ->
+@EvaluationError = Meteor.makeErrorType('EvaluationError', EvaluationError)
 
 # Used also for typechecking.
-@FormulaValidationError = Meteor.makeErrorType('FormulaValidationError',
-  class @FormulaValidationError
-    constructor: (@message) ->
-)
+class FormulaValidationError
+  constructor: (@message) ->
+@FormulaValidationError = Meteor.makeErrorType('FormulaValidationError', FormulaValidationError)
 
-@SyntaxError = Meteor.makeErrorType('SyntaxError',
-  class @SyntaxError
-    constructor: (@message, @details) ->
-)
+class SyntaxError
+  constructor: (@message, @details) ->
+@SyntaxError = Meteor.makeErrorType('SyntaxError', SyntaxError)
 
-@SemanticError = Meteor.makeErrorType('SemanticError',
-  class @SemanticError
-    constructor: (@message) ->
-)
+class SemanticError
+  constructor: (@message) ->
+@SemanticError = Meteor.makeErrorType('SemanticError', SemanticError)
 
 # Model data structures and parameters the client needs to be aware of:
 # (I tried using EJSON custom classes but it was too much of a pain to store in
@@ -271,11 +267,13 @@ EJSON.addType('TypedSet', TypedSet.fromJSONValue)
     if true  # getColumn(type).referenceDisplay?
       # Ignore erroneous families: they do not contain any objects we can match against.
       # Also ignore references that fail to convert to text.
-      matchingCells = (cellId for cellId in allCellIdsInColumnIgnoreErrors(type) when (
-          try
-            text == valueToText(liteModel, type, cellId)
-          catch e
-            false))
+      matchingCells = []
+      for cellId in allCellIdsInColumnIgnoreErrors(type)
+        try
+          if text == valueToText(liteModel, type, cellId)
+            matchingCells.push(cellId)
+        catch e
+          # Skip
       if matchingCells.length == 1
         return matchingCells[0]
       else if matchingCells.length > 1

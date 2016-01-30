@@ -1,6 +1,6 @@
 # Grid utilities
 
-class @ViewCell
+class ViewCell
   constructor: (@value = null, @rowspan = 1, @colspan = 1, @cssClasses = []) ->
     @qFamilyId = null
     @qCellId = null
@@ -10,16 +10,19 @@ class @ViewCell
     @isObject = false
     @kind = null
     @fullText = null
+exported {ViewCell}
 
 # Mutate "orig" by adding "extension" at the bottom.
 # This would be a good place to add some assertions...
 @gridVertExtend = (orig, extension) ->
-  orig.push(extension...)
+  for row in extension
+    orig.push(row)
 
 # Mutate "orig" by adding "extension" at the right.
 @gridHorizExtend = (orig, extension) ->
   for i in [0...orig.length]
-    orig[i].push(extension[i]...)
+    for cell in extension[i]
+      orig[i].push(cell)
 
 # Return a grid consisting of one "height x width" merged cell and enough dummy
 # 1x1 cells.  You can mutate the upper-left cell as desired.

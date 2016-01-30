@@ -133,7 +133,8 @@ Template.changeColumn.helpers
       info = newFormulaInfo.get()
       inferredTypeDesc = if info?.formula?.type? then stringifyType(info.formula.type) else 'error'
       items.push(new HtmlOption('auto', "auto (#{inferredTypeDesc})"))
-    items.push(typeMenuCommonItems.get()...)
+    for item in typeMenuCommonItems.get()
+      items.push(item)
     new HtmlSelect(items, col.specifiedType ? 'auto')
   backendMenu: ->
     new HtmlSelect([

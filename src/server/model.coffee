@@ -175,7 +175,8 @@ class Model
           newValues = []
           for value in family.values
             Cells.find({column: childId, key: value}).forEach (family) ->
-              newValues.push(family.values...)
+              for subValue in family.values
+                newValues.push(subValue)
           Cells.update(family._id, {$set: {values: newValues}})
         updates.specifiedType = childCol.type
         updates.fieldName = childCol.fieldName

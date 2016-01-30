@@ -61,7 +61,7 @@ Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, vis
     if c?
       vals = new FamilyId({cellId: rootCellId, columnId: x.root}).values()
       if c.isObject
-        fam = (@readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited) for v in vals)
+        fam = (Relsheets.readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited) for v in vals)
         fam.qFamilyId = {columnId: x.root, cellId: rootCellId}
         # We could use objectNameWithFallback, but this gives easier syntax for readers.
         objectName = c.objectName ? c.fieldName
@@ -72,7 +72,7 @@ Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, vis
         # applications.  (Doesn't really matter until we have authentication.)
         if expandRefs && c.type? && typeIsReference(c.type)
           ot = View.drillDown(c.type)
-          vals = vals.map((v) => @readObj(ot, v, expandRefs, Columns.findOne(ot.root)?.fieldName, visited))
+          vals = vals.map((v) => Relsheets.readObj(ot, v, expandRefs, Columns.findOne(ot.root)?.fieldName, visited))
         obj[c.fieldName] = vals
 
   obj

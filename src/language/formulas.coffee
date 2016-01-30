@@ -272,7 +272,7 @@ goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
   targetCellsSet = new EJSONKeyedSet()
   for cellId in startCellsTset.elements()
     for value in readFamilyForFormula(model, {columnId: targetColId, cellId: cellId}).elements()
-      if !keysTset? || keysTset.set.has(value)
+      if !(keysTset?) || keysTset.set.has(value)
         targetCellsSet.add(cellIdChild(cellId, value))
   targetCellsTset = new TypedSet(targetColId, targetCellsSet)
 

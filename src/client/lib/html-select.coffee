@@ -1,12 +1,14 @@
-class @HtmlOption
+class HtmlOption
   constructor: (@value, @label) ->
 
-class @HtmlOptgroup
+class HtmlOptgroup
   constructor: (@label, @members) ->
 
-class @HtmlSelect
+class HtmlSelect
   # @items: array of HtmlOption and/or HtmlOptgroup
   constructor: (@items, @currentValue) ->
+
+exported {HtmlOption, HtmlOptgroup, HtmlSelect}
 
 # Since we aren't generating the <select> element itself, the event goes to the
 # parent template and we don't have to deal with the nonsense of making a
