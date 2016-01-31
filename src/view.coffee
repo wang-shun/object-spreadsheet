@@ -40,7 +40,7 @@ class View
         # Cannot use upsert or update(@id, def) if calling from client
         # "update failed: Access denied. Upserts not allowed in a restricted collection."
 
-  @rootLayout: -> @drillDown(rootColumnId).filter (x) => !(@ownerOf(x)?)
+  @rootLayout: -> @drillDown(rootColumnId).filter (x) => !@ownerOf(x)?
 
   @drillDown: (startingColumnId) ->
     children = Columns.findOne(startingColumnId)?.children || []
