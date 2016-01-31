@@ -280,10 +280,10 @@ class ViewSection
       fieldNameCell.columnId = @columnId
       fieldNameCell.kind = 'below'
       typeName = stringifyTypeForSheet(@col.type)
+      # The type is essential to interpret values in the column.  The rest of
+      # the attributes are no more important than the formula itself, which we
+      # currently show only in the action bar, so don't show them here.
       typeCell = new ViewCell(
-        # The type is essential to interpret values in the column.  The rest of
-        # the attributes are no more important than the formula itself, which we
-        # currently show only in the action bar, so don't show them here.
         typeName,
         1, 1, [
           (if @col.isObject then 'rsHeaderTypeKey' else 'rsHeaderTypeLeaf'),
@@ -349,10 +349,10 @@ class ViewSection
       else 0
 
   colorIndexForMatch: (matchIdx) ->
+    # The cost example uses 8 so it repeats colors.  If we use more different
+    # colors, they will start to look similar; would it still be worth doing
+    # compared to repeating colors?
     switch @options.palette
-      # The cost example uses 8 so it repeats colors.  If we use more different
-      # colors, they will start to look similar; would it still be worth doing
-      # compared to repeating colors?
       when 'alternating' then matchIdx % 5
       else 0
 
@@ -365,12 +365,12 @@ class StateEdit
   @parseValue: (qFamilyId, text) ->
     type = getColumn(qFamilyId.columnId).type
     #if typeIsReference(type)
-      #if (m = /^@(\d+)$/.exec(text))
-      #  wantRowNum = Number.parseInt(m[1])
-      #  for [qCellId, coords] in view.qCellIdToGridCoords.entries()
-      #    if qCellId.columnId == type && coords.dataRow == wantRowNum
-      #      return qCellId.cellId
-      #  throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
+    #  if (m = /^@(\d+)$/.exec(text))
+    #    wantRowNum = Number.parseInt(m[1])
+    #    for [qCellId, coords] in view.qCellIdToGridCoords.entries()
+    #      if qCellId.columnId == type && coords.dataRow == wantRowNum
+    #        return qCellId.cellId
+    #    throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
     parseValue(type, text)
 
   @parseValueUi: (qFamilyId, text) ->
@@ -561,7 +561,7 @@ class ClientView
             when 'separator' then 10
             when 'rsRoot' then 18
             else undefined
-      rowHeights:
+      rowHeights: (
         # Specify all the row heights (24 pixels is the Handsontable default),
         # otherwise the fixed clone of the left column sometimes reduced the
         # objectName row to zero height because it wasn't constrained by the
@@ -571,6 +571,7 @@ class ClientView
             if i < headerHeight - (2 + @options.showTypes) then 11 else 24
         else
           24 for i in [0...@grid.length]
+        )
       stretchH: 'last'
       cells: (row, col, prop) =>
         cell = @grid[row]?[col]
@@ -601,13 +602,15 @@ class ClientView
           # changes.  Don't use readOnly because that would dim the cells, which
           # we think is more than is appropriate.
           editor: if Tracker.nonreactive(() -> ActionBar.hasUnsavedData()) then false else 'text'
+
+          # Only column header "top" and "below" cells can be edited,
+          # for the purpose of changing the objectName and fieldName respectively.
+          #
+          # qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
           readOnly: !(
-                      # Only column header "top" and "below" cells can be edited,
-                      # for the purpose of changing the objectName and fieldName respectively.
-                      cell.kind in ['top', 'below'] && cell.columnId != rootColumnId ||
-                      cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
-                      # Add case.  For a state keyed object, you add by typing the key in the padding cell.
-                      cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
+            cell.kind in ['top', 'below'] && cell.columnId != rootColumnId ||
+            cell.qCellId? && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) ||
+            cell.qFamilyId? && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
         }
       autoColumnSize: {
         # I saw glitches with the asynchronous sizing on the cost sheet.  Rather

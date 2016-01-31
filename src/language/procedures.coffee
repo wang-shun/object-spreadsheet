@@ -50,12 +50,12 @@ class EagerFamilyRef
   validate: (mutableVars, mutableCurrentScopeVars, fmla) ->
     EagerSubformula.validate(mutableVars, mutableCurrentScopeVars, fmla)
     valAssert(fmla[0] == 'down', 'Family reference must be a down navigation.')
+    # A single down navigation in concrete syntax will always have
+    # wantValues = !isObject, but the simplification code in resolveNavigation
+    # generates down navigations to object columns with wantValues = true, and
+    # more generally either mismatch can arise from adding/removing object
+    # types.
     valAssert(
-      # A single down navigation in concrete syntax will always have
-      # wantValues = !isObject, but the simplification code in resolveNavigation
-      # generates down navigations to object columns with wantValues = true, and
-      # more generally either mismatch can arise from adding/removing object
-      # types.
       getColumn(fmla[2]).isObject == @wantObject && fmla[4] == !@wantObject,
       if @wantObject
         'new/make only work on object families.'

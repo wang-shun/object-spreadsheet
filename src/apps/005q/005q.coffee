@@ -21,9 +21,9 @@ if Meteor.isClient
       _.sortBy(objs, (x) -> x[field][0])
     people: (calls) ->
       count = calls?.length || 0
-      "#{if count == 1 then "is" else "are"} 
-       #{if count == 0 then "no" else count} 
-       #{if count == 1 then "person" else "people"}"
+      "#{if count == 1 then "is" else "are"} " +
+      "#{if count == 0 then "no" else count} " +
+      "#{if count == 1 then "person" else "people"}"
 
   Template.DoubleOhFiveQueue.events
     "submit form": (event) ->

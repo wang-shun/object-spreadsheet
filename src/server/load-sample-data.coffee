@@ -5,6 +5,8 @@
     {
     type: '_token'
     objectName: 'Person'
+    # We don't flag parents explicitly.  A person is a parent by virtue of being
+    # the parent of some student.
     children: [
       {
       fieldName: 'name'
@@ -17,14 +19,12 @@
       # No need to constrain singleton.
       children: [
         fieldName: 'parent'
-        type: 'Person'
         # There can be more than one parent, but there can be only one meeting per
         # enrollment, which we imagine several of the parents may attend if they
         # believe it is necessary.
+        type: 'Person'
       ]
       }
-      # We don't flag parents explicitly.  A person is a parent by virtue of being
-      # the parent of some student.
       {
       type: '_unit'
       objectName: 'Teacher'
@@ -90,6 +90,7 @@
     {
     type: '_token'
     objectName: 'Meeting'
+    # TODO: Constraint slot.Teacher == enrollment.Teacher
     children: [
       {
       fieldName: 'enrollment'
@@ -101,7 +102,6 @@
       type: 'Person:Teacher:Slot'
       # TODO: Required, singleton, unique
       }
-      # TODO: Constraint slot.Teacher == enrollment.Teacher
     ]
     }
   ]
@@ -232,12 +232,12 @@
   scanColumns = (parentId, schema) ->
     schema.children ?= []
     for columnDef, i in schema.children
+      # parseTypeStr only works because all of the types in our sample dataset refer to
+      # columns that come earlier in preorder.  We can probably live with this
+      # until we implement full validation of acyclic type usage.
       thisId = model.defineColumn(
         parentId, i,
         columnDef.fieldName,
-        # This only works because all of the types in our sample dataset refer to
-        # columns that come earlier in preorder.  We can probably live with this
-        # until we implement full validation of acyclic type usage.
         parseTypeStr(columnDef.type),
         columnDef.objectName? || (columnDef.isObject ? false),
         columnDef.objectName,
@@ -304,9 +304,9 @@
 
   # Note, this only covers the constraints that can be broken by the
   # transactions we support.
+  # XXX Change to universal quantification when available.
   defineParsedFormulaColumn(
     "", 3, "valid", null, false, null,
-    # XXX Change to universal quantification when available.
     '{e : $Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&
      {s : $Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&
      {m : $Meeting | !m.valid} = {}')

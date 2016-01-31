@@ -612,9 +612,9 @@ Meteor.startup () ->
       if @model.wasEmpty
         #if appName == 'ptc' then loadPTCData(@model)
         #else
-          loadDumpIfExists(@model, appName)
-          # TO MAKE A DUMP:
-          # ./private/scripts/mkdump APPNAME
+        loadDumpIfExists(@model, appName)
+        # TO MAKE A DUMP:
+        # ./private/scripts/mkdump APPNAME
       @model.repair()
       @model.evaluateAll()
 

@@ -314,8 +314,7 @@ goDown = (model, vars, startCellsTset, targetColId, keysTset, wantValues) ->
     tsetToText(model, displayTset, newRefsSeen)
   else if typeof value == 'string' then value
   else if value instanceof Date then value.toString("yyyy-MM-dd HH:mm")
-  # Reasonable fallback
-  else JSON.stringify(value)
+  else JSON.stringify(value)  # Reasonable fallback
 
 @genericSetToText = (elements, formatOne) ->
   if elements.length == 1
@@ -526,7 +525,7 @@ dispatch = {
       # XXXXXXX: Validate members of the type.
       new TypedSet(type, new EJSONKeyedSet(list))
     stringify: (model, vars, type, list) ->
-      str:
+      str: (() ->
         # Obviously, if someone manually creates a literal that requires a
         # leading minus or set notation, those constructs will be re-parsed as
         # operators rather than as part of the literal.
@@ -538,12 +537,14 @@ dispatch = {
         else
           # XXX: Canonicalize order?
           '{' + (JSON.stringify(x) for x in list).join(',') + '}'
-      outerPrecedence:
+        )()
+      outerPrecedence: (() ->
         if type == 'number' and list.length == 1 and list[0] < 0
           # Should never be reached by parsing concrete syntax.
           PRECEDENCE_NEG
         else
           PRECEDENCE_ATOMIC
+        )()
 
   # ["date", string]
   date:
@@ -570,7 +571,7 @@ dispatch = {
     evaluate: (model, vars, varName) ->
       vars.get(varName)
     stringify: (model, vars, varName) ->
-      str:
+      str: (() ->
         if varName == 'this'
           # A 'this' reference can only occur implicitly in concrete syntax, as
           # the left operand of a navigation.  The following is just a sentinel
@@ -578,6 +579,7 @@ dispatch = {
           'this'
         else
           annotateNavigationTarget(model, vars, null, varName, null, ['var', varName])
+        )
       outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["up", startCells, targetColumnId, wantValues (bool)]
@@ -665,8 +667,8 @@ dispatch = {
       valExpectType('Predicate', predicateType, 'bool')
       domainType
     evaluate: (model, vars, domainTset, predicateLambda) ->
+      # XXX Use the checked type instead?
       new TypedSet(
-        # XXX Use the checked type instead?
         domainTset.type,
         new EJSONKeyedSet(
           _.filter(domainTset.set.elements(), (x) ->
@@ -736,19 +738,19 @@ dispatch = {
       str: "-#{argSinfo.strFor(PRECEDENCE_NEG)}"
       outerPrecedence: PRECEDENCE_NEG
 
+  # XXX Since we look at one binary operation at a time and '+' is left
+  # associative, "foo" + 3 + 5 is "foo35" but 3 + 5 + "foo" is "8foo".  Java
+  # is the same way, but we could do better for users who are unaware of this
+  # subtlety by making '+' variadic in the abstract syntax.  This is a rare
+  # case because string concatenations will usually include a delimiter.  Or
+  # we could just use a different operator for string concatenation.
+  #
+  # XXX TYPE_ERROR is a misnomer in this context: it means we accept tsets of
+  # any valid type.  (There's no way to write a subexpression that actually
+  # returns TYPE_ERROR; instead it will cause a FormulaValidationError.)
   '+' : overloaded(
     '+', ['left', 'right'],
     [['number', 'number'], singletonInfixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, 'number', 'number', 'number', (x, y) -> x + y)],
-    # XXX Since we look at one binary operation at a time and '+' is left
-    # associative, "foo" + 3 + 5 is "foo35" but 3 + 5 + "foo" is "8foo".  Java
-    # is the same way, but we could do better for users who are unaware of this
-    # subtlety by making '+' variadic in the abstract syntax.  This is a rare
-    # case because string concatenations will usually include a delimiter.  Or
-    # we could just use a different operator for string concatenation.
-    #
-    # XXX TYPE_ERROR is a misnomer in this context: it means we accept tsets of
-    # any valid type.  (There's no way to write a subexpression that actually
-    # returns TYPE_ERROR; instead it will cause a FormulaValidationError.)
     [[TYPE_ERROR, TYPE_ERROR], infixOperator('+', PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, TYPE_ERROR, TYPE_ERROR, 'text',
                                              (model, tsetX, tsetY) -> tsetToText(model, tsetX) + tsetToText(model, tsetY))]
   )
