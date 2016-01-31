@@ -82,7 +82,9 @@ _toColumnId = (selector) ->
 
     
 class CellId
-  constructor: ({columnId, @cellId}) -> @columnId = _toColumnId(columnId)
+  constructor: ({columnId, cellId}) ->
+    @columnId = _toColumnId(columnId)
+    @cellId = cellId
   
   q: -> {@columnId, @cellId}
   
@@ -120,7 +122,9 @@ class CellId
   
 
 class FamilyId
-  constructor: ({columnId, @cellId}) -> @columnId = _toColumnId(columnId)
+  constructor: ({columnId, cellId}) ->
+    @columnId = _toColumnId(columnId)
+    @cellId = cellId
 
   parent: -> # returns a qCellId
     c = getColumn(@columnId)
