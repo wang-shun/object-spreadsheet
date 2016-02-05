@@ -1,0 +1,3 @@
+[submodule "coffeescript-to-typescript"]
+	path = coffeescript-to-typescript
+	url = ../coffeescript-to-typescript

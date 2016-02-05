@@ -4,3 +4,7 @@ dump/meteor/system*
 *.coffee.js
 *.ls.js
 *.jison.js
+
+# TypeScript stuff
+/zzz.ts-compiler.ts
+/coffee-to-ts-errors.txt
