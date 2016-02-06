@@ -1,10 +1,13 @@
 #!/bin/bash
 set -e -x
 
+# I've forgotten this enough times.  Saves a step for new checkouts too.
+make -C tests/coffeescript-to-typescript
+
 ./convert-cleanup.sh
 
 old=($(find src -name '*.coffee'))
-coffeescript-to-typescript/bin/coffee -cma ${old[@]} &>coffee-to-ts-errors.txt
+tests/coffeescript-to-typescript/bin/coffee -cma ${old[@]} &>coffee-to-ts-errors.txt
 #find src -name '*.js' -delete  # Why are these generated??  2016-01-29: I assume it's the typescript-property-accumulator pass, now disabled.
 
 # These apply only to the final conversion.
