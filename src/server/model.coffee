@@ -211,15 +211,15 @@ class Model
       # reference display columns.
       newFamilies =
         for family in Cells.find({column: columnId}).fetch()
+          newValues = []
+          for v in family.values
+            try
+              # XXX: It's O(m*n) to parse m references to an object column with n objects.  Add caching.
+              newValues.push(parseValue(specifiedType, valueToText(liteModel, col.specifiedType, v)))
+            catch e
+              # Ignore
           # Object newly allocated by fetch(), OK to mutate
-          family.values =
-            for v in family.values
-              try
-                # XXX: It's O(m*n) to parse m references to an object column with n objects.  Add caching.
-                parseValue(specifiedType, valueToText(liteModel, col.specifiedType, v))
-              catch e
-                # Yep, that omits it from the collected array.
-                continue
+          family.values = newValues
           family
 
     @invalidateSchemaCache()
