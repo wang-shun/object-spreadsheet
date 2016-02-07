@@ -279,7 +279,7 @@ mergeTypeMaps = (vars1, vars2) ->
     this.vars = this.varsStack[this.varsStack.length - 1][1].shallowClone()
   parser.yy.commitVars = () ->
     newVars = mergeTypeMaps(this.varsPreviousBranch, this.vars)
-    [this.varsPreviousBranch, _] = this.varsStack.pop()
+    this.varsPreviousBranch = this.varsStack.pop()[0]
     this.vars = newVars
 
   try
