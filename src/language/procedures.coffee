@@ -12,20 +12,26 @@ VarName = {
   validate: (mutableVars, mutableCurrentScopeVars, arg) ->
     valAssert(_.isString(arg), 'Variable name must be a string')
   stringify: (model, mutableVars, arg) ->
-    FormulaInternals.stringifyIdent(arg)
+    {
+      name: arg
+      str: FormulaInternals.stringifyIdent(arg)
+    }
 }
-# This one is mostly for documentation purposes.  Defining validate, typecheck,
-# and stringify would only be useful for one statement type (namely if, since
-# foreach needs to bind a variable before calling those methods), which we don't
-# consider to meet the bar for putting those implementations in an argument
-# adapter.  And defining execute would not be useful for any control structure.
-# (A control structure that just executes its body inline would be a pretty
-# useless control structure.)
+# This one is mostly for documentation purposes.  Validate, typecheck, and
+# execute for statements all have side effects; if we performed those side
+# effects during the arg adapter phase, we'd be behaving as if the statements
+# ran unconditionally before the control structure, and a control structure for
+# which that behavior is correct would be a pretty boring control structure.
+# Even for stringify, foreach needs to bind a variable first.
+#
+# We could have the arg adapters return partial applications of the
+# validateStatements, etc. functions, but I don't think this helps
+# understandability.
 Statements = {}
 OptionalVarName = {
   validate: (mutableVars, mutableCurrentScopeVars, arg) ->
     if arg? then VarName.validate(mutableVars, mutableCurrentScopeVars, arg)
-  stringify: (vars, arg) ->
+  stringify: (model, mutableVars, arg) ->
     if arg? then VarName.stringify(model, mutableVars, arg) else null
 }
 EagerSubformula = {
@@ -37,9 +43,15 @@ EagerSubformula = {
     FormulaInternals.EagerSubformula.typecheck(model, mutableVars, arg)
   execute: (model, mutableVars, arg) ->
     FormulaInternals.EagerSubformula.evaluate(model, mutableVars, arg)
-  # All contexts in which formulas appear in statements are safe for PRECEDENCE_LOWEST.
   stringify: (model, mutableVars, arg) ->
-    FormulaInternals.EagerSubformula.stringify(model, mutableVars, arg).strFor(PRECEDENCE_LOWEST)
+    # Anything that binds a local variable needs the original formula in order
+    # to get its type.  Follow the design of stringifySubformula.
+    #
+    # All contexts in which formulas appear in statements are safe for PRECEDENCE_LOWEST.
+    {
+      formula: arg
+      str: FormulaInternals.EagerSubformula.stringify(model, mutableVars, arg).strFor(FormulaInternals.PRECEDENCE_LOWEST)
+    }
 }
 
 # We really just want to think of this as parameterized by two booleans, but I
@@ -101,44 +113,42 @@ dispatch = {
       mutableVars.set(lhsName, rhsType)
     execute: (model, mutableVars, lhsName, rhsTset) ->
       mutableVars.set(lhsName, rhsTset)
-    stringify: (model, mutableVars, lhsStr, rhsStr) ->
-      "let #{lhsStr} = #{rhsStr}\n"
+    stringify: (model, mutableVars, lhsSinfo, rhsSinfo) ->
+      mutableVars.set(lhsSinfo.name, FormulaInternals.tryTypecheckFormula(model, mutableVars, rhsSinfo.formula))
+      "let #{lhsSinfo.str} = #{rhsSinfo.str}\n"
   set:
     argAdapters: [new EagerFamilyRef(false, false), EagerSubformula]
     typecheck: (model, mutableVars, lhsType, rhsType) ->
       valExpectType("Right operand of ':='", rhsType, lhsType)
     execute: (model, mutableVars, lhsFref, rhsTset) ->
-      # XXX Validate not modifying a formula column.
       model.invalidateDataCache()
       for parentCellId in lhsFref.parentCellsTset.elements()
         Cells.upsert({column: lhsFref.columnId, key: parentCellId},
                      {$set: {values: rhsTset.elements()}})
-    stringify: (model, mutableVars, lhsStr, rhsStr) ->
-      "#{lhsStr} := #{rhsStr}\n"
+    stringify: (model, mutableVars, lhsSinfo, rhsSinfo) ->
+      "#{lhsSinfo.str} := #{rhsSinfo.str}\n"
   add:
     argAdapters: [new EagerFamilyRef(false, false), EagerSubformula]
     typecheck: (model, mutableVars, lhsType, rhsType) ->
       valExpectType("Right operand of 'add'", rhsType, lhsType)
     execute: (model, mutableVars, lhsFref, rhsTset) ->
-      # XXX Validate not modifying a formula column.
       model.invalidateDataCache()
       for parentCellId in lhsFref.parentCellsTset.elements()
         Cells.upsert({column: lhsFref.columnId, key: parentCellId},
                      {$addToSet: {values: {$each: rhsTset.elements()}}})
-    stringify: (model, mutableVars, lhsStr, rhsStr) ->
-      "to set #{lhsStr} add #{rhsStr}\n"
+    stringify: (model, mutableVars, lhsSinfo, rhsSinfo) ->
+      "to set #{lhsSinfo.str} add #{rhsSinfo.str}\n"
   remove:
     argAdapters: [new EagerFamilyRef(false, false), EagerSubformula]
     typecheck: (model, mutableVars, lhsType, rhsType) ->
       valExpectType("Right operand of 'remove'", rhsType, lhsType)
     execute: (model, mutableVars, lhsFref, rhsTset) ->
-      # XXX Validate not modifying a formula column.
       model.invalidateDataCache()
       for parentCellId in lhsFref.parentCellsTset.elements()
         Cells.update({column: lhsFref.columnId, key: parentCellId},
                      {$pullAll: {values: rhsTset.elements()}})
-    stringify: (model, mutableVars, lhsStr, rhsStr) ->
-      "from set #{lhsStr} remove #{rhsStr}\n"
+    stringify: (model, mutableVars, lhsSinfo, rhsSinfo) ->
+      "from set #{lhsSinfo.str} remove #{rhsSinfo.str}\n"
   if:
     argAdapters: [EagerSubformula, Statements, Statements]
     validate: (mutableVars, mutableCurrentScopeVars, conditionFmla, thenBody, elseBody) ->
@@ -174,9 +184,17 @@ dispatch = {
       executeStatements(
         model, mutableVars,
         if singleElement(conditionTset.set) then thenBody else elseBody)
-    stringify: (model, mutableVars, conditionStr, thenBody, elseBody) ->
-      "if (#{conditionStr}) {\n" + indent(stringifyStatements(thenBody)) + "}" +
-      (if elseBody.length then " else {\n" + indent(stringifyStatements(elseBody)) + "}\n" else "\n")
+    stringify: (model, mutableVars, conditionSinfo, thenBody, elseBody) ->
+      varsAndStringByBranch =
+        for branch in [thenBody, elseBody]
+          branchVars = mutableVars.shallowClone()
+          str = stringifyStatements(model, branchVars, branch)
+          {branchVars, str}
+      mergedVars = mergeTypeMaps(varsAndStringByBranch[0].branchVars, varsAndStringByBranch[1].branchVars)
+      for [k, v] in mergedVars.entries()
+        mutableVars.set(k, v)
+      "if (#{conditionSinfo.str}) {\n" + indent(varsAndStringByBranch[0].str) + "}" +
+      (if elseBody.length then " else {\n" + indent(varsAndStringByBranch[1].str) + "}\n" else "\n")
   foreach:
     argAdapters: [VarName, EagerSubformula, Statements]
     validate: (mutableVars, mutableCurrentScopeVars, bindVarName, domainFmla, body) ->
@@ -190,16 +208,19 @@ dispatch = {
       validateStatements(mutableVars, mutableCurrentScopeVars, body)
     typecheck: (model, mutableVars, bindVarName, domainType, body) ->
       mutableVars = mutableVars.shallowClone()
-      mutableVars.add(bindVarName)
+      mutableVars.add(bindVarName)  # TODO TEST THIS
+      #mutableVars.set(bindVarName, domainType)
       typecheckStatements(model, mutableVars, body)
     execute: (model, mutableVars, bindVarName, domainTset, body) ->
       for element in domainTset.elements()
         newVars = mutableVars.shallowClone()
         newVars.set(bindVarName, new TypedSet(domainTset.type, set([element])))
         executeStatements(model, newVars, body)
-    stringify: (model, mutableVars, bindVarStr, domainStr, body) ->
-      "foreach (#{bindVarStr} : #{domainStr}) {\n" +
-      indent(stringifyStatements(body)) + "}\n"
+    stringify: (model, mutableVars, bindVarSinfo, domainSinfo, body) ->
+      mutableVars = mutableVars.shallowClone()
+      mutableVars.set(bindVarSinfo.name, FormulaInternals.tryTypecheckFormula(model, mutableVars, domainSinfo.formula))
+      "foreach (#{bindVarSinfo.str} : #{domainSinfo.str}) {\n" +
+        indent(stringifyStatements(model, mutableVars, body)) + "}\n"
   delete:
     argAdapters: [EagerSubformula]
     typecheck: (model, mutableVars, objectsType) ->
@@ -213,8 +234,8 @@ dispatch = {
       model.invalidateDataCache()
       for objectId in objectsTset.elements()
         recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId)
-    stringify: (model, mutableVars, objectsStr) ->
-      "delete #{objectsStr}"
+    stringify: (model, mutableVars, objectsSinfo) ->
+      "delete #{objectsSinfo.str}\n"
   new:
     argAdapters: [OptionalVarName, new EagerFamilyRef(true, false)]
     validate: (mutableVars, mutableCurrentScopeVars, bindVarName, fref) ->
@@ -233,8 +254,10 @@ dispatch = {
         objects.push(cellIdChild(parentCellId, token))
       if bindVarName?
         mutableVars.set(bindVarName, new TypedSet(fref.columnId, set(objects)))
-    stringify: (model, mutableVars, bindVarStr, frefStr) ->
-      (if bindVarStr? then "let #{bindVarStr} = " else '') + "new #{frefStr}"
+    stringify: (model, mutableVars, bindVarSinfo, frefSinfo) ->
+      if bindVarSinfo?
+        mutableVars.set(bindVarSinfo.name, FormulaInternals.tryTypecheckFormula(model, mutableVars, frefSinfo.formula))
+      (if bindVarSinfo? then "let #{bindVarSinfo.str} = " else '') + "new #{frefSinfo.str}\n"
   make:
     argAdapters: [OptionalVarName, new EagerFamilyRef(true, true)]
     validate: (mutableVars, mutableCurrentScopeVars, bindVarName, fref) ->
@@ -253,8 +276,10 @@ dispatch = {
           objects.push(cellIdChild(parentCellId, key))
       if bindVarName?
         mutableVars.set(bindVarName, new TypedSet(fref.columnId, set(objects)))
-    stringify: (model, mutableVars, bindVarStr, frefStr) ->
-      (if bindVarStr? then "let #{bindVarStr} = " else '') + "make #{frefStr}"
+    stringify: (model, mutableVars, bindVarSinfo, frefSinfo) ->
+      if bindVarSinfo?
+        mutableVars.set(bindVarSinfo.name, FormulaInternals.tryTypecheckFormula(model, mutableVars, frefSinfo.formula))
+      (if bindVarSinfo? then "let #{bindVarSinfo.str} = " else '') + "make #{frefSinfo.str}\n"
   check:
     argAdapters: [EagerSubformula]
     typecheck: (model, mutableVars, conditionType) ->
@@ -262,8 +287,8 @@ dispatch = {
     execute: (model, mutableVars, conditionTset) ->
       unless singleElement(conditionTset.set)
         throw new EvaluationError('check condition failed')
-    stringify: (model, mutableVars, conditionStr) ->
-      "check #{conditionStr}"
+    stringify: (model, mutableVars, conditionSinfo) ->
+      "check #{conditionSinfo.str}\n"
 }
 
 mergeTypeMaps = (vars1, vars2) ->
@@ -276,14 +301,17 @@ mergeTypeMaps = (vars1, vars2) ->
       mergedVars.set(varName, TYPE_ERROR)
   mergedVars
 
+paramsToTypeMap = (params) ->
+  new EJSONKeyedMap([p.name, p.type] for p in params)
+
 # params must already be in final format.
-@parseProcedure = (name, params, bodyString) ->
-  unless /\n$/.test(bodyString)
+@parseProcedure = (stringProc) ->
+  bodyString = stringProc.body
+  unless /(^|\n)$/.test(bodyString)
     bodyString += '\n'
 
   parser = setupParserCommon(
-    'ENTRY_PROCEDURE',
-    new EJSONKeyedMap([p.name, p.type] for p in params))
+    'ENTRY_PROCEDURE', paramsToTypeMap(stringProc.params))
   # The following duplicates the authoritative scoping rules expressed in the
   # statement handlers, but is needed to know the correct types during parsing
   # so we can interpret navigations correctly.
@@ -305,7 +333,11 @@ mergeTypeMaps = (vars1, vars2) ->
     this.vars = newVars
 
   try
-    return {name, params, body: parser.parse(bodyString)}
+    return {
+      name: stringProc.name,
+      params: EJSON.clone(stringProc.params),
+      body: parser.parse(bodyString)
+    }
   catch e
     if e instanceof SyntaxError
       throw new FormulaValidationError(e.message)
@@ -314,6 +346,8 @@ mergeTypeMaps = (vars1, vars2) ->
 
 # Based on validateSubformula
 # mutableVars: EJSONKeyedSet<string>
+#
+# Does not use dispatchStatement for the same reasons as validateSubformula.
 validateStatement = (mutableVars, mutableCurrentScopeVars, statement) ->
   valAssert(_.isArray(statement), 'Statement must be an array.')
   valAssert(_.isString(opName = statement[0]), 'Statement must begin with an operation name (a string).')
@@ -337,14 +371,6 @@ dispatchStatement = (action, statement, contextArgs...) ->
     for adapter, i in d.argAdapters
       if adapter[action]? then adapter[action](contextArgs..., args[i]) else args[i]
   d[action](contextArgs..., adaptedArgs...)
-
-# Perhaps it's not surprising that for every action we currently need (typecheck
-# and evaluate), a sequential composition can be processed sequentially.
-#
-# This will aggregate return values, which we just ignore for now.
-dispatchStatements = (action, statements, contextArgs...) ->
-  for statement in statements
-    dispatchStatement(action, statement, contextArgs...)
 
 validateStatements = (mutableVars, mutableCurrentScopeVars, arg) ->
   valAssert(_.isArray(arg),
@@ -411,3 +437,11 @@ stringifyStatements = (model, mutableVars, arg) ->
     if param.singular
       singleElement(args.get(param.name).set)  # Better error message?
   executeStatements(model, args.shallowClone(), proc.body)
+
+@stringifyProcedure = (proc) ->
+  # C.f. stringifyFormula
+  {
+    name: proc.name,
+    params: EJSON.clone(proc.params),
+    body: stringifyStatements(liteModel, paramsToTypeMap(proc.params), proc.body)
+  }

@@ -32,7 +32,11 @@ if Meteor.isServer
           params =
             for p in preProc.params
               {name: p[0], type: parseTypeStr(p[1]), singular: p[2] ? true}
-          proc = parseProcedure(name, params, preProc.body)
+          proc = parseProcedure({
+            name: name,
+            params: params,
+            body: preProc.body
+          })
           oldId = Procedures.findOne({name: name})?._id
           if oldId?
             $$.model.redefineProcedure(oldId, proc)
