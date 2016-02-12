@@ -14,8 +14,8 @@ class EJSONKeyedMap
   unwrapKey = (k) -> EJSON.parse(k.substr(4))
 
   get: (k) -> @obj[wrapKey(k)]
-  set: (k, v) -> @obj[wrapKey(k)] = v
-  delete: (k) -> delete @obj[wrapKey(k)]
+  set: (k, v) -> @obj[wrapKey(k)] = v; return
+  delete: (k) -> delete @obj[wrapKey(k)]; return
   size: -> _.size(@obj)
   keys: -> unwrapKey(wk) for wk of @obj
   entries: -> [unwrapKey(wk), v] for wk, v of @obj
@@ -37,8 +37,8 @@ class EJSONKeyedSet
       @add(x)
   has: (x) -> !!@map.get(x)
   hasAll: (s) -> forall s.elements(), (x) => @has x
-  add: (x) -> @map.set(x, true)
-  delete: (x) -> @map.delete(x)
+  add: (x) -> @map.set(x, true); return
+  delete: (x) -> @map.delete(x); return
   size: -> @map.size()
   elements: -> @map.keys()
   shallowClone: -> new EJSONKeyedSet(@elements())
@@ -61,8 +61,12 @@ class EJSONSmallSet
         @add(x)
   has: (x) -> exists @els, (y) -> EJSON.equals(x,y)
   hasAll: (s) -> forall @els, (x) => @has x
-  add: (x) -> if !@has(x) then @els.push x
-  delete: (x) -> @els = @els.filter (y) -> !EJSON.equals(x,y)
+  add: (x) ->
+    if !@has(x) then @els.push x
+    return
+  delete: (x) ->
+    @els = @els.filter (y) -> !EJSON.equals(x,y)
+    return
   elements: -> @els
   shallowClone: -> new EJSONSmallSet(@els, true)
   typeName: 'EJSONSmallSet'
@@ -83,12 +87,14 @@ class EJSONKeyedMapToSet
       s = new EJSONKeyedSet()
       @map.set(k, s)
     s.add(v)
+    return
   delete: (k, v) ->
     s = @map.get(k)
     if s?
       s.delete(v)
       if s.elements().length == 0
         @map.delete(k)
+    return
   keys: -> @map.keys()
   has: (k, v) -> (s = @map.get(k))? && s.has(v)
   elementsFor: (k) -> @map.get(k)?.elements() ? []
@@ -124,7 +130,7 @@ EJSON.addType('Tree', Tree.fromJSONValue)
 
 class Memo
   constructor: -> @values = {}
-  clear: -> @values = {}
+  clear: -> @values = {}; return
   get: (key, recompute) ->
     if (v = @values[key])? then v
     else @values[key] = recompute()

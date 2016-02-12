@@ -244,6 +244,7 @@
         null  # formula
       )
       scanColumns(thisId, columnDef)
+    return
   scanColumns(rootColumnId, superSchema)
 
   # Insert cells into columns.
@@ -257,6 +258,7 @@
         [value, childCellData] = entry
         fam.add(value)
         insertCells(childColumnId, cellIdChild(cellId, value), childCellData)
+    return
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
@@ -269,6 +271,7 @@
                 parentId, order, fieldName, specifiedType, isObject, objectName,
                 parseFormula(parentId, formulaStr))
     if view then new View(view).addColumn(id, true)
+    return
 
   defineParsedFormulaColumn("Person:Student",
                             1, "parentName", null, false, null,
@@ -366,6 +369,7 @@
                             0, "slotTime", null, false, null,
                             'availableSlot.time',
                             '1')
+  return
 
 
 
@@ -384,3 +388,4 @@
     model.invalidateSchemaCache()
   catch e
     console.log("Failed to load dump for #{appName} into sheet '#{$$.id}':", e.stack)
+  return

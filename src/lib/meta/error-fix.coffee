@@ -10,3 +10,4 @@ unless exceptionStackIncludesMessage
   Blaze._reportException = (e, msg) ->
     e.stack = e.message + '\n' + e.stack
     origReportException(e, msg)
+    return

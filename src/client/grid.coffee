@@ -17,12 +17,14 @@ exported {ViewCell}
 @gridVertExtend = (orig, extension) ->
   for row in extension
     orig.push(row)
+  return
 
 # Mutate "orig" by adding "extension" at the right.
 @gridHorizExtend = (orig, extension) ->
   for i in [0...orig.length]
     for cell in extension[i]
       orig[i].push(cell)
+  return
 
 # Return a grid consisting of one "height x width" merged cell and enough dummy
 # 1x1 cells.  You can mutate the upper-left cell as desired.

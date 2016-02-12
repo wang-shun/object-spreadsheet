@@ -30,6 +30,7 @@ origFormulaStr = new ReactiveVar(null)
 Tracker.autorun(() ->
   cca = changeColumnArgs.get()[0]
   origFormulaStr.set(if cca? then origFormulaStrForData(cca) else null)
+  return
   )
 newFormulaStr = new ReactiveVar(null)
 newFormulaInfo = new ReactiveVar(null)
@@ -42,6 +43,7 @@ Template.changeColumn.rendered = () ->
   # XXX What if there are unsaved changes when the formula changes externally?
   @autorun(() ->
     newFormulaStr.set(origFormulaStr.get())
+    return
     )
   @autorun(() ->
     unless isFormulaDebuggerOpen.get()
@@ -61,7 +63,7 @@ Template.changeColumn.rendered = () ->
       # afterFlush will become unmaintainable if we push it much further, but
       # works for now and is easier than trying to figure out the referencing
       # for a child template.
-      Tracker.afterFlush(() => changeColumnInitFormulaBar(this))
+      Tracker.afterFlush(() => changeColumnInitFormulaBar(this); return)
     else if !shouldShowFormulaBar && @codeMirror?
       # TODO: Consider allowing the action bar to remain expanded when the user
       # switches columns.  But if we make the toggle button always visible, it
@@ -73,7 +75,9 @@ Template.changeColumn.rendered = () ->
       newFormulaInfo.set(null)
       # XXX Do we need to tear down the CodeMirror somehow?
       @codeMirror = null
+    return
     )
+  return
 
 Template.changeColumn.destroyed = () ->
   # Try to avoid holding on to data that's no longer relevant.
@@ -84,6 +88,7 @@ Template.changeColumn.destroyed = () ->
   tracingView = null
   newFormulaInfo.set(null)
   newFormulaStr.set(null)
+  return
 
 # Scanning for all possible reference types is slow enough to make the selection
 # feel laggy, so cache the menu and reuse it.
@@ -103,6 +108,7 @@ Relsheets.onOpen(() ->
         refItems.push(new HtmlOption(colId, stringifyType(colId)))
       for childId in c.children
         scan(childId)
+      return
     scan(rootColumnId)
 
     items = []
@@ -110,7 +116,10 @@ Relsheets.onOpen(() ->
                                 (new HtmlOption(t, t) for t in MAIN_PRIMITIVE_TYPES)))
     items.push(new HtmlOptgroup('Reference to:', refItems))
     typeMenuCommonItems.set(items)
-    ))
+    return
+    )
+  return
+  )
 
 Template.changeColumn.helpers
   #col: -> getColumn(@columnId)
@@ -179,8 +188,8 @@ changeColumnInitFormulaBar = (template) ->
   template.codeMirror = CodeMirror(template.find('#changeFormula-formula'), {
     value: ''  # filled in by autorun below
     extraKeys: {
-      Enter: (cm) -> template.find('.saveFormula').click()
-      Esc: (cm) -> template.find('.revertFormula').click()
+      Enter: (cm) -> template.find('.saveFormula').click(); return
+      Esc: (cm) -> template.find('.revertFormula').click(); return
     }
     })
   template.codeMirrorDoc = template.codeMirror.getDoc()
@@ -191,6 +200,7 @@ changeColumnInitFormulaBar = (template) ->
       if isFormulaDebuggerOpen.get()
         height += NESTED_UNDERLINING_PX_PER_LEVEL * NESTED_UNDERLINING_MAX_DEPTH
       template.codeMirror.setSize('100%', height)
+      return
     ),
     template.autorun(() ->
       formulaStr = newFormulaStr.get()
@@ -203,16 +213,21 @@ changeColumnInitFormulaBar = (template) ->
       # back to the beginning.  Wish for a better two-way binding mechanism...
       if formulaStr != template.codeMirrorDoc.getValue()
         template.codeMirrorDoc.setValue(formulaStr)
-      newFormulaInfo.set(generateFormulaInfo(template)))
-    ]
+      newFormulaInfo.set(generateFormulaInfo(template))
+      return
+    )]
   template.codeMirror.on('beforeChange', (cm, change) ->
     if change.update?
       newtext = change.text.join('').replace(/\n/g, '')
       change.update(null, null, [newtext])
     # Otherwise, change is coming from undo or redo; hope it's OK.
+    return
     )
   template.codeMirror.on('changes', (cm) ->
-    newFormulaStr.set(template.codeMirrorDoc.getValue()))
+    newFormulaStr.set(template.codeMirrorDoc.getValue())
+    return
+    )
+  return
 
 generateFormulaInfo = (template) ->
   tracingView?.destroy()
@@ -267,6 +282,7 @@ generateFormulaInfo = (template) ->
       top: top
       height: NESTED_UNDERLINING_PX_PER_LEVEL
       })
+    return
   layoutSubtree(formulaInfo.root)
   formulaInfo.selectedBand = null
   formulaInfo.haveTraced = false
@@ -336,8 +352,10 @@ class TracingView
       @grid.push(line)
     data = ((cell.value for cell in row) for row in @grid)
     @hot.loadData(data)
+    return
   destroy: () ->
     @hot.destroy()
+    return
 
 updateTracingView = (template) ->
   formulaInfo = newFormulaInfo.get()
@@ -350,6 +368,7 @@ updateTracingView = (template) ->
   unless tracingView?
     tracingView = new TracingView(template.find('#TracingView'))
   tracingView.show(formulaInfo.selectedBand.node)
+  return
 
 hasUnsavedData = () ->
   newFormulaStr.get() != origFormulaStr.get()
@@ -399,6 +418,7 @@ Template.changeColumn.events
                 @columnId,
                 newFormula,
                 standardServerCallback)
+    return
   'change #changeColumn-type': (event, template) ->
     col = getColumn(@columnId)
     newSpecifiedType = getValueOfSelectedOption(template, '#changeColumn-type')
@@ -416,6 +436,7 @@ Template.changeColumn.events
                 @columnId,
                 newSpecifiedType,
                 standardServerCallback)
+    return
   'change #changeColumn-referenceDisplayColumn': (event, template) ->
     newReferenceDisplayColumn = getValueOfSelectedOption(template, '#changeColumn-referenceDisplayColumn')
     if newReferenceDisplayColumn == 'auto'
@@ -424,6 +445,7 @@ Template.changeColumn.events
                 @columnId,
                 newReferenceDisplayColumn,
                 standardServerCallback)
+    return
   'click .saveFormula': (event, template) ->
     contextColumnId = getColumn(@columnId).parent
     # canSave ensures that this is defined.
@@ -435,10 +457,13 @@ Template.changeColumn.events
                 @columnId,
                 formula,
                 standardServerCallback)
+    return
   'click .revertFormula': (event, template) ->
     newFormulaStr.set(origFormulaStr.get())
+    return
   'click .formulaDebuggerToggle': (event, template) ->
     isFormulaDebuggerOpen.set(!isFormulaDebuggerOpen.get())
+    return
   'click .formulaBand': (event, template) ->
     # Update selection.
     formulaInfo = newFormulaInfo.get()
@@ -449,12 +474,14 @@ Template.changeColumn.events
 
     # XXX Might be nice to make this an autorun.
     updateTracingView(template)
+    return
 
 # Needed for the formula div to get added during the "Create formula" handler,
 # rather than sometime later when we get the update from the server.
 Meteor.methods({
   changeColumnFormula: (cc, columnId, formula) ->
     Columns.update(columnId, {$set: {formula: formula}})
+    return
 })
 
 

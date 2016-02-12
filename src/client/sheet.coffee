@@ -1,7 +1,9 @@
 Router.route "/:sheet", ->
   @render "Spreadsheet", data: {sheet: @params.sheet}
+  return
 Router.route "/:sheet/views/:_id", ->
   @render "Spreadsheet", data: {sheet: @params.sheet, viewId: @params._id}
+  return
 
 
 class NotReadyError
@@ -169,6 +171,7 @@ class ViewSection
       typeColors.set(@col.type, 'TBD')
     for subsection in @subsections
       subsection.findTypesToColor(typeColors)
+    return
 
   assignTypeColors: (nextColor, typeColors) ->
     if typeColors.get(@columnId) == 'TBD'
@@ -312,6 +315,7 @@ class ViewSection
       gridVertExtend(corner, grid)
       grid = corner
       currentHeight = height
+      return
 
     for subsection, i in @subsections
       if @extraColClassBefore[i]?
@@ -382,16 +386,19 @@ class StateEdit
 
   @addCell: (qFamilyId, enteredValue, callback=(->), consumePlaceholder=false) ->
     if (newValue = @parseValueUi qFamilyId, enteredValue)?
-      new FamilyId(qFamilyId).add(newValue, (-> $$.call 'notify', callback), consumePlaceholder)
+      new FamilyId(qFamilyId).add(newValue, (-> $$.call 'notify', callback; return), consumePlaceholder)
+    return
 
   @modifyCell: (qCellId, enteredValue, callback=->) ->
     cel = new CellId(qCellId)
     fam = cel.family()
     if (newValue = @parseValueUi(fam, enteredValue))?
-      cel.value(newValue, (-> $$.call 'notify', callback))
+      cel.value(newValue, (-> $$.call 'notify', callback; return))
+    return
 
   @removeCell: (qCellId, callback=->) ->
-    new CellId(qCellId).remove((-> $$.call 'notify', callback))
+    new CellId(qCellId).remove((-> $$.call 'notify', callback; return))
+    return
 
   @canEdit: (columnId) ->
     col = getColumn(columnId)
@@ -423,11 +430,13 @@ insertBlankColumn = (parentId, index, isObject, view) ->
             formula,  # formula
             view?.id,
             standardServerCallback)
+  return
 
 
 headerExpanded = new ReactiveVar(true)
 toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
+  return
 
 class ClientView
 
@@ -458,6 +467,7 @@ class ClientView
   reload: () ->
     @layoutTree = @view.def().layout
     @mainSection = new ViewSection(@layoutTree, @options)
+    return
 
   hotConfig: ->
     thisView = this
@@ -637,12 +647,15 @@ class ClientView
 
       afterDeselect: () ->
         thisView.onSelection()
+        return
 
       afterSelection: (r1, c1, r2, c2) ->
         thisView.onSelection()
-        
+        return
+
       beforeKeyDown: (event) ->
         thisView.onKeyDown(event)
+        return
 
       beforeChange: (changes, source) =>
         for [row, col, oldVal, newVal] in changes
@@ -708,6 +721,7 @@ class ClientView
                 callback: () =>
                   Meteor.call('changeColumnIsObject', $$, ci, true,
                               standardServerCallback)
+                  return
               }
             # If !col.isObject, then the defineColumn (or the first defineColumn
             # of the insertUnkeyedStateObjectTypeWithField) will automatically
@@ -723,6 +737,7 @@ class ClientView
               callback: () =>
                 index = col.children.length
                 insertBlankColumn(ci, index, false, @view)
+                return
             }
             addObjectTypeItem = {
               name:
@@ -735,6 +750,7 @@ class ClientView
               callback: () =>
                 index = col.children.length
                 insertBlankColumn(ci, index, true, @view)
+                return
             }
             if ci == rootColumnId  # order tweak for common case
               items.addObjectTypeItem = addObjectTypeItem
@@ -762,6 +778,7 @@ class ClientView
                   @hot.deselectCell() # <- Otherwise changeColumn form gets hosed.
                   Meteor.call('deleteColumn', $$, ci,
                               standardServerCallback)
+                  return
               }
 
           else
@@ -770,6 +787,7 @@ class ClientView
                 name: "Jump to object '#{c.display}'"
                 callback: () =>
                   @selectSingleCell(coords.row, coords.col)
+                  return
               }
             if (addCommand = @getAddCommandForCell(c))?
               items.add = addCommand
@@ -794,6 +812,7 @@ class ClientView
     if @options.showTypes then $(domElement).addClass('showTypes')
     # Monkey patch: Don't let the user merge or unmerge cells.
     @hot.mergeCells.mergeOrUnmergeSelection = (cellRange) ->
+    return
 
   hotReconfig: () ->
     # @savedSelection is not meaningful after we update the table.
@@ -801,6 +820,7 @@ class ClientView
     cfg = @hotConfig()
     @hot.updateSettings {colWidths: cfg.colWidths, rowHeights: cfg.rowHeights, mergeCells: cfg.mergeCells}
     @hot.loadData cfg.data
+    return
 
   getSelected: =>
     if (s = @hot.getSelected())?
@@ -840,12 +860,14 @@ class ClientView
     $(".referent").removeClass("referent")
     if referent? && (refc = @refId(referent))?
       $(".ref-#{refc}").addClass("referent")
+    return
 
   highlightObject: (obj) ->
     $(".selected-object").removeClass("selected-object")
     if obj? && (refc = @refId(obj))?
       $(".ancestor-#{refc}").addClass("selected-object")
-        
+    return
+
   onSelection: ->
     selection = @hot.getSelected()
     if EJSON.equals(selection, @savedSelection)
@@ -870,6 +892,7 @@ class ClientView
       else
         []
     )
+    return
 
   # get*CommandForCell return a context menu item, but onKeyDown also uses
   # just the callback, so we maintain consistency in what command is offered.
@@ -884,6 +907,7 @@ class ClientView
           name: "Add '#{objectName}' object here"
           callback: () =>
             StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+            return
         }
       else if col.type == '_unit'
         # Adding a duplicate value has no effect, but disallow it as a
@@ -896,6 +920,7 @@ class ClientView
             name: 'Add X here'
             callback: () =>
               StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+              return
           }
       else
         if !selectedCell.isObjectCell
@@ -906,6 +931,7 @@ class ClientView
             name: 'Add cell here'
             callback: () =>
               new FamilyId(c.qFamilyId).addPlaceholder(standardServerCallback)
+              return
           }
     return null
 
@@ -915,6 +941,7 @@ class ClientView
         name: 'Delete cell'
         callback: () =>
           new FamilyId(c.qFamilyId).removePlaceholder(standardServerCallback)
+          return
       }
     else if c.qCellId? && columnIsState(col = getColumn(c.qCellId.columnId))
       return {
@@ -924,6 +951,7 @@ class ClientView
         name: if col.isObject then 'Delete object' else 'Delete cell'
         callback: () =>
           StateEdit.removeCell(c.qCellId, standardServerCallback)
+          return
       }
     else
       return null
@@ -947,6 +975,7 @@ class ClientView
         callback: () =>
           Meteor.call('changeColumnIsObject', $$, col._id, false,
                       standardServerCallback)
+          return
       }
     return null
 
@@ -1012,11 +1041,12 @@ class ClientView
               # Check whether this should be possible (i.e., right children)
               # before attempting it so we can detect real errors from the server.
               @getDemoteCommandForColumn(col)?.callback()
-          
-  
+    return
+
   selectSingleCell: (r1, c1) ->
     cell = @grid[r1][c1]
     @hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1)
+    return
 
   selectMatchingCell: (predicate) ->
     for i in [0...@grid.length]
@@ -1063,7 +1093,9 @@ rebuildView = (viewId) ->
     # selection (view.selectMatchingCell doesn't always seem to trigger this).
     view.onSelection()
     ActionBar.isLoading.set(false)
+    return
   )
+  return
 
 # Helper decorator for use with Tracker.autorun
 guarded = (op) ->
@@ -1076,6 +1108,7 @@ guarded = (op) ->
         return  # Let the autorun run again once we have the data.
       throw e
     window.why = null
+    return
 
 
 Template.Spreadsheet.rendered = ->
@@ -1084,10 +1117,13 @@ Template.Spreadsheet.rendered = ->
   # $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
   if sheet then document.title = sheet
   Relsheets.open(sheet)
-  Tracker.autorun(guarded -> rebuildView viewId)
+  Tracker.autorun(guarded -> rebuildView viewId; return)
+  return
 
 Template.Spreadsheet.events =
-  'click .toggleHeaderExpanded': -> toggleHeaderExpanded()
+  'click .toggleHeaderExpanded': ->
+    toggleHeaderExpanded()
+    return
 
 Template.Spreadsheet.helpers
   # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
@@ -1098,3 +1134,4 @@ Template.Spreadsheet.helpers
 
 $ ->
   exported {ClientView, StateEdit, rebuildView, guarded}
+  return

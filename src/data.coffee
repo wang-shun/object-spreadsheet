@@ -5,12 +5,13 @@
 #CELLS_COLLECTION = 'cells'
 # need them for publisher? maybe just use Columns._name, Cells._name?
 
-scoped = (name, prop) -> Object.defineProperty(@, name, prop)
+scoped = (name, prop) -> Object.defineProperty(@, name, prop); return
 
 scoped('$$', {get: -> Tablespace.get()})
 for coll in ['Columns', 'Cells', 'Views', 'Procedures']
   ((coll) ->  # Work around JavaScript variable capture semantics
     scoped(coll, {get: -> $$[coll]})
+    return
   )(coll)
 
 
@@ -44,16 +45,19 @@ class Tablespace extends ControlContext
         @publish collection
       @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }
       @Views.allow { insert: (-> true), update: (-> true), remove: (-> true) }
+    return
 
   publish: (collection) ->
     # Do not inline this into the same function as the loop over collections, or
     # the reference to "collection" from the publish function will see the wrong
     # value of the variable (insane JavaScript semantics).
     Meteor.publish collection._name, -> collection.find()
+    return
 
   subscribeAll: () ->
     for collection in [@Columns,@Cells,@Views]
       Meteor.subscribe collection._name
+    return
 
   runTransaction: (op) ->
     @run ->
@@ -104,7 +108,7 @@ class CellId
     ancestors
     
   value: (set, callback=->) -> 
-    if set? then @remove() ; @family().add(set, callback)
+    if set? then @remove() ; @family().add(set, callback) ; return
     else cellIdLastStep(@cellId)
   
   family: (columnId) ->
@@ -116,7 +120,7 @@ class CellId
   families: ->
     (@family(childId) for childId in getColumn(@columnId)?.children ? [])
     
-  remove: (callback=->) -> @family().remove(@value(), callback)
+  remove: (callback=->) -> @family().remove(@value(), callback) ; return
   
   ref: -> new TypedSet(@columnId, set([@cellId]))
   
@@ -170,14 +174,17 @@ class FamilyId
       # Use updateOne instead of update, since client is not allowed
       # to update documents via selector, only by id
       updateOne Cells, {column: @columnId, key: @cellId}, {$pull: {values: value}}, callback
+    return
 
   addPlaceholder: (callback=->) ->
     # If the field is initially absent, $inc treats it as 0.
     upsertOne(Cells, @selector(), {$inc: {numPlaceholders: 1}}, callback)
+    return
 
   removePlaceholder: (callback=->) ->
     if Cells.findOne(@selector())?.numPlaceholders   # XXX race
       updateOne(Cells, @selector(), {$inc: {numPlaceholders: -1}}, callback)
+    return
 
 
 rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
@@ -197,13 +204,14 @@ allCellIdsInColumnIgnoreErrors = (columnId) ->
 updateOne = (collection, selector, modifier, callback) ->
   if (doc = collection.findOne(selector))?
     collection.update(doc._id, modifier, callback)
+  return
     
 upsertOne = (collection, selector, modifier, callback) ->
   doc = collection.findOne(selector)
   if doc then id = doc._id
   else id = collection.insert(selector)
   collection.update(id, modifier, callback)
-      
+  return
 
 
 class CellsInMemory
@@ -254,6 +262,7 @@ class CellsInMemory
       for _id, doc of @byId
         if doc.dirty == query.dirty
           cb(doc)
+      return
 
   update: (query, modifier, options) ->
     #console.log "[update(#{JSON.stringify query}, #{JSON.stringify modifier}, #{JSON.stringify options})]"
@@ -281,10 +290,12 @@ class CellsInMemory
       else
         doc[k] = _.clone(v)
     #console.log "  >> #{JSON.stringify doc}"
+    return
 
   upsert: (query, modifier, options) ->
     if options? then throw Error "unimplemented upsert(..., options)"
     @update(query, modifier, {upsert: true})
+    return
 
   remove: (query, callback=->) ->
     if (column = query.column)?
@@ -307,11 +318,13 @@ class CellsInMemory
         @byId = {}
 
     callback()
+    return
 
   stash: (doc) ->
     #console.log "  stash[doc=#{JSON.stringify doc}]"
     delete @byId[doc._id]
     @recycle.set([doc.column, doc.key],  doc._id)
+    return
 
 #
 # Provides transaction-like behaviour by taking a snapshot of the
@@ -326,11 +339,13 @@ class TransactionCells
     
   prefetch: ->
     @mem.insert(doc) for doc in @dbCells.find().fetch()
+    return
       
   insert: (doc) ->
     doc = _.clone(doc)
     doc.dirty = true
     @mem.insert(doc)
+    return
     
   update: (query, values, upsert=false) ->
     if _.size(values) != 1
@@ -347,11 +362,15 @@ class TransactionCells
       @mem.upsert(query, values)
     else
       @mem.update(query, values)
-      
+    return
+
   upsert: (query, values) ->
     @update(query, values, true)
+    return
     
-  remove:  (query={})  ->  @mem.remove(query) # nothing fancy here...
+  remove:  (query={})  ->
+    @mem.remove(query) # nothing fancy here...
+    return
   find:    (query={})  ->  @mem.find(query)
   findOne: (query={})  ->  @mem.findOne(query)
   
@@ -361,29 +380,33 @@ class TransactionCells
       if ! @mem.findOne(doc._id)
         raw.remove({_id: doc._id}, (err) -> if err? then console.log "remove: #{err}")
         #@dbCells.remove(doc._id)
+      return
     @mem.find({dirty: true}).forEach (doc) =>
       delete doc.dirty
       raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> if err? then console.log "remove: #{err}")
       #@dbCells.upsert(doc._id, doc)
+      return
+    return
 
 class Transaction
-      
+
   constructor: (dbCells) ->
     @Cells = new TransactionCells(dbCells ? Cells)
-    
+
   begin: ->
     @Cells.prefetch()
     $$.Cells = @Cells
-    
+    return
+
   rollback: ->
     $$.Cells = @Cells.dbCells
-    undefined
-    
+    return
+
   commit: ->
     @Cells.commit()
     $$.Cells = @Cells.dbCells
-    undefined
-        
+    return
+
 
 
 exported {Tablespace, CellId, FamilyId, rootCell, allCellIdsInColumnIgnoreErrors, Transaction, CellsInMemory}

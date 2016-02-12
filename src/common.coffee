@@ -78,6 +78,7 @@ class SemanticError
   ret = []
   visit = (name, descriptor) ->  # descriptor = [childId, isValues, direction]
     if name == wantName then ret.push(descriptor)
+    return
   visit(col.fieldName, [id, true, 'up'])
   for physChildCol in Columns.find({parent: id}).fetch()
     if physChildCol.isObject
@@ -214,10 +215,12 @@ class TypedSet
   add: (xType, x) ->
     @type = commonSupertype(@type, xType)
     @set.add(x)
+    return
   addAll: (tset) ->
     @type = commonSupertype(@type, tset.type)
     for e in tset.set.elements()
       @set.add(e)
+    return
 
   elements: -> @set.elements()
 

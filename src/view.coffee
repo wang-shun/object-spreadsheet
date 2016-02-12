@@ -20,12 +20,14 @@ class View
         Views.upsert(@id, def)
       if own
         Columns.update(columnId, {$set: {view: @id}})
+    return
 
   removeColumn: (columnId) ->
     def = @def()
     def.layout = def.layout.filter((x) -> x != columnId)
     Views.update(@id, def)
-    
+    return
+
   reorderColumn: (columnId, newIndex) ->
     def = @def()
     parentId = Columns.findOne(columnId)?.parent
@@ -39,6 +41,7 @@ class View
         Views.update(@id, {$set: {layout: layoutTree}})
         # Cannot use upsert or update(@id, def) if calling from client
         # "update failed: Access denied. Upserts not allowed in a restricted collection."
+    return
 
   @rootLayout: -> @drillDown(rootColumnId).filter (x) => !@ownerOf(x)?
 
@@ -53,6 +56,8 @@ class View
     Views.find().forEach (view) ->
       if view.layout.find(columnId)?
         new View(view._id).removeColumn(columnId)
+      return
+    return
 
 
 

@@ -2,6 +2,7 @@
 if Meteor.isClient
   Router.route "/:sheet/apps/ptc/parent", ->
     @render "PTC_Parent_login", data: {sheet: @params.sheet}
+    return
   # That's actually a Person token.  So the URL should be like:
   # /ptc/apps/ptc/parent/5
   # which means that the Person id is ["5"].
@@ -11,24 +12,28 @@ if Meteor.isClient
       sheet: @params.sheet,
       # XXX: validate (not to mention authentication)
       clientUser: [@params.clientUser]}
+    return
   Router.route "/:sheet/apps/split-view/ptc", ->
     @render "PTC_Demo", data: {sheet: @params.sheet}
+    return
   ptcDemoShowingMasterData = new ReactiveVar(false)
   Template.PTC_Demo.helpers
     showingMasterData: -> ptcDemoShowingMasterData.get()
   Template.PTC_Demo.events
-    'click .demo-ptc-switch-to-view-model': -> ptcDemoShowingMasterData.set(false)
-    'click .demo-ptc-switch-to-master-data': -> ptcDemoShowingMasterData.set(true)
+    'click .demo-ptc-switch-to-view-model': -> ptcDemoShowingMasterData.set(false); return
+    'click .demo-ptc-switch-to-master-data': -> ptcDemoShowingMasterData.set(true); return
 
   Template.PTC_Parent.created = ->
     Relsheets.open(@data?.sheet, 'ptc')
+    return
 
   Template.PTC_Parent.helpers
     viewData: -> Relsheets.readSubtree('ParentView', [@clientUser])
 
   Template.PTC_Parent_login.created = ->
     Relsheets.open(@data?.sheet)
-    
+    return
+
   Template.PTC_Parent_login.helpers
     root: -> 
       Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
@@ -36,7 +41,8 @@ if Meteor.isClient
   blur = (jbutton) ->
     jbutton.width(jbutton.width())
     jbutton.text("∙ ∙ ∙")
-      
+    return
+
   Template.PTC_Parent_enrollment.events
     # Future: We could modify the transaction procedures to take objects in
     # the view subtree, instead of the original domain objects, as parameters.
@@ -52,13 +58,15 @@ if Meteor.isClient
         clientUser: [@clientUser],
         enr: [@enrollment],
         slot: [@slot]},
-        (error, result) -> $(ev.target).text('Schedule'))
+        (error, result) -> $(ev.target).text('Schedule'); return)
+      return
     "click .cancel": (ev) ->
       blur($(ev.target))
       Relsheets.call("parentCancelMeeting", {
         clientUser: [@clientUser],
         meeting: @meeting},
-        (error, result) -> $(ev.target).text('Cancel'))
+        (error, result) -> $(ev.target).text('Cancel'); return)
+      return
 
       
 if Meteor.isServer

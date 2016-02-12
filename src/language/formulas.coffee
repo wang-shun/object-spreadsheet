@@ -69,6 +69,7 @@ readColumnTypeForFormula = (model, columnId) ->
 @valExpectType = (what, actualType, expectedType) ->
   valAssert(commonSupertype(actualType, expectedType) == expectedType,
             "#{what} has type '#{actualType}', wanted '#{expectedType}'")
+  return
 
 @singleElement = (set) ->
   elements = set.elements()
@@ -94,6 +95,7 @@ class FormulaEngine
   invalidateSchemaCache: ->
     @goUpMemo.clear()
     @compiled = {}
+    return
 
 
 # Argument adapters to reduce the amount of duplicated work to validate
@@ -104,6 +106,7 @@ EagerSubformula = {
   # this point in the file.  Better ideas welcome.
   validate: (vars, arg) ->
     validateSubformula(vars, arg)
+    return
   typecheck: (model, vars, arg) ->
     typecheckFormula(model, vars, arg)
   evaluate: (model, vars, arg) ->
@@ -115,6 +118,7 @@ EagerSubformula = {
 OptionalEagerSubformula = {
   validate: (vars, arg) ->
     if arg? then validateSubformula(vars, arg)
+    return
   typecheck: (model, vars, arg) ->
     if arg? then typecheckFormula(model, vars, arg) else null
   evaluate: (model, vars, arg) ->
@@ -140,6 +144,7 @@ HomogeneousEagerSubformulaList = {
               'Expected a list of subformulas')
     for item in arg
       validateSubformula(vars, item)
+    return
   typecheck: (model, vars, termFmlas) ->
     typeSoFar = TYPE_EMPTY
     for fmla in termFmlas
@@ -177,6 +182,7 @@ Lambda = {
     newVars = vars.shallowClone()
     newVars.add(varName)
     validateSubformula(newVars, body)
+    return
   typecheck: (model, vars, [varName, body]) ->
     (argType) ->
       newVars = vars.shallowClone()
@@ -198,6 +204,7 @@ Lambda = {
 ColumnId = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Column ID must be a string')
+    return
   typecheck: (model, vars, arg) ->
     # XXX: Disallow the root column and add a special case for '$'?
     valAssert(model.getColumn(arg)?, "No column exists with ID '#{arg}'")
@@ -206,6 +213,7 @@ ColumnId = {
 String = {
   validate: (vars, arg) ->
     valAssert(_.isString(arg), 'Must be a string')
+    return
   typecheck: (model, vars, arg) -> arg
 }
 Type = {
@@ -213,6 +221,7 @@ Type = {
     valAssert(_.isString(arg), 'Type must be a string')
     # Future: Reject unknown primitive types
     #if !typeIsReference(arg) ...
+    return
   typecheck: (model, vars, arg) ->
     if typeIsReference(arg)
       ColumnId.typecheck(model, vars, arg)
@@ -522,6 +531,7 @@ dispatch = {
     validate: (vars, type, list) ->
       valAssert(_.isArray(list), 'Set literal must be an array')
       # Future: Could go ahead and validate primitive-type literals here.
+      return
     typecheck: (model, vars, type, list) ->
       type
     evaluate: (model, vars, type, list) ->
@@ -569,6 +579,7 @@ dispatch = {
                 'Variable name must be a string')
       valAssert(vars.has(varName),
                 "Undefined variable #{varName}")
+      return
     typecheck: (model, vars, varName) ->
       vars.get(varName)
     evaluate: (model, vars, varName) ->
@@ -592,6 +603,7 @@ dispatch = {
     argAdapters: [EagerSubformulaCells, ColumnId, {}]
     validate: (vars, startCellsFmla, targetColumnId, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
+      return
     typecheck: typecheckUp
     evaluate: goUp
     stringify: (model, vars, startCellsSinfo, targetColumnId, wantValues) ->
@@ -610,6 +622,7 @@ dispatch = {
     argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}]
     validate: (vars, startCellsFmla, targetColumnId, keysFmla, wantValues) ->
       valAssert(_.isBoolean(wantValues), 'wantValues must be a boolean')
+      return
     typecheck: typecheckDown
     evaluate: goDown
     stringify: (model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) ->
@@ -826,10 +839,12 @@ validateSubformula = (vars, formula) ->
       adapter.validate(vars, args[i])
   if d.validate?
     d.validate(vars, args...)
+  return
 
 @validateFormula = (formula) ->
   try
     validateSubformula(new EJSONKeyedSet(['this']), formula)
+    return
   catch e
     # XXX: Want to do this here?
     if e instanceof FormulaValidationError
@@ -901,7 +916,8 @@ tryTypecheckFormula = (model, vars, formula) ->
 
 @DUMMY_FORMULA = ['dummy']
 Meteor.startup(() ->  # Load order for TYPE_EMPTY
-  typecheckFormula(null, null, DUMMY_FORMULA))  # Action bar looks for type field.
+  typecheckFormula(null, null, DUMMY_FORMULA)  # Action bar looks for type field.
+  return)
 
 # BELOW: Concrete syntax support.  However, this is used on the server, by
 # loadPTCData!
@@ -1002,8 +1018,10 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
     # Don't check shadowing here, because the rules for procedures are
     # complicated.  It will be done later by the validate method.
     this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula))
+    return
   parser.yy.unbindVar = (varName) ->
     this.vars.delete(varName)
+    return
   parser.yy.navigate = (startCellsFmla, targetName, keysFmla) ->
     resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla)
   parser.yy.parseError = (err, hash) -> throw new SyntaxError(err, hash)

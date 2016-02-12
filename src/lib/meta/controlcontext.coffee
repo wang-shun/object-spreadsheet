@@ -13,7 +13,7 @@ class OnDemand extends Announce
         cb.apply @
       catch e
         console.log e.stack
-  @onCreate: (op) -> listeners.create.push op
+  @onCreate: (op) -> listeners.create.push op; return
 
 
 class ControlContext extends OnDemand
@@ -26,7 +26,7 @@ class ControlContext extends OnDemand
   run: (func=->) ->
     #Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
     CallingContext.set @, =>
-      if @lock then @scheduled.push func  # HACK
+      if @lock then @scheduled.push func; return  # HACK
       else
         try
           @lock = 1
@@ -35,7 +35,7 @@ class ControlContext extends OnDemand
         finally
           @lock = 0
         func.apply @
-  do: (task) -> @scheduled.push task
+  do: (task) -> @scheduled.push task; return
 
   # Convenience method;
   # calls a Meteor method, passing the current cc as first argument

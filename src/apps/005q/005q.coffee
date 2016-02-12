@@ -2,18 +2,23 @@
 if Meteor.isClient
   Router.route "/:sheet/apps/005q", ->
     @render "DoubleOhFiveQueue", data: {sheet: @params.sheet}
+    return
 
   Router.route "/:sheet/apps/005q/staff", ->
     @render "DoubleOhFiveQueueStaff", data: {sheet: @params.sheet}
+    return
     
   Router.route "/:sheet/apps/split-view/005q", ->
     @render "DoubleOhFiveQueue_Demo", data: {sheet: @params.sheet}
+    return
 
   Template.DoubleOhFiveQueue.created = ->
     Relsheets.open(@data?.sheet, '005q')
+    return
 
   Template.DoubleOhFiveQueueStaff.created = ->
     Relsheets.open(@data?.sheet, '005q')
+    return
 
   Template.DoubleOhFiveQueue.helpers
     root: -> Relsheets.read()
@@ -31,7 +36,7 @@ if Meteor.isClient
         name: [event.target.name.value]
         issue: [event.target.issue.value]
         location: [event.target.location.value]
-      Relsheets.call("enqueue", formData, (error, result) -> if !error? then event.target.reset())
+      Relsheets.call("enqueue", formData, (error, result) -> if !error? then event.target.reset(); return)
       $('.help.button').addClass("disabled")
       false
       
@@ -41,6 +46,7 @@ if Meteor.isClient
         helpButton.removeClass("disabled")
       else
         helpButton.addClass("disabled")
+      return
 
   Template.DoubleOhFiveQueueStaff.helpers
     root: -> Relsheets.read()
@@ -48,10 +54,13 @@ if Meteor.isClient
   Template.DoubleOhFiveQueueStaff.events
     "click .pick": ->
       Relsheets.call("pick", {@call, @user})
+      return
     "click .forfeit": ->
       Relsheets.call("forfeit", {@call, @user})
+      return
     "click .done": ->
       Relsheets.call("done", {@call})
+      return
 
     
 if Meteor.isServer

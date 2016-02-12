@@ -33,6 +33,7 @@ Template.html_select_content.helpers({
 
 @selectOptionWithValue = (template, selectSelector, value) ->
   template.find("#{selectSelector} option[value=#{value}]").selected = true
+  return
 
 @getValueOfSelectedOption = (template, selectSelector) ->
   template.$(selectSelector).val()

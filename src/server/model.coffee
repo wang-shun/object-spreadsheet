@@ -117,6 +117,7 @@ class Model
       return
     Columns.update(columnId, {$set: {fieldName: fieldName}})
     @invalidateColumnCache()
+    return
 
   changeColumnObjectName: (columnId, objectName) ->
     if columnId == rootColumnId
@@ -130,6 +131,7 @@ class Model
                              'A column with isObject = false cannot have an objectName.')      
     Columns.update(columnId, {$set: {objectName: objectName}})
     @invalidateColumnCache()
+    return
 
   changeColumnIsObject: (columnId, isObject) ->
     if columnId == rootColumnId
@@ -156,6 +158,7 @@ class Model
           for [token, value] in zip(tokens, family.values)
             key = cellIdChild(family.key, token)
             Cells.insert({column: childId, key, values: [value]})
+          return
     else
       updates.objectName = null
       # When making a column into a value column:
@@ -177,7 +180,9 @@ class Model
             Cells.find({column: childId, key: value}).forEach (family) ->
               for subValue in family.values
                 newValues.push(subValue)
+              return
           Cells.update(family._id, {$set: {values: newValues}})
+          return
         updates.specifiedType = childCol.type
         updates.fieldName = childCol.fieldName
         updates.children = []
@@ -190,6 +195,7 @@ class Model
                                  'Please delete all child columns first.')
     Columns.update(columnId, {$set: updates})
     @invalidateColumnCache()
+    return
 
   changeColumnSpecifiedType: (columnId, specifiedType) ->
     if columnId == rootColumnId
@@ -231,12 +237,15 @@ class Model
         # XXX _id should be stable for state families, but cleaner not to rely
         # on it (or change _id to be column+key like we were discussing).
         Cells.update(family._id, {$set: {values: family.values}})
+    return
 
   _changeColumnType: (columnId, type) ->
     Columns.update(columnId, {$set: {type}})
+    return
 
   _changeColumnTypecheckError: (columnId, typecheckError) ->
     Columns.update(columnId, {$set: {typecheckError}})
+    return
 
   # Future: API to move and copy groups of columns.  This is an order of
   # magnitude more complicated.
@@ -285,6 +294,7 @@ class Model
 
     Columns.update(columnId, {$set: updates})
     @invalidateSchemaCache()  # type may change
+    return
 
   changeColumnReferenceDisplayColumn: (columnId, referenceDisplayColumn) ->
     if columnId == rootColumnId
@@ -296,6 +306,7 @@ class Model
     # We use a different convention than Match.Optional...
     check(referenceDisplayColumn, Match.OneOf(String, null))
     Columns.update(columnId, {$set: {referenceDisplayColumn}})
+    return
 
   reorderColumn: (columnId, newIndex) ->
     if columnId == rootColumnId
@@ -307,7 +318,8 @@ class Model
     children.splice(newIndex, 0, columnId)
     Columns.update(col.parent,  {$set: {children}})
     @invalidateColumnCache()
-    
+    return
+
   deleteColumn: (columnId) ->
     if columnId == rootColumnId
       throw new Meteor.Error('delete-root-column',
@@ -322,6 +334,7 @@ class Model
     parentCol.children.splice(parentCol.children.indexOf(columnId), 1)
     Columns.update(parentCol._id, {$set: {children: parentCol.children}})
     Columns.remove(columnId)
+    return
 
   evaluateFamily1: (qFamilyId) ->
     col = @getColumn(qFamilyId.columnId)
@@ -424,6 +437,7 @@ class Model
     for [columnId, _] in @getAllColumns()
       @typecheckColumn(columnId)
     if @settings.profiling >= 1 then console.log "</typecheckAll>"
+    return
 
   evaluateAll: ->
     # We're now assuming that everything that can make the computed data invalid
@@ -442,24 +456,29 @@ class Model
           for value in tset.elements()
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             evaluateSubtree(childQCellId)
+      return
 
     # Future: Only evaluate what users are viewing.
     evaluateSubtree({columnId: rootColumnId, cellId: rootCellId})
     if @settings.profiling >= 1 then console.log "</evaluateAll>"
+    return
 
   ## Removes all column definitions and data!
   drop: ->
     Columns.remove({_id: {$ne: rootColumnId}})
     Columns.update(rootColumnId, {$set: {children: []}})
     Cells.remove({})
+    return
 
   populateColumnCache: ->
     for c in Columns.find().fetch()
       @columnCache[c._id] = c
+    return
 
   invalidateColumnCache: ->
     @columnCache = {}
-      
+    return
+
   invalidateSchemaCache: ->
     if @settings.profiling >= 1 then console.log "--- invalidateSchemaCache ---"
     @invalidateColumnCache()
@@ -468,12 +487,14 @@ class Model
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       @_changeColumnType(columnId, null)
       @_changeColumnTypecheckError(columnId, null)
+    return
 
   invalidateDataCache: ->
     if @settings.profiling >= 1 then console.log "--- invalidateDataCache ---"
     for [columnId, col] in @getAllColumns() when columnId != rootColumnId
       if col.formula?
         Cells.remove({column: columnId})
+    return
 
   # Procedure object:
   # {
@@ -496,10 +517,12 @@ class Model
     # https://docs.mongodb.org/manual/reference/method/db.collection.update/#update-parameter
     # No effect if no procedure with the ID exists.  OK?
     Procedures.update(procId, proc)
+    return
 
   deleteProcedure: (procId) ->
     # No effect if no procedure with the ID exists.  OK?
     Procedures.remove(procId)
+    return
 
   executeCannedTransaction: (name, argsObj) ->
     proc = Procedures.findOne({name: name})
@@ -524,6 +547,7 @@ class Model
       $$.runTransaction(=>
         executeProcedure(this, proc, args)
         @evaluateAll()
+        return
         )
     catch e
       if e instanceof EvaluationError
@@ -532,6 +556,7 @@ class Model
         throw new Meteor.Error('transaction-failed', 'Transaction failed.')
       else
         throw e
+    return
 
   repair: () ->
     # We can add repair steps for crashes and bugs in old versions of the code here.
@@ -545,6 +570,7 @@ class Model
       col = @getColumn(columnId)
       for childColId in col.children
         scanColumnSubtree(childColId)
+      return
     scanColumnSubtree(rootColumnId)
     for col in Columns.find().fetch()
       unless liveColumnIds.has(col._id)
@@ -562,6 +588,7 @@ class Model
           for value in ce.values
             childQCellId = {columnId: childColId, cellId: cellIdChild(qCellId.cellId, value)}
             scanCellSubtree(childQCellId)
+      return
     scanCellSubtree({columnId: rootColumnId, cellId: rootCellId})
     for ce in Cells.find().fetch()
       unless liveFamilies.has({column: ce.column, key: ce.key})
@@ -582,6 +609,7 @@ class Model
           col.formula = DUMMY_FORMULA
           col.specifiedType = null
           Columns.update(col._id, col)
+    return
 
 
 # Used by procedures and the UI.
@@ -601,6 +629,7 @@ class Model
         Cells.remove({column: childColId, key: cellId})
   Cells.update({column: columnId, key: cellIdParent(cellId)},
                {$pull: {values: cellIdLastStep(cellId)}})
+  return
 
 Meteor.startup () ->
   Tablespace.onCreate ->
@@ -617,10 +646,14 @@ Meteor.startup () ->
         # ./private/scripts/mkdump APPNAME
       @model.repair()
       @model.evaluateAll()
+      return
+    return
 
   if Meteor.isServer   # this condition is here to allow standalone mode
     Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
     #tspace.run()  # Slows down server startup.
+
+  return
 
 
 Meteor.methods
@@ -629,13 +662,17 @@ Meteor.methods
   # change from the client.  It would be a little harder for the client itself
   # to request this via another method (it would require a callback).
   # Future: validation!
-  open: (cc) -> cc.run()
+  open: (cc) ->
+    cc.run()
+    return
   defineColumn: (cc, parentId, index, fieldName, specifiedType, isObject, objectName, formula, viewId) ->
     cc.run ->
       #attrs = if viewId? then {view: viewId} else {}
       id = @model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula)
       if viewId? then new View(viewId).addColumn(id, true)  # FIXME: honor index
       @model.evaluateAll()
+      return
+    return
   insertUnkeyedStateObjectTypeWithField: (cc, parentId, index, objectName, fieldName, specifiedType, viewId) ->
     cc.run ->
       #attrs = if viewId? then {view: viewId} else {}
@@ -646,43 +683,70 @@ Meteor.methods
         view.addColumn(objectColId, true)  # FIXME: honor index
         view.addColumn(fieldColId, true)  # FIXME: honor index
       @model.evaluateAll()
+      return
+    return
   changeColumnFieldName: (cc, columnId, fieldName) ->
-    cc.run -> @model.changeColumnFieldName(columnId, fieldName)
+    cc.run ->
+      @model.changeColumnFieldName(columnId, fieldName)
+      return
+    return
   changeColumnIsObject: (cc, columnId, isObject) ->
     cc.run ->
       @model.changeColumnIsObject(columnId, isObject)
       # For the case where a token object is converted to or from a field.
       @model.evaluateAll()
+      return
+    return
   changeColumnObjectName: (cc, columnId, objectName) ->
-    cc.run -> @model.changeColumnObjectName(columnId, objectName)
+    cc.run ->
+      @model.changeColumnObjectName(columnId, objectName)
+      return
+    return
   changeColumnSpecifiedType: (cc, columnId, specifiedType) ->
     cc.run ->
       @model.changeColumnSpecifiedType(columnId, specifiedType)
       @model.evaluateAll()
+      return
+    return
   changeColumnFormula: (cc, columnId, formula) ->
     cc.run ->
       @model.changeColumnFormula(columnId, formula)
       @model.evaluateAll()
+      return
+    return
   changeColumnReferenceDisplayColumn: (cc, columnId, referenceDisplayColumn) ->
     cc.run ->
       @model.changeColumnReferenceDisplayColumn(columnId, referenceDisplayColumn)
+      return
+    return
   reorderColumn: (cc, columnId, newIndex) ->
-    cc.run -> @model.reorderColumn(columnId, newIndex)
+    cc.run ->
+      @model.reorderColumn(columnId, newIndex)
+      return
+    return
   deleteColumn: (cc, columnId) ->
     cc.run ->
       @model.deleteColumn(columnId)
       View.removeColumnFromAll(columnId)
       @model.evaluateAll()
+      return
+    return
   recursiveDeleteStateCellNoInvalidate: (cc, columnId, cellId) ->
     cc.run ->
       recursiveDeleteStateCellNoInvalidate(columnId, cellId)
+      return
+    return
   notify: (cc) ->
     cc.run ->
       @model.invalidateDataCache()
       @model.evaluateAll()
+      return
+    return
   executeCannedTransaction: (cc, name, argsObj) ->
     cc.run ->
       @model.executeCannedTransaction(name, argsObj)
+      return
+    return
 
 
 exported {Model}

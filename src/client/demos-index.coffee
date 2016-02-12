@@ -20,10 +20,11 @@ Router.route(
     else
       examplesNamePrefix ?= ''
       @render "Index", {data: {examplesNamePrefix: examplesNamePrefix}}
+    return
   ),
   {
     name: 'index',
-    onAfterAction: -> document.title = "Object Spreadsheets"
+    onAfterAction: -> document.title = "Object Spreadsheets"; return
   })
 
 Template.Index.helpers
@@ -47,11 +48,12 @@ Template.Index_ConditionalExampleLink.helpers
 
 Template.Index.events
   'input #examplesNamePrefix': (event, template) ->
-    Router.go(indexPathForExamplesNamePrefix(event.target.value))
+    Router.go(indexPathForExamplesNamePrefix(event.target.value)); return
   'input #newSheetName': (event, template) ->
-    Session.set('newSheetName', event.target.value)
+    Session.set('newSheetName', event.target.value); return
   'click #newSheetGo': (event, template) ->
-    Router.go("/" + Session.get('newSheetName'))
+    Router.go("/" + Session.get('newSheetName')); return
   'keypress #newSheetName': (event, template) ->
     if event.which == 13
       Router.go("/" + Session.get('newSheetName'))
+    return

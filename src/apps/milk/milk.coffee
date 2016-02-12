@@ -2,12 +2,15 @@
 if Meteor.isClient
   Router.route "/:sheet/apps/maid", ->
     @render "MilkMaid", data: {sheet: @params.sheet}
+    return
 
   Router.route "/:sheet/apps/split-view/milk", ->
     @render "MilkMaid_Demo", data: {sheet: @params.sheet}
+    return
 
   Template.MilkMaid.created = ->
     Relsheets.open(@data?.sheet, 'milk')
+    return
 
   Template.MilkMaid.helpers
     milk: -> Relsheets.read()
@@ -19,8 +22,10 @@ if Meteor.isClient
   Template.MilkMaid.events
     "click button": ->
       Relsheets.call("supply", {me: @})
+      return
     "click .marking": ->
       Relsheets.call("request", {level: @})
+      return
 
       
 if Meteor.isServer

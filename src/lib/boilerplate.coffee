@@ -7,21 +7,25 @@ if Meteor.isClient
       $$.call('open', () ->
         if proceduresAppName?
           $$.call('compileProcedures', proceduresAppName)
-        $$.subscribeAll())
+        $$.subscribeAll()
+        return)
       for callback in openCallbacks
         callback()
+      return
     call: (transaction, argsObj, callback) ->
       $$.call('executeCannedTransaction', transaction, glue(argsObj),
               standardServerCallbackThen(callback))
+      return
     onOpen: (callback) ->
       openCallbacks.push(callback)
+      return
 
 
 if Meteor.isServer
 
   Relsheets =
     _procedures: {}
-    procedures: (appName, defs) -> @_procedures[appName] = defs
+    procedures: (appName, defs) -> @_procedures[appName] = defs; return
     compile: (appName) ->
       # This may run multiple times; it should overwrite and not cause any problems.
       try
@@ -45,9 +49,14 @@ if Meteor.isServer
       catch e
         # Incompatible schema change?
         console.log("Failed to define app #{appName} sample procedure #{name} on sheet #{$$.id}:", e.stack)
+      return
 
   Meteor.methods
-    compileProcedures: (cc, appName) -> cc.run -> Relsheets.compile(appName)
+    compileProcedures: (cc, appName) ->
+      cc.run ->
+        Relsheets.compile(appName)
+        return
+      return
 
 
 Relsheets.readObj = (t, rootCellId=[], expandRefs=false, keyField=undefined, visited=undefined) ->
