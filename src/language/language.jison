@@ -9,7 +9,11 @@ ws [ \t\r]
 %%
 {ws}+ /* skip whitespace */
 \n return 'NL'
-/* Single-line comments.  FIXME: These are lost when code is saved. */
+/* Single-line comments.
+
+FIXME: These are lost when code is saved.  We'll have to replace every NL in
+productions by "NL with optional comment" and add slots to the abstract syntax
+to save those comments. */
 \#[^\n]*\n return 'NL'
 
 /* Primitive literals */
@@ -148,6 +152,9 @@ entryPointEOF
 statements
     :
         { $$ = []; }
+    /* Lines that are blank, possibly after removal of a comment. */
+    | statements NL
+        { $$ = $1; }
     | statements statement
         { $$ = $1.concat([$2]); }
     ;
