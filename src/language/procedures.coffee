@@ -153,9 +153,8 @@ dispatch = {
         model, mutableVars,
         if singleElement(conditionTset.set) then thenBody else elseBody)
     stringify: (model, mutableVars, conditionStr, thenBody, elseBody) ->
-      "if (#{conditionStr}) {\n" + indent(stringifyStatements(thenBody)) + "}\n" +
-      (if elseBody.length
-        "else {\n" + indent(stringifyStatements(elseBody)) + "}\n")
+      "if (#{conditionStr}) {\n" + indent(stringifyStatements(thenBody)) + "}" +
+      (if elseBody.length then " else {\n" + indent(stringifyStatements(elseBody)) + "}\n" else "\n")
   foreach:
     argAdapters: [VarName, EagerSubformula, Statements]
     validate: (mutableVars, mutableCurrentScopeVars, bindVarName, domainFmla, body) ->

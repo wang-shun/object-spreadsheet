@@ -167,9 +167,9 @@ statement
         { $$ = ['add', $3, $5]; }
     | FROM SET familyReference REMOVE expression NL
         { $$ = ['remove', $3, $5]; }
-    | ifHeader '{' NL statements '}' NL optElse
+    | ifHeader '{' NL statements '}' optElse
         { yy.commitVars();
-          $$ = ['if', $1, $4, $7]; }
+          $$ = ['if', $1, $4, $6]; }
     | foreachPush '(' binding ')' '{' NL statements '}' NL
         { yy.rollbackVars();
           $$ = ['foreach', $3.var, $3.domain, $7]; }
@@ -193,7 +193,7 @@ ifHeader
     ;
 
 optElse
-    :
+    : NL
         { $$ = []; }
     | elseHeader '{' NL statements '}' NL
         { $$ = $4; }
