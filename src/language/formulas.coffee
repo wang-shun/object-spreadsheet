@@ -925,8 +925,11 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
       startCellsFmla = ['var', 'this']
       # Fall through to navigation interpretations.
     else  # i.e., in procedures
-      # Easier than trying to generalize the error message below.
       valAssert(vars.get(targetName)?, "Undefined variable '#{targetName}'")
+      # Currently this can only happen in procedures.
+      valAssert(vars.get(targetName) != TYPE_ERROR,
+                "Variable '#{targetName}' cannot be read because " +
+                "it does not have a known type at this point.")
       return ['var', targetName]
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.

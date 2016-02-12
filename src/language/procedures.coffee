@@ -142,12 +142,34 @@ dispatch = {
   if:
     argAdapters: [EagerSubformula, Statements, Statements]
     validate: (mutableVars, mutableCurrentScopeVars, conditionFmla, thenBody, elseBody) ->
-      validateStatements(mutableVars, mutableCurrentScopeVars, thenBody)
-      validateStatements(mutableVars, mutableCurrentScopeVars, elseBody)
+      # We can't simply validate the "then" part and then the "else" part,
+      # because a loop in the "else" part shouldn't be reported as shadowing a
+      # variable defined only in the "then" part.  Check each part separately;
+      # then, all variables that were in the current scope after either part
+      # should be in the current scope after the "if".
+      currentScopeVarsByBranch =
+        for branch in [thenBody, elseBody]
+          branchVars = mutableVars.shallowClone()
+          branchCurrentScopeVars = mutableCurrentScopeVars.shallowClone()
+          validateStatements(branchVars, branchCurrentScopeVars, branch)
+          branchCurrentScopeVars
+      for csv in currentScopeVarsByBranch
+        for varName in csv.elements()
+          mutableCurrentScopeVars.add(varName)
+          mutableVars.add(varName)
     typecheck: (model, mutableVars, conditionType, thenBody, elseBody) ->
       valExpectType('if condition', conditionType, 'bool')
-      typecheckStatements(model, mutableVars, thenBody)
-      typecheckStatements(model, mutableVars, elseBody)
+      varsByBranch =
+        for branch in [thenBody, elseBody]
+          branchVars = mutableVars.shallowClone()
+          typecheckStatements(model, branchVars, branch)
+          branchVars
+      mergedVars = mergeTypeMaps(varsByBranch[0], varsByBranch[1])
+      # Mutate mutableVars to match mergedVars.  (Maybe if we introduce a real
+      # class to track the defined variables, this will be less hacky.)  Here,
+      # mergedVars should contain a superset of the keys of mutableVars.
+      for [k, v] in mergedVars.entries()
+        mutableVars.set(k, v)
     execute: (model, mutableVars, conditionTset, thenBody, elseBody) ->
       executeStatements(
         model, mutableVars,
@@ -245,13 +267,14 @@ dispatch = {
 }
 
 mergeTypeMaps = (vars1, vars2) ->
-  if vars1
-    mergedVars = new EJSONKeyedMap()
-    for [varName, type1] in vars1.entries()
-      if (type2 = vars2.get(varName))?
-        mergedVars.set(varName, commonSupertype(type1, type2))
-  else
-    vars2
+  mergedVars = new EJSONKeyedMap()
+  for [varName, type1] in vars1.entries()
+    type2 = vars2.get(varName)
+    mergedVars.set(varName, commonSupertype(type1, type2 ? TYPE_ERROR))
+  for varName in vars2.keys()
+    unless vars1.get(varName)?
+      mergedVars.set(varName, TYPE_ERROR)
+  mergedVars
 
 # params must already be in final format.
 @parseProcedure = (name, params, bodyString) ->
@@ -361,7 +384,6 @@ stringifyStatements = (model, mutableVars, arg) ->
   catch e
     # XXX: Want to do this here?
     if e instanceof FormulaValidationError
-      console.log(e.stack)
       throw new Meteor.Error('invalid-procedure',
                              'Invalid procedure: ' + e.message)
     else

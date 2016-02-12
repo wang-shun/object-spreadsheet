@@ -194,7 +194,8 @@ ifHeader
 
 optElse
     : NL
-        { $$ = []; }
+        { yy.nextBranch();
+          $$ = []; }
     | elseHeader '{' NL statements '}' NL
         { $$ = $4; }
     ;
