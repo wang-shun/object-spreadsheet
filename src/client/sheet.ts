@@ -520,7 +520,7 @@ class ClientView {
   }
 
   public hotConfig() {
-    var _ref;
+    var _ref, _results;
     let thisView = this;
     // Display the root column for completeness.  However, it doesn't have a real
     // value.
@@ -700,12 +700,21 @@ class ClientView {
         // ~ Matt 2015-11-21
         syncLimit: "100%"
       },
-      mergeCells: (_ref = []).concat.apply(_ref, grid.map((row, i) => row.filter((cell) => cell.rowspan !== 1 || cell.colspan !== 1).map((cell, j) => ({
-            row: i,
-            col: j,
-            rowspan: cell.rowspan,
-            colspan: cell.colspan
-          })))),
+      mergeCells: (_ref = []).concat.apply(_ref, grid.map((row, i) => {
+        _results = [];
+        for (let j = 0; j < row.length; j++) {
+          let cell = row[j];
+          if (cell.rowspan !== 1 || cell.colspan !== 1) {
+            _results.push({
+              row: i,
+              col: j,
+              rowspan: cell.rowspan,
+              colspan: cell.colspan
+            });
+          }
+        }
+        return _results;
+      })),
       // We don't have a principled design for how the selection should move
       // after pressing Enter, and for now, the default behavior is causing
       // surprises when it moves the selection to the padding cell at the bottom
