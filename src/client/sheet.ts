@@ -639,7 +639,8 @@ class ClientView {
           case "rsRoot":
             return 18;
           default:
-            return null;
+            // NOTE!  Auto column size only works if this is undefined, not null.
+            return undefined;
         }
       }),
       rowHeights: ((function() {
