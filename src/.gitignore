@@ -1,2 +1,2 @@
 # Ignore automatically generated TypeScript files during conversion testing.
-*.ts
+#*.ts
