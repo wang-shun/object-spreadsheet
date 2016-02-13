@@ -681,14 +681,7 @@ dispatch = {
           )))
     stringify: (model, vars, domainSinfo, predicateLambda) ->
       # XXX Wasteful
-      predicateSinfo = predicateLambda(
-        try
-          typecheckFormula(model, vars, domainSinfo.formula)
-        catch e
-          # If we try to stringify a formula that doesn't typecheck, we want to
-          # get something half-useful rather than crash.  Any dependent
-          # navigations will most likely be marked "problem".
-          TYPE_EMPTY)
+      predicateSinfo = predicateLambda(tryTypecheckFormula(model, vars, domainSinfo.formula))
       {
         str: "{#{predicateSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)} " +
              "| #{predicateSinfo[1].strFor(PRECEDENCE_LOWEST)}}"
@@ -709,14 +702,7 @@ dispatch = {
         res += singleElement(addendLambda(tset).set)
       return new TypedSet('number', new EJSONKeyedSet([res]))
     stringify: (model, vars, domainSinfo, addendLambda) ->
-      addendSinfo = addendLambda(
-        try
-          typecheckFormula(model, vars, domainSinfo.formula)
-        catch e
-          # If we try to stringify a formula that doesn't typecheck, we want to
-          # get something half-useful rather than crash.  Any dependent
-          # navigations will most likely be marked "problem".
-          TYPE_EMPTY)
+      addendSinfo = addendLambda(tryTypecheckFormula(model, vars, domainSinfo.formula))
       {
         str: "sum[#{addendSinfo[0]} : #{domainSinfo.strFor(PRECEDENCE_LOWEST)}]" +
              "(#{addendSinfo[1].strFor(PRECEDENCE_LOWEST)})"
@@ -822,6 +808,10 @@ dispatch = {
 # Catches syntax errors, references to nonexistent bound variables, and
 # variable shadowing, but not anything related to schema, data, or types.
 # vars: EJSONKeyedSet<string>
+#
+# This is just different enough from dispatchSubformula not to use it.
+# Specifically, the validate method of the operation is optional, and it
+# receives the original arguments (the adapters do not return values).
 validateSubformula = (vars, formula) ->
   valAssert(_.isArray(formula), 'Subformula must be an array.')
   valAssert(_.isString(opName = formula[0]), 'Subformula must begin with an operation name (a string).')
@@ -848,7 +838,6 @@ validateSubformula = (vars, formula) ->
     else
       throw e
 
-# validateSubformula is just different enough not to use this...
 dispatchFormula = (action, formula, contextArgs...) ->
   d = dispatch[formula[0]]
   args = formula[1..]
@@ -863,6 +852,14 @@ dispatchFormula = (action, formula, contextArgs...) ->
 @typecheckFormula = (model, vars, formula) ->
   formula.vars = vars
   formula.type = dispatchFormula('typecheck', formula, model, vars)
+
+# Helper for use in stringify, where we want to do our best rather than crash if
+# the formula is ill-typed.
+tryTypecheckFormula = (model, vars, formula) ->
+  try
+    typecheckFormula(model, vars, formula)
+  catch e
+    TYPE_EMPTY
 
 # Assumes formula has passed typechecking.
 # vars: EJSONKeyedMap<string, TypedSet>
@@ -930,8 +927,11 @@ resolveNavigation = (model, vars, startCellsFmla, targetName, keysFmla) ->
       startCellsFmla = ['var', 'this']
       # Fall through to navigation interpretations.
     else  # i.e., in procedures
-      # Easier than trying to generalize the error message below.
       valAssert(vars.get(targetName)?, "Undefined variable '#{targetName}'")
+      # Currently this can only happen in procedures.
+      valAssert(vars.get(targetName) != TYPE_ERROR,
+                "Variable '#{targetName}' cannot be read because " +
+                "it does not have a known type at this point.")
       return ['var', targetName]
 
   # XXX: This is a lot of duplicate work reprocessing subtrees.
@@ -1086,4 +1086,4 @@ stringifySubformula = (model, vars, formula) ->
     children: children
   }
 
-exported {FormulaEngine, FormulaInternals: {EagerSubformula}}
+exported {FormulaEngine, FormulaInternals: {EagerSubformula, stringifyIdent, tryTypecheckFormula, PRECEDENCE_LOWEST}}
