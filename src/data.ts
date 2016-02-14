@@ -22,6 +22,12 @@ for (let coll of ["Columns", "Cells", "Views", "Procedures"]) {
 }
 
 class Tablespace extends ControlContext {
+    public formulaEngine;
+    public Columns;
+    public Cells;
+    public Views;
+    public Procedures;
+
   constructor(public id) {
     super();
     if (Meteor.isServer) {
@@ -116,6 +122,9 @@ function _toColumnId(selector) {
 }
 
 class CellId {
+    public columnId;
+    public cellId;
+
   constructor({
       columnId: columnId,
       cellId: cellId
@@ -182,6 +191,9 @@ class CellId {
 }
 
 class FamilyId {
+    public columnId;
+    public cellId;
+
   constructor({
       columnId: columnId,
       cellId: cellId
@@ -345,6 +357,10 @@ let _cnt = 0;
     return `cim.${_cnt}`;
   };
 class CellsInMemory {
+    public byColumn;
+    public byId;
+    public recycle;
+
 
 
   constructor() {
@@ -513,6 +529,8 @@ class CellsInMemory {
 // changes back to the Mongo collection.
 //
 class TransactionCells {
+    public mem;
+
   constructor(public dbCells) {
     //@mem = new Mongo.Collection(null)
     this.mem = new CellsInMemory;
@@ -593,6 +611,8 @@ class TransactionCells {
 }
 
 class Transaction {
+    public Cells;
+
   constructor(dbCells) {
     this.Cells = new TransactionCells(fallback(dbCells, Cells));
   }

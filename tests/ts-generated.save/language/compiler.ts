@@ -97,6 +97,8 @@ class FormulaCompiler {
 }
 
 class CompilationUnit {
+    public mnemonics;
+
   constructor(public engine) {
     this.mnemonics = {};
   }

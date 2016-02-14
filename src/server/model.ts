@@ -5,6 +5,10 @@ class CannedTransaction {
 }
 
 class Model {
+    public settings;
+    public columnCache;
+    public wasEmpty;
+
   // TODO: Indicate which methods are intended to be public!
 
   //@columns: EJSONKeyedMap<ColumnId, Column>

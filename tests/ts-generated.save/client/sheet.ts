@@ -54,6 +54,18 @@ class ViewHlist {
 }
 
 class ViewSection {
+    public columnId;
+    public col;
+    public relationSingular;
+    public width;
+    public leftEdgeSingular;
+    public rightEdgeSingular;
+    public extraColClassBefore;
+    public subsections;
+    public headerHeightBelow;
+    public amRootWithSeparateTables;
+    public headerMinHeight;
+
   constructor(public layoutTree, public options : any = {}) {
     this.columnId = this.layoutTree.root;
     this.col = getColumn(this.columnId);
@@ -488,6 +500,15 @@ function toggleHeaderExpanded() {
 }
 
 class ClientView {
+    public options;
+    public hot;
+    public savedSelection;
+    public layoutTree;
+    public mainSection;
+    public qCellIdToGridCoords;
+    public grid;
+    public colClasses;
+
   constructor(public view) {
     this.options = {
       // Show type row in header
@@ -913,8 +934,8 @@ class ClientView {
     var s;
     if ((s = this.hot.getSelected()) != null) {
       let [r1, c1, r2, c2] = s;
-      let [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
-      let [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)];
+      [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
+      [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)];
       return [r1, c1, r2, c2];
     }
   }

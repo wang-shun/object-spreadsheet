@@ -11,6 +11,8 @@
     return EJSON.parse(k.substr(4));
   };
 class EJSONKeyedMap {
+    public obj;
+
   constructor(ents : any = []) {
     // Future: Change to ECMAScript 6 Map when supported by all relevant JS
     // engines and CoffeeScript.
@@ -83,6 +85,8 @@ exported({
 });
 
 class EJSONKeyedSet {
+    public map;
+
   constructor(els : any = []) {
     this.map = new EJSONKeyedMap();
     for (let x of els) {
@@ -136,6 +140,8 @@ exported({
 });
 
 class EJSONSmallSet {
+    public els;
+
   constructor(els : any = [], _trustMeDistinct : any = false) {
     if (_trustMeDistinct) {
       this.els = els.slice(0);
@@ -191,6 +197,8 @@ exported({
 //@EJSONKeyedSet = EJSONSmallSet
 
 class EJSONKeyedMapToSet {
+    public map;
+
   constructor() {
     this.map = new EJSONKeyedMap();
   }
@@ -279,6 +287,8 @@ class Tree {
 EJSON.addType("Tree", Tree.fromJSONValue);
 
 class Memo {
+    public values;
+
   constructor() {
     this.values = {};
   }

@@ -2,6 +2,14 @@
 
 
 class ViewCell {
+    public qFamilyId;
+    public qCellId;
+    public columnId;
+    public isObject;
+    public kind;
+    public fullText;
+    public isObjectHeader;
+
   constructor(public value : any = null, public rowspan : any = 1, public colspan : any = 1, public cssClasses : any = []) {
     this.qFamilyId = null;
     this.qCellId = null;
