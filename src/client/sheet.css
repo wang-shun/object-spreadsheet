@@ -47,6 +47,9 @@ h1 { margin-top: 0px; padding-top: 9px; }
   background-color: #FDF;
 }
 
+.handsontable td.referent-object {
+  background-color: #FFE0FF;
+}
 .reference {
   text-decoration: underline;
 }

@@ -593,7 +593,7 @@ dispatch = {
           'this'
         else
           annotateNavigationTarget(model, vars, null, varName, null, ['var', varName])
-        )
+        )()
       outerPrecedence: PRECEDENCE_ATOMIC
 
   # ["up", startCells, targetColumnId, wantValues (bool)]

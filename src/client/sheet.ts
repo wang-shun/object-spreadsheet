@@ -957,8 +957,10 @@ class ClientView {
   public highlightReferent(referent) {
     var refc;
     $(".referent").removeClass("referent");
+    $(".referent-object").removeClass("referent-object");
     if ((referent != null) && ((refc = this.refId(referent)) != null)) {
       $(`.ref-${refc}`).addClass("referent");
+      $(`.ancestor-${refc}`).addClass("referent-object");
     }
   }
 

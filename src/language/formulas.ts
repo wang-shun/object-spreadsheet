@@ -624,7 +624,7 @@ let dispatch = {
           } else {
             return annotateNavigationTarget(model, vars, null, varName, null, ["var", varName]);
           }
-        }),
+        })(),
         outerPrecedence: PRECEDENCE_ATOMIC
       })
   },
