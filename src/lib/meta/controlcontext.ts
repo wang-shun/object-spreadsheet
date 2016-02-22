@@ -1,5 +1,5 @@
 let instances = {};
-class Announce {
+class OnDemand {
   public static get(id) {
     var v;
     return (v = instances[id]) != null ? v : instances[id] = new this(id);
@@ -9,8 +9,9 @@ class Announce {
 let listeners = {
     create: []
   };
-class OnDemand extends Announce {
+class Announce extends OnDemand {
   constructor() {
+    super();
     for (let cb of listeners.create) {
       try {
         cb.apply(this);
@@ -25,7 +26,15 @@ class OnDemand extends Announce {
   }
 }
 
-class ControlContext extends OnDemand {
+declare class CallingContext {
+  static get: () => any;
+  static set: (cc: any, func: () => {}) => {};
+}
+
+class ControlContext extends Announce {
+  scheduled: Array<() => {}>;
+  lock: number;
+    
   constructor() {
     this.scheduled = [];
     this.lock = 0;
