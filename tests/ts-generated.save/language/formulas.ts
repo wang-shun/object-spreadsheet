@@ -85,6 +85,9 @@ this.singleElement = (set) => {
 };
 
 class FormulaEngine {
+    public goUpMemo;
+    public compiled;
+
   constructor() {
     this.goUpMemo = new Memo;
     this.compiled = {};
@@ -624,7 +627,7 @@ let dispatch = {
           } else {
             return annotateNavigationTarget(model, vars, null, varName, null, ["var", varName]);
           }
-        }),
+        })(),
         outerPrecedence: PRECEDENCE_ATOMIC
       })
   },

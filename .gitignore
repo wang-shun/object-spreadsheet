@@ -1,7 +1,10 @@
 .DS_Store
 dump/meteor/ptc:*
 dump/meteor/system*
+node_modules
+typings
 *.coffee.js
+*.ts.js
 *.ls.js
 *.jison.js
 

@@ -54,6 +54,18 @@ class ViewHlist {
 }
 
 class ViewSection {
+    public columnId;
+    public col;
+    public relationSingular;
+    public width;
+    public leftEdgeSingular;
+    public rightEdgeSingular;
+    public extraColClassBefore;
+    public subsections;
+    public headerHeightBelow;
+    public amRootWithSeparateTables;
+    public headerMinHeight;
+
   constructor(public layoutTree, public options : any = {}) {
     this.columnId = this.layoutTree.root;
     this.col = getColumn(this.columnId);
@@ -435,7 +447,7 @@ class StateEdit {
       return this.parseValue(qFamilyId, text);
     } catch (e) {
       alert("Invalid value: " + e.message);
-      return null;
+      throw e;
     }
   }
 
@@ -488,6 +500,15 @@ function toggleHeaderExpanded() {
 }
 
 class ClientView {
+  public options;
+  public hot;
+  public savedSelection;
+  public layoutTree;
+  public mainSection;
+  public qCellIdToGridCoords;
+  public grid;
+  public colClasses;
+
   constructor(public view) {
     this.options = {
       // Show type row in header
@@ -675,6 +696,10 @@ class ClientView {
             classes.push(`ancestor-${refc}`);
           }
         }
+
+        if (this.pending && this.pending.indexOf(`${row}-${col}`) >= 0) {
+          classes.push('pending');
+        }
         return {
           renderer: col === 0 && row === 0 ? "html" : "text",
           className: (cell.cssClasses.concat(classes)).join(" "),
@@ -737,17 +762,36 @@ class ClientView {
       beforeKeyDown: (event) => {
         thisView.onKeyDown(event);
       },
+      afterRender: (isForced) => {
+        if (isForced) this.pending = []; // this is the best way to make sure no "dirt" is left
+      },
       beforeChange: (changes, source) => {
-        for (let [row, col, oldVal, newVal] of changes) {
+        if (!source) return;   // Run this handler only for interactive edits
+
+        var fail = false;
+        for (let change of changes) {
+          let [row, col, oldVal, newVal] = change;
+          if (oldVal === newVal) continue;
+          
           cell = this.grid[row][col];
+          revertingCallback = (error, result) => {
+            if (error) {
+              fail = true;  // prevent race condition in case we're still in this function
+              this.pending = [];
+              this.hot.setDataAtCell(row, col, oldVal);
+            }
+            standardServerCallback(error, result);
+          }
+          this.pending.push(`${row}-${col}`);
+          
           // One of these cases should apply...
           if (cell.kind === "top") {
             let name = newVal === "" ? null : newVal;
-            Meteor.call("changeColumnObjectName", $$, cell.columnId, name, standardServerCallback);
+            Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
           }
           if (cell.kind === "below") {
             name = newVal === "" ? null : newVal;
-            Meteor.call("changeColumnFieldName", $$, cell.columnId, name, standardServerCallback);
+            Meteor.call("changeColumnFieldName", $$, cell.columnId, name, revertingCallback);
           }
           // Currently, types can only be changed via the action bar.
           //if cell.kind == 'type'
@@ -760,29 +804,40 @@ class ClientView {
           //  if parsed
           //    Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
           //                standardServerCallback
-          if ((cell.qCellId != null) && !cell.isObjectCell) {
-            // XXX Once we validate values, we should replace the hard-coded
-            // check for 'text' with an attempt to validate the input.
-            // Currently not allowing empty strings as this is the only way to catch
-            // cell deletion keystroke (see comment in onKeyDown).
-            if (newVal) {  // || getColumn(cell.qCellId.columnId).type == 'text'
-              StateEdit.modifyCell(cell.qCellId, newVal, standardServerCallback);
-            } else {
-              if (this.getDeleteCommandForCell(cell) != null) {
-                this.getDeleteCommandForCell(cell).callback();
+          try {
+            if ((cell.qCellId != null) && !cell.isObjectCell) {
+              // XXX Once we validate values, we should replace the hard-coded
+              // check for 'text' with an attempt to validate the input.
+              // Currently not allowing empty strings as this is the only way to catch
+              // cell deletion keystroke (see comment in onKeyDown).
+              if (newVal) {  // || getColumn(cell.qCellId.columnId).type == 'text'
+                StateEdit.modifyCell(cell.qCellId, newVal, revertingCallback);
+              } else {
+                if (this.getDeleteCommandForCell(cell) != null) {
+                  this.getDeleteCommandForCell(cell).callback();
+                }
+                //StateEdit.removeCell cell.qCellId, standardServerCallback
               }
-              //StateEdit.removeCell cell.qCellId, standardServerCallback
-            }
-          } else if ((cell.qFamilyId != null) && !cell.isObjectCell) {
-            if (newVal || getColumn(cell.qFamilyId.columnId).type === "text") {
-              StateEdit.addCell(cell.qFamilyId, newVal, standardServerCallback, cell.isPlaceholder);
+            } else if ((cell.qFamilyId != null) && !cell.isObjectCell) {
+              if (newVal || getColumn(cell.qFamilyId.columnId).type === "text") {
+                StateEdit.addCell(cell.qFamilyId, newVal, revertingCallback, cell.isPlaceholder);
+              }
             }
           }
+          catch (e) {
+            fail = true;   // Note: this reverts all changes.
+                           // The ones that have been applied will propagate back through
+                           // Meteor collections.
+          }
         }
+        
+        if (fail) return false;
+        
+        
         // Don't apply the changes directly; let them come though the Meteor
         // stubs.  This ensures that they get reverted by Meteor if the server
         // call fails.
-        return false;
+        //return false;
       },
       contextMenu: {
         build: () => {
@@ -914,8 +969,8 @@ class ClientView {
     var s;
     if ((s = this.hot.getSelected()) != null) {
       let [r1, c1, r2, c2] = s;
-      let [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
-      let [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)];
+      [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
+      [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)];
       return [r1, c1, r2, c2];
     }
   }

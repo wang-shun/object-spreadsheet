@@ -58,6 +58,20 @@ h1 { margin-top: 0px; padding-top: 9px; }
   background-color: #FFD;
 }
 
+.handsontable td.pending {
+  position: relative;
+  background-color: #FFF8EE;
+}
+.handsontable td.pending::before {
+  content: " ";
+  position: absolute;
+  height: 100%;
+  width: 6px;
+  background: #FFE0AE;
+  right: 0;
+  top: 0;
+}
+
 /*
 Override some Handsontable styles.  div.wtHolder is an extra selector that
 will always match, just to get higher priority.
@@ -263,7 +277,7 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
   box-shadow: inset 0px 0px 1px 2px #EEE;
 }
 
-.handsontable td.dataPadding:not(.area):not(.selected-object):not(.parent-root) {
+.handsontable td.dataPadding:not(.area):not(.selected-object):not(.parent-root):not(.pending) {
   background: #FBFBFB;
 }
 .handsontable td.dataPadding:not(.parent-root) {

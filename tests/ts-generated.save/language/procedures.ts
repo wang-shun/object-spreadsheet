@@ -413,7 +413,7 @@ this.parseProcedure = (stringProc) => {
     this.vars = this.vars.shallowClone();
   };
   parser.yy.rollbackVars = function() {
-    let [this.varsPreviousBranch, this.vars] = this.varsStack.pop();
+    [this.varsPreviousBranch, this.vars] = this.varsStack.pop();
   };
   parser.yy.nextBranch = function() {
     // assert !this.varsPreviousBranch?

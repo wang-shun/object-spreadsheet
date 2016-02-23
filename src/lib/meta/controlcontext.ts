@@ -32,8 +32,8 @@ declare class CallingContext {
 }
 
 class ControlContext extends Announce {
-  scheduled: Array<() => {}>;
-  lock: number;
+  private scheduled: Array<() => {}>;
+  private lock: number;
     
   constructor() {
     this.scheduled = [];
