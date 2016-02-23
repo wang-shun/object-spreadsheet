@@ -1,6 +1,3 @@
-declare var Views: any
-declare var Columns: any
-
 
 class View {
   constructor(public id) {}
