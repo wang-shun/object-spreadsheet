@@ -1,0 +1,11 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        ".meteor": true,
+        "**/*.coffee": true,
+        "**/*.coffee.js": true
+    },
+    "editor.tabSize": 2
+}
