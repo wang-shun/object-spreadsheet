@@ -139,6 +139,15 @@ class Model {
     return [objectColId, fieldColId];
   }
 
+  private checkNameClash(columnId, childName) {
+    if (columnLogicalChildrenByName(columnId, childName).length > 0) {
+      var parentName = objectNameWithFallback(this.getColumn(columnId));
+      throw new Meteor.Error("model-name-clash", 
+        parentName ? `Object '${parentName}' already has a child named '${childName}'`
+                   : `Top-level object named '${childName}' already exists.`);
+    }
+  }
+
   public changeColumnFieldName(columnId, fieldName) {
     if (columnId === rootColumnId) {
       throw new Meteor.Error("modify-root-column", "Cannot modify the root column.");
@@ -147,6 +156,7 @@ class Model {
     if (fieldName === col.fieldName) {
       return;
     }
+    this.checkNameClash(col.parent, fieldName);
     Columns.update(columnId, {
       $set: {
         fieldName: fieldName
@@ -166,6 +176,7 @@ class Model {
     if (!col.isObject && (objectName != null)) {
       throw new Meteor.Error("defineColumn-objectName-not-isObject", "A column with isObject = false cannot have an objectName.");
     }
+    this.checkNameClash(col.parent, objectName);
     Columns.update(columnId, {
       $set: {
         objectName: objectName
