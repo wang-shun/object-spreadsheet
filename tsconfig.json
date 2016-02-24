@@ -1,9 +1,10 @@
 {
     "compilerOptions": {
-        "module": "commonjs",
         "sourceMap": true
     },
     "exclude": [
-        "tests"
+        "tests",
+        "packages",
+        ".meteor"
     ]
 }
