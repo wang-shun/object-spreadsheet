@@ -37,7 +37,7 @@ let OptionalVarName = {
   },
   stringify: (model, mutableVars, arg) => arg != null ? VarName.stringify(model, mutableVars, arg) : null
 };
-let EagerSubformula = {
+let procedures_EagerSubformula = {
   // Wrapper needed to strip mutableCurrentScopeVars argument.
   validate: (mutableVars, mutableCurrentScopeVars, arg) => {
     FormulaInternals.EagerSubformula.validate(mutableVars, arg);
@@ -63,7 +63,7 @@ class EagerFamilyRef {
   constructor(public wantObject, public wantKeys) {}
 
   public validate(mutableVars, mutableCurrentScopeVars, fmla) {
-    EagerSubformula.validate(mutableVars, mutableCurrentScopeVars, fmla);
+    procedures_EagerSubformula.validate(mutableVars, mutableCurrentScopeVars, fmla);
     valAssert(fmla[0] === "down", "Family reference must be a down navigation.");
     // A single down navigation in concrete syntax will always have
     // wantValues = !isObject, but the simplification code in resolveNavigation
@@ -75,7 +75,7 @@ class EagerFamilyRef {
   }
 
   public typecheck(model, mutableVars, fmla) {
-    let type = EagerSubformula.typecheck(model, mutableVars, fmla);
+    let type = procedures_EagerSubformula.typecheck(model, mutableVars, fmla);
     // EagerFamilyRef is used only as the target of mutations, so we can go ahead
     // and check this here.
     valAssert(getColumn(fmla[2]).formula == null, "Cannot mutate a formula column.");
@@ -90,7 +90,7 @@ class EagerFamilyRef {
     };
   }
 
-  public stringify = EagerSubformula.stringify;
+  public stringify = procedures_EagerSubformula.stringify;
 }
 
 function validateAssignment(mutableVars, mutableCurrentScopeVars, lhsName) {
@@ -105,9 +105,9 @@ function indent(str) {
   return str.replace(/^(?=.)/mg, "  ");
 }
 
-let dispatch = {
+let procedures_dispatch = {
   "let": {
-    argAdapters: [VarName, EagerSubformula],
+    argAdapters: [VarName, procedures_EagerSubformula],
     validate: (mutableVars, mutableCurrentScopeVars, lhsName, rhsFmla) => {
       validateAssignment(mutableVars, mutableCurrentScopeVars, lhsName);
     },
@@ -123,7 +123,7 @@ let dispatch = {
     }
   },
   set: {
-    argAdapters: [new EagerFamilyRef(false, false), EagerSubformula],
+    argAdapters: [new EagerFamilyRef(false, false), procedures_EagerSubformula],
     typecheck: (model, mutableVars, lhsType, rhsType) => {
       valExpectType("Right operand of ':='", rhsType, lhsType);
     },
@@ -143,7 +143,7 @@ let dispatch = {
     stringify: (model, mutableVars, lhsSinfo, rhsSinfo) => `${lhsSinfo.str} := ${rhsSinfo.str}\n`
   },
   add: {
-    argAdapters: [new EagerFamilyRef(false, false), EagerSubformula],
+    argAdapters: [new EagerFamilyRef(false, false), procedures_EagerSubformula],
     typecheck: (model, mutableVars, lhsType, rhsType) => {
       valExpectType("Right operand of 'add'", rhsType, lhsType);
     },
@@ -165,7 +165,7 @@ let dispatch = {
     stringify: (model, mutableVars, lhsSinfo, rhsSinfo) => `to set ${lhsSinfo.str} add ${rhsSinfo.str}\n`
   },
   remove: {
-    argAdapters: [new EagerFamilyRef(false, false), EagerSubformula],
+    argAdapters: [new EagerFamilyRef(false, false), procedures_EagerSubformula],
     typecheck: (model, mutableVars, lhsType, rhsType) => {
       valExpectType("Right operand of 'remove'", rhsType, lhsType);
     },
@@ -185,7 +185,7 @@ let dispatch = {
     stringify: (model, mutableVars, lhsSinfo, rhsSinfo) => `from set ${lhsSinfo.str} remove ${rhsSinfo.str}\n`
   },
   "if": {
-    argAdapters: [EagerSubformula, Statements, Statements],
+    argAdapters: [procedures_EagerSubformula, Statements, Statements],
     validate: (mutableVars, mutableCurrentScopeVars, conditionFmla, thenBody, elseBody) => {
       // We can't simply validate the "then" part and then the "else" part,
       // because a loop in the "else" part shouldn't be reported as shadowing a
@@ -240,7 +240,7 @@ let dispatch = {
     }
   },
   foreach: {
-    argAdapters: [VarName, EagerSubformula, Statements],
+    argAdapters: [VarName, procedures_EagerSubformula, Statements],
     validate: (mutableVars, mutableCurrentScopeVars, bindVarName, domainFmla, body) => {
       mutableVars = mutableVars.shallowClone();
       mutableCurrentScopeVars = new EJSONKeyedSet();
@@ -269,7 +269,7 @@ let dispatch = {
     }
   },
   "delete": {
-    argAdapters: [EagerSubformula],
+    argAdapters: [procedures_EagerSubformula],
     typecheck: (model, mutableVars, objectsType) => {
       // XXX Duplicating functionality of EagerSubformulaCells in formulas.coffee.
       // It's not worth providing a whole EagerSubformulaCells wrapper yet.
@@ -363,7 +363,7 @@ let dispatch = {
     }
   },
   check: {
-    argAdapters: [EagerSubformula],
+    argAdapters: [procedures_EagerSubformula],
     typecheck: (model, mutableVars, conditionType) => {
       valExpectType("check condition", conditionType, "bool");
     },
@@ -449,8 +449,8 @@ function validateStatement(mutableVars, mutableCurrentScopeVars, statement) {
   var opName;
   valAssert(_.isArray(statement), "Statement must be an array.");
   valAssert(_.isString(opName = statement[0]), "Statement must begin with an operation name (a string).");
-  valAssert(dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);
-  let d = dispatch[opName];
+  valAssert(procedures_dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);
+  let d = procedures_dispatch[opName];
   let args = statement.slice(1);
   valAssert(args.length === d.argAdapters.length, `Wrong number of arguments to '${opName}' (required ${d.argAdapters.length}, got ${args.length})`);
   d.argAdapters.forEach((adapter, i) => {
@@ -465,7 +465,7 @@ function validateStatement(mutableVars, mutableCurrentScopeVars, statement) {
 
 // Copied from formulas.coffee.  More generality than we need right now.
 function dispatchStatement(action, statement, ...contextArgs) {
-  let d = dispatch[statement[0]];
+  let d = procedures_dispatch[statement[0]];
   let args = statement.slice(1);
   let adaptedArgs = d.argAdapters.map((adapter, i) => adapter[action] != null ? adapter[action].apply(adapter, contextArgs.concat([args[i]])) : args[i]);
   d[action].apply(d, contextArgs.concat(adaptedArgs));
