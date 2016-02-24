@@ -226,7 +226,7 @@ let ColumnId = {
     return arg;
   }
 };
-let String = {
+let StringArg = {
   validate: (vars, arg) => {
     valAssert(_.isString(arg), "Must be a string");
   },
@@ -598,7 +598,7 @@ let dispatch = {
   },
   // ["date", string]
   date: {
-    argAdapters: [String],
+    argAdapters: [StringArg],
     typecheck: () => "date",
     evaluate: (model, vars, string) => new TypedSet("date", new EJSONKeyedSet([Date.parse(string)])),
     stringify: (model, vars, string) => ({
