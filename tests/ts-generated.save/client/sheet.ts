@@ -54,17 +54,17 @@ class ViewHlist {
 }
 
 class ViewSection {
-    public columnId;
-    public col;
-    public relationSingular;
-    public width;
-    public leftEdgeSingular;
-    public rightEdgeSingular;
-    public extraColClassBefore;
-    public subsections;
-    public headerHeightBelow;
-    public amRootWithSeparateTables;
-    public headerMinHeight;
+  public columnId;
+  public col;
+  public relationSingular;
+  public width;
+  public leftEdgeSingular;
+  public rightEdgeSingular;
+  public extraColClassBefore;
+  public subsections;
+  public headerHeightBelow;
+  public amRootWithSeparateTables;
+  public headerMinHeight;
 
   constructor(public layoutTree, public options : any = {}) {
     this.columnId = this.layoutTree.root;
@@ -500,14 +500,14 @@ function toggleHeaderExpanded() {
 }
 
 class ClientView {
-    public options;
-    public hot;
-    public savedSelection;
-    public layoutTree;
-    public mainSection;
-    public qCellIdToGridCoords;
-    public grid;
-    public colClasses;
+  public options;
+  public hot;
+  public savedSelection;
+  public layoutTree;
+  public mainSection;
+  public qCellIdToGridCoords;
+  public grid;
+  public colClasses;
 
   constructor(public view) {
     this.options = {

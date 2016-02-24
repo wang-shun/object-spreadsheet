@@ -314,8 +314,8 @@ function generateFormulaInfo(template) {
 }
 
 class TracingView {
-    public grid;
-    public hot;
+  public grid;
+  public hot;
 
   constructor(domElement) {
     // TODO: Add a bunch more settings?

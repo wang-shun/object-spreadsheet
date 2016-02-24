@@ -22,11 +22,11 @@ for (let coll of ["Columns", "Cells", "Views", "Procedures"]) {
 }
 
 class Tablespace extends ControlContext {
-    public formulaEngine;
-    public Columns;
-    public Cells;
-    public Views;
-    public Procedures;
+  public formulaEngine;
+  public Columns;
+  public Cells;
+  public Views;
+  public Procedures;
 
   constructor(public id) {
     super();
@@ -122,8 +122,8 @@ function _toColumnId(selector) {
 }
 
 class CellId {
-    public columnId;
-    public cellId;
+  public columnId;
+  public cellId;
 
   constructor({
       columnId: columnId,
@@ -191,8 +191,8 @@ class CellId {
 }
 
 class FamilyId {
-    public columnId;
-    public cellId;
+  public columnId;
+  public cellId;
 
   constructor({
       columnId: columnId,
@@ -357,9 +357,9 @@ let _cnt = 0;
     return `cim.${_cnt}`;
   };
 class CellsInMemory {
-    public byColumn;
-    public byId;
-    public recycle;
+  public byColumn;
+  public byId;
+  public recycle;
 
 
 
@@ -529,7 +529,7 @@ class CellsInMemory {
 // changes back to the Mongo collection.
 //
 class TransactionCells {
-    public mem;
+  public mem;
 
   constructor(public dbCells) {
     //@mem = new Mongo.Collection(null)
@@ -611,7 +611,7 @@ class TransactionCells {
 }
 
 class Transaction {
-    public Cells;
+  public Cells;
 
   constructor(dbCells) {
     this.Cells = new TransactionCells(fallback(dbCells, Cells));

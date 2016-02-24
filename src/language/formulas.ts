@@ -85,8 +85,8 @@ this.singleElement = (set) => {
 };
 
 class FormulaEngine {
-    public goUpMemo;
-    public compiled;
+  public goUpMemo;
+  public compiled;
 
   constructor() {
     this.goUpMemo = new Memo;

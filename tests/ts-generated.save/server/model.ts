@@ -5,9 +5,9 @@ class CannedTransaction {
 }
 
 class Model {
-    public settings;
-    public columnCache;
-    public wasEmpty;
+  public settings;
+  public columnCache;
+  public wasEmpty;
 
   // TODO: Indicate which methods are intended to be public!
 

@@ -11,7 +11,7 @@
     return EJSON.parse(k.substr(4));
   };
 class EJSONKeyedMap {
-    public obj;
+  public obj;
 
   constructor(ents : any = []) {
     // Future: Change to ECMAScript 6 Map when supported by all relevant JS
@@ -85,7 +85,7 @@ exported({
 });
 
 class EJSONKeyedSet {
-    public map;
+  public map;
 
   constructor(els : any = []) {
     this.map = new EJSONKeyedMap();
@@ -140,7 +140,7 @@ exported({
 });
 
 class EJSONSmallSet {
-    public els;
+  public els;
 
   constructor(els : any = [], _trustMeDistinct : any = false) {
     if (_trustMeDistinct) {
@@ -197,7 +197,7 @@ exported({
 //@EJSONKeyedSet = EJSONSmallSet
 
 class EJSONKeyedMapToSet {
-    public map;
+  public map;
 
   constructor() {
     this.map = new EJSONKeyedMap();
@@ -287,7 +287,7 @@ class Tree {
 EJSON.addType("Tree", Tree.fromJSONValue);
 
 class Memo {
-    public values;
+  public values;
 
   constructor() {
     this.values = {};

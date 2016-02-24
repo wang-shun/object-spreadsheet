@@ -26,8 +26,8 @@ class OnDemand extends Announce {
 }
 
 class ControlContext extends OnDemand {
-    public scheduled;
-    public lock;
+  public scheduled;
+  public lock;
 
   constructor() {
     this.scheduled = [];
