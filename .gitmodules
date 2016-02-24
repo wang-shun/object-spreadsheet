@@ -1,3 +1,6 @@
 [submodule "coffeescript-to-typescript"]
 	path = tests/coffeescript-to-typescript
 	url = ../coffeescript-to-typescript
+[submodule "hansoft_typescript"]
+	path = packages/hansoft_typescript
+	url = ../hansoft_typescript
