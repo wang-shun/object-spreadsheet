@@ -508,6 +508,8 @@ class ClientView {
   public qCellIdToGridCoords;
   public grid;
   public colClasses;
+  public cellClasses;
+  private pending: Array<String>;
 
   constructor(public view) {
     this.options = {
@@ -527,10 +529,13 @@ class ClientView {
       // Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
       sepcols: false,
       // Show children of the root as separate tables.
-      separateTables: true
+      separateTables: true,
+      // Developers only (print some logs with timestamps)
+      profile: false
     };
     this.hot = null;
     this.savedSelection = null;
+    this.pending = [];
 
     this.reload();
   }
@@ -543,6 +548,7 @@ class ClientView {
   public hotConfig() {
     var _ref, _results;
     let thisView = this;
+    if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid started  --- `);
     // Display the root column for completeness.  However, it doesn't have a real
     // value.
     let hlist = this.mainSection.prerenderHlist([], "");
@@ -577,27 +583,13 @@ class ClientView {
         let toggleHtml = `<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">\n  <path style="stroke: black; fill: black" d="${headerExpanded.get() ? "M 1 4 l 8 0 l -4 4 z" : "M 3 1 l 4 4 l -4 4 z"}"/>\n</svg>`;
         grid[0][0].value = toggleHtml;
         grid[0][0].cssClasses.push("rsRoot");
-        //gridVertExtend(gridCaption,
-        //               gridMergedCell(headerHeight - 2, 1, toggleHtml + ' Obj', ['htBottom', 'rsCaption']))
       }
-      //gridCaption.push(
-      //  [new ViewCell('Field', 1, 1, ['rsCaption'])],
-      //  [new ViewCell('Type', 1, 1, ['rsCaption'])])
     }
-    //else
-    //  gridVertExtend(gridCaption,
-    //                 gridMergedCell(headerHeight - 1, 1, "", ['htBottom', 'rsCaption']))
-    //  gridVertExtend(gridCaption,
-    //                 gridMergedCell(1, 1, "", ['rsCaption']))
 
     if (!this.options.showTypes) {  // HACK: Same
       //gridCaption.pop()
       headerHeight = headerHeight - 1;
     }
-    //gridVertExtend(gridCaption,
-    //               ([new ViewCell("@#{i+1}", 1, 1, ['rsCaption','rsRowNum'])] for i in [0...gridData.length]))
-    //gridHorizExtend(gridCaption, grid)
-    //grid = gridCaption
 
     // Add last column that will stretch horizontally
     let sentinel = grid.map((row) => [new ViewCell("", 1, 1, ["rsSentinel"])]);
@@ -615,8 +607,6 @@ class ClientView {
             row: i,
             col: j
           });
-          //# dataRow is user-facing row number, one-based.
-          // dataRow: i - headerHeight + 1
         }
       });
     });
@@ -624,12 +614,14 @@ class ClientView {
       for (let cell of row) {
         if (cell.value instanceof CellReference) {
           cell.referent = cell.value.qCellId;
-          cell.display = cell.value.display;  // ? '@' + (@qCellIdToGridCoords.get(cell.value.qCellId)?.dataRow || '?')
+          cell.display = cell.value.display;
         }
       }
     }
 
     this.grid = grid;
+
+    if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid finished  --- `);
 
     this.colClasses = _.range(0, grid[0].length).map((col) => {
       let colCls = null;
@@ -643,6 +635,28 @@ class ClientView {
       }
       return colCls;
     });
+
+    this.cellClasses = grid.map((dataRow, row) => dataRow.map((cell, col) => {
+      var refc;
+      let adjcol = col + cell.colspan;
+      let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
+      if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
+        classes.push(`ref-${refc}`);
+      }
+      if ((cell.qFamilyId != null ? cell.qFamilyId.cellId.length : null) === 0) {  // seems to work; == undefined if qFamilyId doesn't exist
+        classes.push("parent-root");
+      }
+      if (cell.ancestorQCellId) console.log(cell.ancestorQCellId);
+      let ancestors = cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.qFamilyId != null ? new FamilyId(cell.qFamilyId).ancestors() : [];
+      for (let ancestor of ancestors) {
+        if ((refc = this.refId(ancestor.q())) != null) {
+          classes.push(`ancestor-${refc}`);
+        }
+      }
+      if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) || (cell.qFamilyId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
+        classes.push("editable");
+      return cell.cssClasses.concat(classes);
+    }))
 
     return {
       data: grid.map((row) => row.map((cell) => fallback(cell.display, cell.value))),
@@ -677,32 +691,18 @@ class ClientView {
       }).call(this)),
       stretchH: "last",
       cells: (row, col, prop) => {
-        var refc;
-        cell = this.grid[row] != null ? this.grid[row][col] : null;
-        if (!cell) {
+        var clsRow = this.cellClasses[row]; 
+        var classes = clsRow != null ? clsRow[col] : null;
+        if (!classes) {
           return {};  // may occur if grid is changing
         }
-        let adjcol = col + cell.colspan;
-        let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
-        if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
-          classes.push(`ref-${refc}`);
-        }
-        if ((cell.qFamilyId != null ? cell.qFamilyId.cellId.length : null) === 0) {  // seems to work; == undefined if qFamilyId doesn't exist
-          classes.push("parent-root");
-        }
-        let ancestors = cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.qFamilyId != null ? new FamilyId(cell.qFamilyId).ancestors() : [];
-        for (let ancestor of ancestors) {
-          if ((refc = this.refId(ancestor.q())) != null) {
-            classes.push(`ancestor-${refc}`);
-          }
-        }
 
-        if (this.pending && this.pending.indexOf(`${row}-${col}`) >= 0) {
-          classes.push('pending');
+        if (this.pending.indexOf(`${row}-${col}`) >= 0) {
+          classes = classes.concat('pending');  // must copy classes because at this point it aliases an element of this.cellClasses
         }
         return {
           renderer: col === 0 && row === 0 ? "html" : "text",
-          className: (cell.cssClasses.concat(classes)).join(" "),
+          className: classes.join(" "),
           // Edge case: renaming the column whose formula is currently being edited could change
           // the string representation of the original formula, which would trigger a reactive
           // update that would lose the unsaved changes.
@@ -717,7 +717,8 @@ class ClientView {
           // for the purpose of changing the objectName and fieldName respectively.
           //
           // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
-          readOnly: !((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) || (cell.qFamilyId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
+          readOnly: classes.indexOf("editable") == -1 
+          //!((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) || (cell.qFamilyId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
         };
       },
       autoColumnSize: {
@@ -769,19 +770,18 @@ class ClientView {
         if (!source) return;   // Run this handler only for interactive edits
 
         var fail = false;
-        for (let change of changes) {
-          let [row, col, oldVal, newVal] = change;
+        for (let [row, col, oldVal, newVal] of changes) {
           if (oldVal === newVal) continue;
           
-          cell = this.grid[row][col];
-          revertingCallback = (error, result) => {
+          let cell = this.grid[row][col];
+          let revertingCallback = ((row, col, oldVal) => (error, result) => {
             if (error) {
               fail = true;  // prevent race condition in case we're still in this function
               this.pending = [];
               this.hot.setDataAtCell(row, col, oldVal);
             }
             standardServerCallback(error, result);
-          }
+          })(row, col, oldVal);  // enfore closure; in ES 6 we wouldn't need this anymore
           this.pending.push(`${row}-${col}`);
           
           // One of these cases should apply...
@@ -962,6 +962,19 @@ class ClientView {
       rowHeights: cfg.rowHeights,
       mergeCells: cfg.mergeCells
     });
+    /*
+     * Tried this as an optimization. Didn't seem to be faster (sometimes slower)
+     * than just running loadData. Might be different on larger spreadsheets though,
+     * so I'm leaving it here for reference.   ~ Shachar, 2-24-2016
+     *
+    cfg.data.forEach((dataRow, row) =>
+      dataRow.forEach((dataElem, col) => {
+        if (dataElem !== this.hot.getDataAtCell(row, col)) {
+          this.hot.setDataAtCell(row, col, dataElem);
+        }
+      })
+    )
+    */
     this.hot.loadData(cfg.data);
   }
 
@@ -1301,6 +1314,11 @@ function guarded(op) {
     }
     window.why = null;
   };
+}
+
+function stamp() {
+  var d = new Date();
+  return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
 }
 
 Template.Spreadsheet.rendered = function() {
