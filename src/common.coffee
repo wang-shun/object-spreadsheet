@@ -16,22 +16,22 @@
 # Careful: with "class EvaluationError", the original class gets assigned to a
 # file-scope variable that shadows the exported wrapped class seen by the rest
 # of the application, and instanceof breaks.
-class EvaluationError
+class EvaluationError_
   constructor: (@message) ->
-@EvaluationError = Meteor.makeErrorType('EvaluationError', EvaluationError)
+@EvaluationError = Meteor.makeErrorType('EvaluationError', EvaluationError_)
 
 # Used also for typechecking.
-class FormulaValidationError
+class FormulaValidationError_
   constructor: (@message) ->
-@FormulaValidationError = Meteor.makeErrorType('FormulaValidationError', FormulaValidationError)
+@FormulaValidationError = Meteor.makeErrorType('FormulaValidationError', FormulaValidationError_)
 
-class SyntaxError
+class SyntaxError_
   constructor: (@message, @details) ->
-@SyntaxError = Meteor.makeErrorType('SyntaxError', SyntaxError)
+@SyntaxError = Meteor.makeErrorType('SyntaxError', SyntaxError_)
 
-class SemanticError
+class SemanticError_
   constructor: (@message) ->
-@SemanticError = Meteor.makeErrorType('SemanticError', SemanticError)
+@SemanticError = Meteor.makeErrorType('SemanticError', SemanticError_)
 
 # Model data structures and parameters the client needs to be aware of:
 # (I tried using EJSON custom classes but it was too much of a pain to store in
@@ -204,7 +204,7 @@ NON_REFERENCE_TYPES = [TYPE_EMPTY, TYPE_ERROR].concat(MAIN_PRIMITIVE_TYPES)
     t2
 
 
-class TypedSet
+class @TypedSet
   # public fields
   #@type: column ID or primitive, or TYPE_EMPTY if we don't know because the set is empty.
   #@set: EJSONKeyedSet<@type>
@@ -301,5 +301,3 @@ EJSON.addType('TypedSet', TypedSet.fromJSONValue)
   else
     JSON.parse text
 
-
-exported {TypedSet}

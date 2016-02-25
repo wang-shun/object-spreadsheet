@@ -6,16 +6,15 @@ Router.route "/:sheet/views/:_id", ->
   return
 
 
-class NotReadyError
+class NotReadyError_
   constructor: (@message) ->
-NotReadyError = Meteor.makeErrorType('NotReadyError', NotReadyError)
+NotReadyError = Meteor.makeErrorType('NotReadyError', NotReadyError_)
 
 # Object that can be used as ViewCell.value or ViewHlist.value to defer the
 # resolution of the target cell ID to a row number.  I'm a terrible person for
 # taking advantage of heterogeneous fields in JavaScript... ~ Matt
-class CellReference
+class @CellReference
   constructor: (@qCellId, @display) ->
-exported {CellReference}
 
 @stringifyTypeForSheet = (type) ->
   if type == '_unit'
@@ -364,7 +363,7 @@ class ViewSection
 # shouldn't cause any problem and not worth doing differently.
 selectedCell = null
 
-class StateEdit
+class @StateEdit
 
   @parseValue: (qFamilyId, text) ->
     type = getColumn(qFamilyId.columnId).type
@@ -438,7 +437,7 @@ toggleHeaderExpanded = () ->
   headerExpanded.set(!headerExpanded.get())
   return
 
-class ClientView
+class @ClientView
 
   constructor: (@view) ->
     @options =
@@ -1060,7 +1059,7 @@ class ClientView
 view = null
 
 
-rebuildView = (viewId) ->
+@rebuildView = (viewId) ->
   if !view || !view.hot
     if view?.hot?
       view.hot.destroy()
@@ -1098,7 +1097,7 @@ rebuildView = (viewId) ->
   return
 
 # Helper decorator for use with Tracker.autorun
-guarded = (op) ->
+@guarded = (op) ->
   (args...) ->
     try
       op(args...)
@@ -1132,6 +1131,3 @@ Template.Spreadsheet.helpers
 
 
 
-$ ->
-  exported {ClientView, StateEdit, rebuildView, guarded}
-  return

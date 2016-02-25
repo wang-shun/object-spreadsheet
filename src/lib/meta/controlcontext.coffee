@@ -1,11 +1,11 @@
 
-class Announce
+class @Announce
   instances = {}
   @get: (id) ->
     if (v = instances[id])? then v
     else instances[id] = new @ id
 
-class OnDemand extends Announce
+class @OnDemand extends Announce
   listeners = {create: []}
   constructor: ->
     for cb in listeners.create
@@ -16,7 +16,7 @@ class OnDemand extends Announce
   @onCreate: (op) -> listeners.create.push op; return
 
 
-class ControlContext extends OnDemand
+class @ControlContext extends OnDemand
   constructor: ->
     @scheduled = []
     @lock = 0
@@ -41,5 +41,3 @@ class ControlContext extends OnDemand
   # calls a Meteor method, passing the current cc as first argument
   call: (method, args...) ->
     Meteor.call method, @, args...
-
-exported {Announce, OnDemand, ControlContext}

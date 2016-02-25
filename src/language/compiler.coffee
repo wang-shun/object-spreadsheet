@@ -56,7 +56,7 @@ dispatchTable =
     body: "lhs(v)->{#1 rhs(u)->{#2 var c=EJSON.equals(v,u); yield c; }#2 }#1"
 
 
-class FormulaCompiler
+class @FormulaCompiler
 
   constructor: (@engine) ->
 
@@ -113,7 +113,5 @@ unittest = ->
 
   eval(code)
 
-if Meteor?
-  exported {FormulaCompiler}
-else
+unless Meteor?
   unittest()

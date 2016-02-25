@@ -3,7 +3,7 @@
 # Now that we're no longer using custom classes, we might be able to use plain
 # JSON, but we've written this already...
 
-class EJSONKeyedMap
+class @EJSONKeyedMap
   constructor: (ents = []) ->
     # Future: Change to ECMAScript 6 Map when supported by all relevant JS
     # engines and CoffeeScript.
@@ -28,9 +28,8 @@ class EJSONKeyedMap
     m.obj = EJSON.fromJSONValue(json)
     m
 EJSON.addType('EJSONKeyedMap', EJSONKeyedMap.fromJSONValue)
-exported {EJSONKeyedMap}
 
-class EJSONKeyedSet
+class @EJSONKeyedSet
   constructor: (els = []) ->
     @map = new EJSONKeyedMap()
     for x in els
@@ -49,9 +48,8 @@ class EJSONKeyedSet
     s.map = EJSONKeyedMap.fromJSONValue(json)
     s
 EJSON.addType('EJSONKeyedSet', EJSONKeyedSet.fromJSONValue)
-exported {EJSONKeyedSet}
 
-class EJSONSmallSet
+class @EJSONSmallSet
   constructor: (els = [], _trustMeDistinct=false) ->
     if _trustMeDistinct
       @els = els[..]
@@ -73,12 +71,11 @@ class EJSONSmallSet
   toJSONValue: -> @els
   @fromJSONValue: (json) -> new EJSONSmallSet(json, true)
 EJSON.addType('EJSONSmallSet', EJSONSmallSet.fromJSONValue)
-exported {EJSONSmallSet}
 
 #@EJSONKeyedSet = EJSONSmallSet
 
 
-class EJSONKeyedMapToSet
+class @EJSONKeyedMapToSet
   constructor: ->
     @map = new EJSONKeyedMap()
   add: (k, v) ->
@@ -98,9 +95,8 @@ class EJSONKeyedMapToSet
   keys: -> @map.keys()
   has: (k, v) -> (s = @map.get(k))? && s.has(v)
   elementsFor: (k) -> @map.get(k)?.elements() ? []
-exported {EJSONKeyedMapToSet}
 
-class Tree
+class @Tree
   constructor: (@root, @subtrees=[]) ->
 
   ## applies op to the root of each subtree
@@ -128,7 +124,7 @@ class Tree
 EJSON.addType('Tree', Tree.fromJSONValue)
 
 
-class Memo
+class @Memo
   constructor: -> @values = {}
   clear: -> @values = {}; return
   get: (key, recompute) ->
@@ -137,23 +133,21 @@ class Memo
 
 
 # helper functions
-forall = (list, pred) ->
+@forall = (list, pred) ->
   for x in list
     if !pred(x) then return false
   true
-exists = (list, pred) ->
+@exists = (list, pred) ->
   for x in list
     if pred(x) then return true
   false
-without = (list, item) -> list.filter (x) -> x != item
+@without = (list, item) -> list.filter (x) -> x != item
 
-zip = (args...) ->
+@zip = (args...) ->
   lengthArray = (arr.length for arr in args)
   length = Math.min(lengthArray...)
   for i in [0...length]
     arr[i] for arr in args
 
-set = (x) -> new EJSONKeyedSet(x)
-T = (args...) -> new Tree(args...)
-
-exported {set, Tree, T, Memo, forall, exists, without, zip}
+@set = (x) -> new EJSONKeyedSet(x)
+@T = (args...) -> new Tree(args...)

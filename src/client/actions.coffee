@@ -486,4 +486,4 @@ Meteor.methods({
 
 
 
-exported {ActionBar: {fullTextToShow, isLoading, changeColumnArgs, isExpanded, hasUnsavedData}}
+@ActionBar = {fullTextToShow, isLoading, changeColumnArgs, isExpanded, hasUnsavedData}

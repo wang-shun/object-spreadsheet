@@ -2,7 +2,7 @@ class CannedTransaction
   # @params: EJSONKeyedMap of name to type
   constructor: (@params, @body) ->
 
-class Model
+class @Model
 
   # TODO: Indicate which methods are intended to be public!
 
@@ -42,7 +42,7 @@ class Model
   getAllColumns: (columnId=rootColumnId) ->
     col = @getColumn columnId
     # A bit of auto-repair in case some columns were deleted
-    validChildren = col.children.filter (x) -> @getColumn(x)?
+    validChildren = col.children.filter (x) => @getColumn(x)?
     if validChildren.length != col.children.length
       Columns.update(columnId, {$set: {children: validChildren}})
     [[columnId, col]].concat (@getAllColumns c for c in validChildren)...
@@ -748,5 +748,3 @@ Meteor.methods
       return
     return
 
-
-exported {Model}

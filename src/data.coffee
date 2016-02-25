@@ -15,7 +15,7 @@ for coll in ['Columns', 'Cells', 'Views', 'Procedures']
   )(coll)
 
 
-class Tablespace extends ControlContext
+class @Tablespace extends ControlContext
   constructor: (@id) ->
     super()
     if Meteor.isServer
@@ -85,7 +85,7 @@ _toColumnId = (selector) ->
   else selector
 
     
-class CellId
+class @CellId
   constructor: ({columnId, cellId}) ->
     @columnId = _toColumnId(columnId)
     @cellId = cellId
@@ -125,7 +125,7 @@ class CellId
   ref: -> new TypedSet(@columnId, set([@cellId]))
   
 
-class FamilyId
+class @FamilyId
   constructor: ({columnId, cellId}) ->
     @columnId = _toColumnId(columnId)
     @cellId = cellId
@@ -187,9 +187,9 @@ class FamilyId
     return
 
 
-rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
+@rootCell = CellId.ROOT = new CellId({columnId: rootColumnId, cellId: rootCellId})
 
-allCellIdsInColumnIgnoreErrors = (columnId) ->
+@allCellIdsInColumnIgnoreErrors = (columnId) ->
   if columnId == rootColumnId
     return [rootCellId]
   cellIds = []
@@ -214,7 +214,7 @@ upsertOne = (collection, selector, modifier, callback) ->
   return
 
 
-class CellsInMemory
+class @CellsInMemory
 
   _cnt = 0
   _freshId = -> _cnt += 1 ; "cim.#{_cnt}"
@@ -388,7 +388,7 @@ class TransactionCells
       return
     return
 
-class Transaction
+class @Transaction
 
   constructor: (dbCells) ->
     @Cells = new TransactionCells(dbCells ? Cells)
@@ -408,5 +408,3 @@ class Transaction
     return
 
 
-
-exported {Tablespace, CellId, FamilyId, rootCell, allCellIdsInColumnIgnoreErrors, Transaction, CellsInMemory}

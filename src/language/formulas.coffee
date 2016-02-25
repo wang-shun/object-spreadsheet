@@ -77,7 +77,7 @@ readColumnTypeForFormula = (model, columnId) ->
   elements[0]
 
 
-class FormulaEngine
+class @FormulaEngine
   constructor: ->
     @goUpMemo = new Memo
     @compiled = {}
@@ -1104,4 +1104,4 @@ stringifySubformula = (model, vars, formula) ->
     children: children
   }
 
-exported {FormulaEngine, FormulaInternals: {EagerSubformula, stringifyIdent, tryTypecheckFormula, PRECEDENCE_LOWEST}}
+@FormulaInternals = {EagerSubformula, stringifyIdent, tryTypecheckFormula, PRECEDENCE_LOWEST}

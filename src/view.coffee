@@ -1,6 +1,6 @@
 
 
-class View
+class @View
   constructor: (@id) ->
 
   def: ->
@@ -60,5 +60,3 @@ class View
     return
 
 
-
-exported {View}

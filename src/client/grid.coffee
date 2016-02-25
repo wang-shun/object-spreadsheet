@@ -1,6 +1,6 @@
 # Grid utilities
 
-class ViewCell
+class @ViewCell
   constructor: (@value = null, @rowspan = 1, @colspan = 1, @cssClasses = []) ->
     @qFamilyId = null
     @qCellId = null
@@ -10,7 +10,6 @@ class ViewCell
     @isObject = false
     @kind = null
     @fullText = null
-exported {ViewCell}
 
 # Mutate "orig" by adding "extension" at the bottom.
 # This would be a good place to add some assertions...
