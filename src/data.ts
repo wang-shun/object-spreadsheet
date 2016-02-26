@@ -8,16 +8,17 @@
 
 namespace Objsheets {
 
-  function scoped(name, prop) {
-    Object.defineProperty(this, name, prop);
+  function scoped(obj, name, prop) {
+    Object.defineProperty(obj, name, prop);
   }
 
-  scoped("$$", {
+  export var $$, Columns, Cells, Views, Procedures;
+  scoped(Objsheets, "$$", {
     get: () => Tablespace.get()
   });
   for (let coll of ["Columns", "Cells", "Views", "Procedures"]) {
     ((coll) => {
-      scoped(coll, {
+      scoped(Objsheets, coll, {
         get: () => $$[coll]
       });
     })(coll);  // Work around JavaScript variable capture semantics
