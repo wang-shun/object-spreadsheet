@@ -1,13 +1,4 @@
-.DS_Store
-dump/meteor/ptc:*
-dump/meteor/system*
-node_modules
-typings
-*.coffee.js
-*.ts.js
-*.ls.js
-*.jison.js
+# If you add things, please comment the reason! ~ Matt 2016-02-26
 
-# TypeScript stuff
-/zzz.ts-compiler.ts
-/coffee-to-ts-errors.txt
+# Mac OS X garbage file
+.DS_Store
