@@ -29,10 +29,10 @@ namespace Objsheets {
       });
     });
     let ptcDemoShowingMasterData = new ReactiveVar(false);
-    Template.PTC_Demo.helpers({
+    Template["PTC_Demo"].helpers({
       showingMasterData: () => ptcDemoShowingMasterData.get()
     });
-    Template.PTC_Demo.events({
+    Template["PTC_Demo"].events({
       "click .demo-ptc-switch-to-view-model": () => {
         ptcDemoShowingMasterData.set(false);
       },
@@ -41,21 +41,21 @@ namespace Objsheets {
       }
     });
 
-    Template.PTC_Parent.created = function() {
+    Template["PTC_Parent"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "ptc");
     };
 
-    Template.PTC_Parent.helpers({
+    Template["PTC_Parent"].helpers({
       viewData: function() {
         return Relsheets.readSubtree("ParentView", [this.clientUser]);
       }
     });
 
-    Template.PTC_Parent_login.created = function() {
+    Template["PTC_Parent_login"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null);
     };
 
-    Template.PTC_Parent_login.helpers({
+    Template["PTC_Parent_login"].helpers({
       root: () => Relsheets.readObj(((new View("1").def()) != null ? (new View("1").def()).layout : null) || new Tree(rootColumnId))
     });
 
@@ -64,7 +64,7 @@ namespace Objsheets {
       jbutton.text("∙ ∙ ∙");
     }
 
-    Template.PTC_Parent_enrollment.events({
+    Template["PTC_Parent_enrollment"].events({
       // Future: We could modify the transaction procedures to take objects in
       // the view subtree, instead of the original domain objects, as parameters.
       // This would let us avoid duplicating the write access control checks in the

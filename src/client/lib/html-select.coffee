@@ -12,7 +12,7 @@ class @HtmlSelect
 # parent template and we don't have to deal with the nonsense of making a
 # reference between the templates.  Yay!
 
-Template.html_select_content.helpers({
+Template['html_select_content'].helpers({
   currentValueFound: ->
     for item in @items
       if item instanceof HtmlOptgroup

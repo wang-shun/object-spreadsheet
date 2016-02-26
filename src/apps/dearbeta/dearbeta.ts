@@ -16,18 +16,18 @@ namespace Objsheets {
       });
     });
 
-    Template.DearBeta.created = function() {
+    Template["DearBeta"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "beta");
     };
 
-    Template.DearBeta.helpers({
+    Template["DearBeta"].helpers({
       files: () => {
         let obj = Relsheets.read();
         return obj.File;
       }
     });
 
-    Template.DearBeta.events({
+    Template["DearBeta"].events({
       "click .Request .up": function() {
         Relsheets.call("requestUp", {
           at: [this.Request.qFamilyId.cellId]

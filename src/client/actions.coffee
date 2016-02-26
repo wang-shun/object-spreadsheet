@@ -1,7 +1,7 @@
 fullTextToShow = new ReactiveVar(null)
 isLoading = new ReactiveVar(true)
 
-Template.actionBar.helpers
+Template['actionBar'].helpers
   loading: -> isLoading.get()
   fullTextToShow: -> fullTextToShow.get()
   changeColumnArgs: -> changeColumnArgs.get()
@@ -39,7 +39,7 @@ isFormulaDebuggerOpen = new ReactiveVar(false)
 
 tracingView = null
 
-Template.changeColumn.rendered = () ->
+Template['changeColumn'].rendered = () ->
   # XXX What if there are unsaved changes when the formula changes externally?
   @autorun(() ->
     newFormulaStr.set(origFormulaStr.get())
@@ -79,7 +79,7 @@ Template.changeColumn.rendered = () ->
     )
   return
 
-Template.changeColumn.destroyed = () ->
+Template['changeColumn'].destroyed = () ->
   # Try to avoid holding on to data that's no longer relevant.
   # XXX: Should we rather define the reactive vars on the template instance?
   # Then we'd need more Template.instance() from the helpers.
@@ -121,7 +121,7 @@ Relsheets.onOpen(() ->
   return
   )
 
-Template.changeColumn.helpers
+Template['changeColumn'].helpers
   #col: -> getColumn(@columnId)
   isFormulaModified: ->
     newFormulaStr.get() != origFormulaStr.get()
@@ -379,7 +379,7 @@ isExpanded = () ->
 stateColumnHasValues = (columnId) ->
   Cells.find({column: columnId, values: {$not: {$size: 0}}}).count() > 0
 
-Template.changeColumn.events
+Template['changeColumn'].events
   'change #changeColumn-backend': (event, template) ->
     newFormula =
       if getValueOfSelectedOption(template, '#changeColumn-backend') == 'computed'

@@ -8,18 +8,18 @@ if Meteor.isClient
     @render "MilkMaid_Demo", data: {sheet: @params.sheet}
     return
 
-  Template.MilkMaid.created = ->
+  Template['MilkMaid'].created = ->
     Relsheets.open(@data?.sheet, 'milk')
     return
 
-  Template.MilkMaid.helpers
+  Template['MilkMaid'].helpers
     milk: -> Relsheets.read()
     label: -> @['name']
     isNext: -> @isNext[0]
     sameAs: (o) -> EJSON.equals(@qCellId, o[0]?.qCellId)
     stringify: (a) -> JSON.stringify(a)
     
-  Template.MilkMaid.events
+  Template['MilkMaid'].events
     "click button": ->
       Relsheets.call("supply", {me: @})
       return

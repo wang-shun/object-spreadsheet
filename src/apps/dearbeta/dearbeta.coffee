@@ -7,16 +7,16 @@ if Meteor.isClient
     @render "DearBeta_Demo", data: {sheet: @params.sheet}
     return
 
-  Template.DearBeta.created = ->
+  Template['DearBeta'].created = ->
     Relsheets.open(@data?.sheet, 'beta')
     return
 
-  Template.DearBeta.helpers
+  Template['DearBeta'].helpers
     files: ->
       obj = Relsheets.read()
       obj.File
 
-  Template.DearBeta.events
+  Template['DearBeta'].events
     "click .Request .up": ->
       Relsheets.call("requestUp", {at: [@Request.qFamilyId.cellId]})
       return

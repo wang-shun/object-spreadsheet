@@ -17,24 +17,24 @@ if Meteor.isClient
     @render "PTC_Demo", data: {sheet: @params.sheet}
     return
   ptcDemoShowingMasterData = new ReactiveVar(false)
-  Template.PTC_Demo.helpers
+  Template['PTC_Demo'].helpers
     showingMasterData: -> ptcDemoShowingMasterData.get()
-  Template.PTC_Demo.events
+  Template['PTC_Demo'].events
     'click .demo-ptc-switch-to-view-model': -> ptcDemoShowingMasterData.set(false); return
     'click .demo-ptc-switch-to-master-data': -> ptcDemoShowingMasterData.set(true); return
 
-  Template.PTC_Parent.created = ->
+  Template['PTC_Parent'].created = ->
     Relsheets.open(@data?.sheet, 'ptc')
     return
 
-  Template.PTC_Parent.helpers
+  Template['PTC_Parent'].helpers
     viewData: -> Relsheets.readSubtree('ParentView', [@clientUser])
 
-  Template.PTC_Parent_login.created = ->
+  Template['PTC_Parent_login'].created = ->
     Relsheets.open(@data?.sheet)
     return
 
-  Template.PTC_Parent_login.helpers
+  Template['PTC_Parent_login'].helpers
     root: -> 
       Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
 
@@ -43,7 +43,7 @@ if Meteor.isClient
     jbutton.text("∙ ∙ ∙")
     return
 
-  Template.PTC_Parent_enrollment.events
+  Template['PTC_Parent_enrollment'].events
     # Future: We could modify the transaction procedures to take objects in
     # the view subtree, instead of the original domain objects, as parameters.
     # This would let us avoid duplicating the write access control checks in the

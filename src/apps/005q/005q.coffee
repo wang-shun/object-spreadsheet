@@ -12,15 +12,15 @@ if Meteor.isClient
     @render "DoubleOhFiveQueue_Demo", data: {sheet: @params.sheet}
     return
 
-  Template.DoubleOhFiveQueue.created = ->
+  Template['DoubleOhFiveQueue'].created = ->
     Relsheets.open(@data?.sheet, '005q')
     return
 
-  Template.DoubleOhFiveQueueStaff.created = ->
+  Template['DoubleOhFiveQueueStaff'].created = ->
     Relsheets.open(@data?.sheet, '005q')
     return
 
-  Template.DoubleOhFiveQueue.helpers
+  Template['DoubleOhFiveQueue'].helpers
     root: -> Relsheets.read()
     sortBy: (objs, field) ->
       _.sortBy(objs, (x) -> x[field][0])
@@ -30,7 +30,7 @@ if Meteor.isClient
       "#{if count == 0 then "no" else count} " +
       "#{if count == 1 then "person" else "people"}"
 
-  Template.DoubleOhFiveQueue.events
+  Template['DoubleOhFiveQueue'].events
     "submit form": (event) ->
       formData =
         name: [event.target.name.value]
@@ -48,10 +48,10 @@ if Meteor.isClient
         helpButton.addClass("disabled")
       return
 
-  Template.DoubleOhFiveQueueStaff.helpers
+  Template['DoubleOhFiveQueueStaff'].helpers
     root: -> Relsheets.read()
     
-  Template.DoubleOhFiveQueueStaff.events
+  Template['DoubleOhFiveQueueStaff'].events
     "click .pick": ->
       Relsheets.call("pick", {@call, @user})
       return

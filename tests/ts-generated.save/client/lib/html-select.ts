@@ -18,7 +18,7 @@ namespace Objsheets {
   // parent template and we don't have to deal with the nonsense of making a
   // reference between the templates.  Yay!
 
-  Template.html_select_content.helpers({
+  Template["html_select_content"].helpers({
     currentValueFound: function() {
       for (let item of this.items) {
         if (item instanceof HtmlOptgroup) {

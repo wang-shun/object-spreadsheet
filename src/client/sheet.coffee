@@ -1110,7 +1110,7 @@ view = null
     return
 
 
-Template.Spreadsheet.rendered = ->
+Template['Spreadsheet'].rendered = ->
   sheet = @data?.sheet || ''
   viewId = @data?.viewId
   # $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
@@ -1119,12 +1119,12 @@ Template.Spreadsheet.rendered = ->
   Tracker.autorun(guarded -> rebuildView viewId; return)
   return
 
-Template.Spreadsheet.events =
+Template['Spreadsheet'].events =
   'click .toggleHeaderExpanded': ->
     toggleHeaderExpanded()
     return
 
-Template.Spreadsheet.helpers
+Template['Spreadsheet'].helpers
   # TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
   actionBarClass: -> if ActionBar.isExpanded() then 'actionBarExpanded' else ''
   selectionLockClass: -> if ActionBar.hasUnsavedData() then 'selectionLock' else ''

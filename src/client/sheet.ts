@@ -1322,7 +1322,7 @@ namespace Objsheets {
     return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
   }
 
-  Template.Spreadsheet.rendered = function() {
+  Template["Spreadsheet"].rendered = function() {
     let sheet = (this.data != null ? this.data.sheet : null) || "";
     let viewId = this.data != null ? this.data.viewId : null;
     // $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
@@ -1335,13 +1335,13 @@ namespace Objsheets {
     }));
   };
 
-  Template.Spreadsheet.events = {
+  Template["Spreadsheet"].events = {
     "click .toggleHeaderExpanded": () => {
       toggleHeaderExpanded();
     }
   };
 
-  Template.Spreadsheet.helpers({
+  Template["Spreadsheet"].helpers({
     // TODO: Find a less hacky way to make this happen? ~ Matt 2015-10-01
     actionBarClass: () => ActionBar.isExpanded() ? "actionBarExpanded" : "",
     selectionLockClass: () => ActionBar.hasUnsavedData() ? "selectionLock" : ""

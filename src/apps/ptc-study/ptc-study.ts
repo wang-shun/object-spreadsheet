@@ -9,11 +9,11 @@ namespace Objsheets {
       });
     });
 
-    Template.PTC_study_login.created = function() {
+    Template["PTC_study_login"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null);  // no procedures
     };
 
-    Template.PTC_study_login.helpers({
+    Template["PTC_study_login"].helpers({
       root: () => {
         try {
           return Relsheets.readObj(T(rootColumnId, [T(parseObjectTypeRef("FamilyPage"), [T(parseColumnRef("FamilyPage:studentName")[0])])]));
@@ -34,11 +34,11 @@ namespace Objsheets {
       });
     });
 
-    Template.PTC_study_FamilyPage.created = function() {
+    Template["PTC_study_FamilyPage"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "ptc-study");
     };
 
-    Template.PTC_study_FamilyPage.helpers({
+    Template["PTC_study_FamilyPage"].helpers({
       FamilyPage: function() {
         return Relsheets.readSubtree("FamilyPage", this.familyPage);
       },
@@ -50,7 +50,7 @@ namespace Objsheets {
       jbutton.text("∙ ∙ ∙");
     }
 
-    Template.PTC_study_FamilyPage.events({
+    Template["PTC_study_FamilyPage"].events({
       "click .schedule": function(ev) {
         blur($(ev.target));
         Relsheets.call("parentScheduleMeeting", {

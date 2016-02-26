@@ -17,11 +17,11 @@ namespace Objsheets {
       });
     });
 
-    Template.MilkMaid.created = function() {
+    Template["MilkMaid"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "milk");
     };
 
-    Template.MilkMaid.helpers({
+    Template["MilkMaid"].helpers({
       milk: () => Relsheets.read(),
       label: function() {
         return this["name"];
@@ -35,7 +35,7 @@ namespace Objsheets {
       stringify: (a) => JSON.stringify(a)
     });
 
-    Template.MilkMaid.events({
+    Template["MilkMaid"].events({
       "click button": function() {
         Relsheets.call("supply", {
           me: this

@@ -3,7 +3,7 @@ namespace Objsheets {
   let fullTextToShow = new ReactiveVar(null);
   let isLoading = new ReactiveVar(true);
 
-  Template.actionBar.helpers({
+  Template["actionBar"].helpers({
     loading: () => isLoading.get(),
     fullTextToShow: () => fullTextToShow.get(),
     changeColumnArgs: () => changeColumnArgs.get()
@@ -39,7 +39,7 @@ namespace Objsheets {
 
   let tracingView = null;
 
-  Template.changeColumn.rendered = function() {
+  Template["changeColumn"].rendered = function() {
     // XXX What if there are unsaved changes when the formula changes externally?
     this.autorun(() => {
       newFormulaStr.set(origFormulaStr.get());
@@ -85,7 +85,7 @@ namespace Objsheets {
     });
   };
 
-  Template.changeColumn.destroyed = () => {
+  Template["changeColumn"].destroyed = () => {
     // Try to avoid holding on to data that's no longer relevant.
     // XXX: Should we rather define the reactive vars on the template instance?
     // Then we'd need more Template.instance() from the helpers.
@@ -129,7 +129,7 @@ namespace Objsheets {
     });
   });
 
-  Template.changeColumn.helpers({
+  Template["changeColumn"].helpers({
     //col: -> getColumn(@columnId)
     isFormulaModified: () => newFormulaStr.get() !== origFormulaStr.get(),
     canSave: () => {
@@ -435,7 +435,7 @@ namespace Objsheets {
     }).count() > 0;
   }
 
-  Template.changeColumn.events({
+  Template["changeColumn"].events({
     "change #changeColumn-backend": function(event, template) {
       let newFormula = getValueOfSelectedOption(template, "#changeColumn-backend") === "computed" ? DUMMY_FORMULA : null;  //changeColumn-backend') == 'computed'
       let col = getColumn(this.columnId);

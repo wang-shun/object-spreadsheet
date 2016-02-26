@@ -25,15 +25,15 @@ namespace Objsheets {
       });
     });
 
-    Template.DoubleOhFiveQueue.created = function() {
+    Template["DoubleOhFiveQueue"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "005q");
     };
 
-    Template.DoubleOhFiveQueueStaff.created = function() {
+    Template["DoubleOhFiveQueueStaff"].created = function() {
       Relsheets.open(this.data != null ? this.data.sheet : null, "005q");
     };
 
-    Template.DoubleOhFiveQueue.helpers({
+    Template["DoubleOhFiveQueue"].helpers({
       root: () => Relsheets.read(),
       sortBy: (objs, field) => _.sortBy(objs, (x) => x[field][0]),
       people: (calls) => {
@@ -42,7 +42,7 @@ namespace Objsheets {
       }
     });
 
-    Template.DoubleOhFiveQueue.events({
+    Template["DoubleOhFiveQueue"].events({
       "submit form": (event) => {
         let formData = {
           name: [event.target.name.value],
@@ -67,11 +67,11 @@ namespace Objsheets {
       }
     });
 
-    Template.DoubleOhFiveQueueStaff.helpers({
+    Template["DoubleOhFiveQueueStaff"].helpers({
       root: () => Relsheets.read()
     });
 
-    Template.DoubleOhFiveQueueStaff.events({
+    Template["DoubleOhFiveQueueStaff"].events({
       "click .pick": function() {
         Relsheets.call("pick", {
           call: this.call,

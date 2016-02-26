@@ -4,11 +4,11 @@ if Meteor.isClient
     @render "PTC_study_login", data: {sheet: @params.sheet}
     return
 
-  Template.PTC_study_login.created = ->
+  Template['PTC_study_login'].created = ->
     Relsheets.open(@data?.sheet)  # no procedures
     return
 
-  Template.PTC_study_login.helpers
+  Template['PTC_study_login'].helpers
     root: ->
       try
         Relsheets.readObj(
@@ -26,11 +26,11 @@ if Meteor.isClient
       familyPage: JSON.parse(@params.familyPage)}
     return
 
-  Template.PTC_study_FamilyPage.created = ->
+  Template['PTC_study_FamilyPage'].created = ->
     Relsheets.open(@data?.sheet, 'ptc-study')
     return
 
-  Template.PTC_study_FamilyPage.helpers
+  Template['PTC_study_FamilyPage'].helpers
     FamilyPage: -> Relsheets.readSubtree('FamilyPage', @familyPage)
     formatDate: (d) -> valueToTextIgnoreErrors('date', d)
 
@@ -39,7 +39,7 @@ if Meteor.isClient
     jbutton.text("∙ ∙ ∙")
     return
 
-  Template.PTC_study_FamilyPage.events
+  Template['PTC_study_FamilyPage'].events
     "click .schedule": (ev) ->
       blur($(ev.target))
       Relsheets.call("parentScheduleMeeting", {block: this},

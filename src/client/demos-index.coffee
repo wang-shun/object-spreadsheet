@@ -27,7 +27,7 @@ Router.route(
     onAfterAction: -> document.title = "Object Spreadsheets"; return
   })
 
-Template.Index.helpers
+Template['Index'].helpers
   # Since we aren't restricting what domain names can point to our hosted demo
   # servers, it's easiest to just base this on the URL of the current page.  To
   # use Meteor.absoluteUrl, we'd have to set the ROOT_URL environment variable
@@ -38,7 +38,7 @@ Template.Index.helpers
   indexMultiuser: () -> indexMultiuser
   newSheetName: () -> Session.get('newSheetName')
 
-Template.Index_ConditionalExampleLink.helpers
+Template['Index_ConditionalExampleLink'].helpers
   examplesNamePrefixWithDot: () ->
     examplesNamePrefix = Template.parentData().examplesNamePrefix
     if examplesNamePrefix then examplesNamePrefix + '.' else ''
@@ -46,7 +46,7 @@ Template.Index_ConditionalExampleLink.helpers
     examplesNamePrefix = Template.parentData().examplesNamePrefix
     !indexMultiuser || examplesNamePrefix
 
-Template.Index.events
+Template['Index'].events
   'input #examplesNamePrefix': (event, template) ->
     Router.go(indexPathForExamplesNamePrefix(event.target.value)); return
   'input #newSheetName': (event, template) ->
