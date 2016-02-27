@@ -1,7 +1,7 @@
 namespace Objsheets {
 
   if (Meteor.isServer) {
-    Relsheets.procedures("ptc-study-solution", {
+    RelsheetsServer.procedures("ptc-study-solution", {
       parentScheduleMeeting: {
         params: [["block", "FamilyPage:EnrollmentBlock:AvailableSlotBlock"]],
         body: "block.EnrollmentBlock.enrollment.scheduledSlot := block.slot"

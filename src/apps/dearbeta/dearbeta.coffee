@@ -8,32 +8,32 @@ if Meteor.isClient
     return
 
   Template['DearBeta'].created = ->
-    Relsheets.open(@data?.sheet, 'beta')
+    RelsheetsClient.open(@data?.sheet, 'beta')
     return
 
   Template['DearBeta'].helpers
     files: ->
-      obj = Relsheets.read()
+      obj = RelsheetsClient.read()
       obj.File
 
   Template['DearBeta'].events
     "click .Request .up": ->
-      Relsheets.call("requestUp", {at: [@Request.qFamilyId.cellId]})
+      RelsheetsClient.call("requestUp", {at: [@Request.qFamilyId.cellId]})
       return
     "click .Request .down": ->
-      Relsheets.call("requestDown", {at: [@qCellId.cellId]})
+      RelsheetsClient.call("requestDown", {at: [@qCellId.cellId]})
       return
     "click .Hint .up": ->
-      Relsheets.call("hintUp", {at: [@Vote.qFamilyId.cellId]})
+      RelsheetsClient.call("hintUp", {at: [@Vote.qFamilyId.cellId]})
       return
     "click .Hint .down": ->
-      Relsheets.call("hintDown", {at: [@qCellId.cellId]})
+      RelsheetsClient.call("hintDown", {at: [@qCellId.cellId]})
       return
     "click .Hint .del": ->
-      Relsheets.call("hintDel", {at: [@qCellId.cellId]})
+      RelsheetsClient.call("hintDel", {at: [@qCellId.cellId]})
       return
     "submit form": (event) ->
-      Relsheets.call(
+      RelsheetsClient.call(
         "hintAdd",
         {at: [@Hint.qFamilyId.cellId], text: [event.target.text.value]},
         (error, result) -> if !error? then event.target.reset(); return)
@@ -42,7 +42,7 @@ if Meteor.isClient
 
 if Meteor.isServer
   
-  Relsheets.procedures "beta",
+  RelsheetsServer.procedures "beta",
     requestUp:
       params: [['at', 'File:Node:Time']]
       body: '''new at.Request'''

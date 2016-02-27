@@ -17,13 +17,13 @@ namespace Objsheets {
     });
 
     Template["PTC_study_solution_login"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null);  // no procedures
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null);  // no procedures
     };
 
     Template["PTC_study_solution_login"].helpers({
       root: () => {
         try {
-          return Relsheets.readObj(T(rootColumnId, [T(parseObjectTypeRef("FamilyPage"), [T(parseColumnRef("FamilyPage:studentName")[0])])]));
+          return RelsheetsClient.readObj(T(rootColumnId, [T(parseObjectTypeRef("FamilyPage"), [T(parseColumnRef("FamilyPage:studentName")[0])])]));
         } catch (e) {
           // Saw some cases of not ready.  XXX: Distinguish from real errors.
           return {};
@@ -42,12 +42,12 @@ namespace Objsheets {
     });
 
     Template["PTC_study_solution_FamilyPage"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "ptc-study-solution");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "ptc-study-solution");
     };
 
     Template["PTC_study_solution_FamilyPage"].helpers({
       FamilyPage: function() {
-        return Relsheets.readSubtree("FamilyPage", this.familyPage);
+        return RelsheetsClient.readSubtree("FamilyPage", this.familyPage);
       },
       formatDate: (d) => valueToTextIgnoreErrors("date", d)
     });
@@ -60,7 +60,7 @@ namespace Objsheets {
     Template["PTC_study_solution_FamilyPage"].events({
       "click .schedule": function(ev) {
         blur($(ev.target));
-        Relsheets.call("parentScheduleMeeting", {
+        RelsheetsClient.call("parentScheduleMeeting", {
           block: this
         }, (error, result) => {
           $(ev.target).text("Schedule");
@@ -68,7 +68,7 @@ namespace Objsheets {
       },
       "click .cancel": function(ev) {
         blur($(ev.target));
-        Relsheets.call("parentCancelMeeting", {
+        RelsheetsClient.call("parentCancelMeeting", {
           block: this
         }, (error, result) => {
           $(ev.target).text("Cancel");

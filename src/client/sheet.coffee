@@ -1115,7 +1115,7 @@ Template['Spreadsheet'].rendered = ->
   viewId = @data?.viewId
   # $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
   if sheet then document.title = sheet
-  Relsheets.open(sheet)
+  RelsheetsClient.open(sheet)
   Tracker.autorun(guarded -> rebuildView viewId; return)
   return
 

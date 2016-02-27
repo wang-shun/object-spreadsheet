@@ -9,11 +9,11 @@ if Meteor.isClient
     return
 
   Template['MilkMaid'].created = ->
-    Relsheets.open(@data?.sheet, 'milk')
+    RelsheetsClient.open(@data?.sheet, 'milk')
     return
 
   Template['MilkMaid'].helpers
-    milk: -> Relsheets.read()
+    milk: -> RelsheetsClient.read()
     label: -> @['name']
     isNext: -> @isNext[0]
     sameAs: (o) -> EJSON.equals(@qCellId, o[0]?.qCellId)
@@ -21,16 +21,16 @@ if Meteor.isClient
     
   Template['MilkMaid'].events
     "click button": ->
-      Relsheets.call("supply", {me: @})
+      RelsheetsClient.call("supply", {me: @})
       return
     "click .marking": ->
-      Relsheets.call("request", {level: @})
+      RelsheetsClient.call("request", {level: @})
       return
 
       
 if Meteor.isServer
 
-  Relsheets.procedures 'milk',
+  RelsheetsServer.procedures 'milk',
     supply:
       params: [['me', 'Team']]
       body: '''$Gauge.reading := {l: $Gauge.Level | l.name = "Full"}

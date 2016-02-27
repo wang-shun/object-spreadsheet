@@ -17,44 +17,44 @@ namespace Objsheets {
     });
 
     Template["DearBeta"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "beta");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "beta");
     };
 
     Template["DearBeta"].helpers({
       files: () => {
-        let obj = Relsheets.read();
+        let obj = RelsheetsClient.read();
         return obj.File;
       }
     });
 
     Template["DearBeta"].events({
       "click .Request .up": function() {
-        Relsheets.call("requestUp", {
+        RelsheetsClient.call("requestUp", {
           at: [this.Request.qFamilyId.cellId]
         });
       },
       "click .Request .down": function() {
-        Relsheets.call("requestDown", {
+        RelsheetsClient.call("requestDown", {
           at: [this.qCellId.cellId]
         });
       },
       "click .Hint .up": function() {
-        Relsheets.call("hintUp", {
+        RelsheetsClient.call("hintUp", {
           at: [this.Vote.qFamilyId.cellId]
         });
       },
       "click .Hint .down": function() {
-        Relsheets.call("hintDown", {
+        RelsheetsClient.call("hintDown", {
           at: [this.qCellId.cellId]
         });
       },
       "click .Hint .del": function() {
-        Relsheets.call("hintDel", {
+        RelsheetsClient.call("hintDel", {
           at: [this.qCellId.cellId]
         });
       },
       "submit form": function(event) {
-        Relsheets.call("hintAdd", {
+        RelsheetsClient.call("hintAdd", {
           at: [this.Hint.qFamilyId.cellId],
           text: [event.target.text.value]
         }, (error, result) => {
@@ -68,7 +68,7 @@ namespace Objsheets {
   }
 
   if (Meteor.isServer) {
-    Relsheets.procedures("beta", {
+    RelsheetsServer.procedures("beta", {
       requestUp: {
         params: [["at", "File:Node:Time"]],
         body: "new at.Request"

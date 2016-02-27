@@ -1,6 +1,6 @@
 if Meteor.isServer
 
-  Relsheets.procedures('ptc-study', {
+  RelsheetsServer.procedures('ptc-study', {
 
     parentScheduleMeeting:
       params: [['block', 'FamilyPage:EnrollmentBlock:AvailableSlotBlock']]

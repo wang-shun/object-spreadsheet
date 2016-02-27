@@ -18,11 +18,11 @@ namespace Objsheets {
     });
 
     Template["MilkMaid"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "milk");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "milk");
     };
 
     Template["MilkMaid"].helpers({
-      milk: () => Relsheets.read(),
+      milk: () => RelsheetsClient.read(),
       label: function() {
         return this["name"];
       },
@@ -37,12 +37,12 @@ namespace Objsheets {
 
     Template["MilkMaid"].events({
       "click button": function() {
-        Relsheets.call("supply", {
+        RelsheetsClient.call("supply", {
           me: this
         });
       },
       "click .marking": function() {
-        Relsheets.call("request", {
+        RelsheetsClient.call("request", {
           level: this
         });
       }
@@ -50,7 +50,7 @@ namespace Objsheets {
   }
 
   if (Meteor.isServer) {
-    Relsheets.procedures("milk", {
+    RelsheetsServer.procedures("milk", {
       supply: {
         params: [["me", "Team"]],
         body: "$Gauge.reading := {l: $Gauge.Level | l.name = \"Full\"}\nme.quota := me.quota - 2\nif (me.quota <= 0) {\n  me.lastTime := d\"now\" \n  $Team.quota := 4      # reset all quotas\n  let m = new $Message\n  m.`to` := {c: $Team | c.isNext}\n  m.subject := \"Heads Up: You Are Next\"\n}"  // reset all quotas

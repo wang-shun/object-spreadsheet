@@ -1274,7 +1274,7 @@ namespace Objsheets {
     if (sheet) {
       document.title = sheet;
     }
-    Relsheets.open(sheet);
+    RelsheetsClient.open(sheet);
     Tracker.autorun(guarded(() => {
       rebuildView(viewId);
     }));

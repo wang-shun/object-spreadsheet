@@ -24,19 +24,19 @@ if Meteor.isClient
     'click .demo-ptc-switch-to-master-data': -> ptcDemoShowingMasterData.set(true); return
 
   Template['PTC_Parent'].created = ->
-    Relsheets.open(@data?.sheet, 'ptc')
+    RelsheetsClient.open(@data?.sheet, 'ptc')
     return
 
   Template['PTC_Parent'].helpers
-    viewData: -> Relsheets.readSubtree('ParentView', [@clientUser])
+    viewData: -> RelsheetsClient.readSubtree('ParentView', [@clientUser])
 
   Template['PTC_Parent_login'].created = ->
-    Relsheets.open(@data?.sheet)
+    RelsheetsClient.open(@data?.sheet)
     return
 
   Template['PTC_Parent_login'].helpers
     root: -> 
-      Relsheets.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
+      RelsheetsClient.readObj((new View("1").def())?.layout || new Tree(rootColumnId))
 
   blur = (jbutton) ->
     jbutton.width(jbutton.width())
@@ -54,7 +54,7 @@ if Meteor.isClient
     # possible).  Further experience should inform the design here.
     "click .schedule": (ev) ->
       blur($(ev.target))
-      Relsheets.call("parentCreateMeeting", {
+      RelsheetsClient.call("parentCreateMeeting", {
         clientUser: [@clientUser],
         enr: [@enrollment],
         slot: [@slot]},
@@ -62,7 +62,7 @@ if Meteor.isClient
       return
     "click .cancel": (ev) ->
       blur($(ev.target))
-      Relsheets.call("parentCancelMeeting", {
+      RelsheetsClient.call("parentCancelMeeting", {
         clientUser: [@clientUser],
         meeting: @meeting},
         (error, result) -> $(ev.target).text('Cancel'); return)
@@ -71,7 +71,7 @@ if Meteor.isClient
       
 if Meteor.isServer
 
-  Relsheets.procedures 'ptc',
+  RelsheetsServer.procedures 'ptc',
     teacherCreateSlot:
       params: [['clientUser', 'Person'],
                ['time', 'text']]

@@ -13,15 +13,15 @@ if Meteor.isClient
     return
 
   Template['DoubleOhFiveQueue'].created = ->
-    Relsheets.open(@data?.sheet, '005q')
+    RelsheetsClient.open(@data?.sheet, '005q')
     return
 
   Template['DoubleOhFiveQueueStaff'].created = ->
-    Relsheets.open(@data?.sheet, '005q')
+    RelsheetsClient.open(@data?.sheet, '005q')
     return
 
   Template['DoubleOhFiveQueue'].helpers
-    root: -> Relsheets.read()
+    root: -> RelsheetsClient.read()
     sortBy: (objs, field) ->
       _.sortBy(objs, (x) -> x[field][0])
     people: (calls) ->
@@ -36,7 +36,7 @@ if Meteor.isClient
         name: [event.target.name.value]
         issue: [event.target.issue.value]
         location: [event.target.location.value]
-      Relsheets.call("enqueue", formData, (error, result) -> if !error? then event.target.reset(); return)
+      RelsheetsClient.call("enqueue", formData, (error, result) -> if !error? then event.target.reset(); return)
       $('.help.button').addClass("disabled")
       false
       
@@ -49,23 +49,23 @@ if Meteor.isClient
       return
 
   Template['DoubleOhFiveQueueStaff'].helpers
-    root: -> Relsheets.read()
+    root: -> RelsheetsClient.read()
     
   Template['DoubleOhFiveQueueStaff'].events
     "click .pick": ->
-      Relsheets.call("pick", {@call, @user})
+      RelsheetsClient.call("pick", {@call, @user})
       return
     "click .forfeit": ->
-      Relsheets.call("forfeit", {@call, @user})
+      RelsheetsClient.call("forfeit", {@call, @user})
       return
     "click .done": ->
-      Relsheets.call("done", {@call})
+      RelsheetsClient.call("done", {@call})
       return
 
     
 if Meteor.isServer
 
-  Relsheets.procedures '005q',
+  RelsheetsServer.procedures '005q',
     enqueue:
       params: [['name', 'text'],
                ['issue', 'text'],

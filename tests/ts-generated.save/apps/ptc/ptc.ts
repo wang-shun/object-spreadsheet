@@ -42,21 +42,21 @@ namespace Objsheets {
     });
 
     Template["PTC_Parent"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "ptc");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "ptc");
     };
 
     Template["PTC_Parent"].helpers({
       viewData: function() {
-        return Relsheets.readSubtree("ParentView", [this.clientUser]);
+        return RelsheetsClient.readSubtree("ParentView", [this.clientUser]);
       }
     });
 
     Template["PTC_Parent_login"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null);
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null);
     };
 
     Template["PTC_Parent_login"].helpers({
-      root: () => Relsheets.readObj(((new View("1").def()) != null ? (new View("1").def()).layout : null) || new Tree(rootColumnId))
+      root: () => RelsheetsClient.readObj(((new View("1").def()) != null ? (new View("1").def()).layout : null) || new Tree(rootColumnId))
     });
 
     function blur(jbutton) {
@@ -75,7 +75,7 @@ namespace Objsheets {
       // possible).  Further experience should inform the design here.
       "click .schedule": function(ev) {
         blur($(ev.target));
-        Relsheets.call("parentCreateMeeting", {
+        RelsheetsClient.call("parentCreateMeeting", {
           clientUser: [this.clientUser],
           enr: [this.enrollment],
           slot: [this.slot]
@@ -85,7 +85,7 @@ namespace Objsheets {
       },
       "click .cancel": function(ev) {
         blur($(ev.target));
-        Relsheets.call("parentCancelMeeting", {
+        RelsheetsClient.call("parentCancelMeeting", {
           clientUser: [this.clientUser],
           meeting: this.meeting
         }, (error, result) => {
@@ -96,7 +96,7 @@ namespace Objsheets {
   }
 
   if (Meteor.isServer) {
-    Relsheets.procedures("ptc", {
+    RelsheetsServer.procedures("ptc", {
       teacherCreateSlot: {
         params: [["clientUser", "Person"], ["time", "text"]],
         body: "let t = clientUser.Teacher\ncheck t != {}\nlet s = new t.Slot\ns.time := time\ncheck $valid"

@@ -101,7 +101,7 @@ namespace Objsheets {
   // Scanning for all possible reference types is slow enough to make the selection
   // feel laggy, so cache the menu and reuse it.
   let typeMenuCommonItems = new ReactiveVar([]);
-  Relsheets.onOpen(() => {
+  RelsheetsClient.onOpen(() => {
     Tracker.autorun(() => {
       // Note: It's possible to create cycles in the "key + parent" relation on
       // object types.  This is a pointless thing to do but does not break our

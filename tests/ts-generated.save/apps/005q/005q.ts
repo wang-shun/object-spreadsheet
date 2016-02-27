@@ -26,15 +26,15 @@ namespace Objsheets {
     });
 
     Template["DoubleOhFiveQueue"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "005q");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "005q");
     };
 
     Template["DoubleOhFiveQueueStaff"].created = function() {
-      Relsheets.open(this.data != null ? this.data.sheet : null, "005q");
+      RelsheetsClient.open(this.data != null ? this.data.sheet : null, "005q");
     };
 
     Template["DoubleOhFiveQueue"].helpers({
-      root: () => Relsheets.read(),
+      root: () => RelsheetsClient.read(),
       sortBy: (objs, field) => _.sortBy(objs, (x) => x[field][0]),
       people: (calls) => {
         let count = (calls != null ? calls.length : null) || 0;
@@ -49,7 +49,7 @@ namespace Objsheets {
           issue: [event.target.issue.value],
           location: [event.target.location.value]
         };
-        Relsheets.call("enqueue", formData, (error, result) => {
+        RelsheetsClient.call("enqueue", formData, (error, result) => {
           if (error == null) {
             event.target.reset();
           }
@@ -68,24 +68,24 @@ namespace Objsheets {
     });
 
     Template["DoubleOhFiveQueueStaff"].helpers({
-      root: () => Relsheets.read()
+      root: () => RelsheetsClient.read()
     });
 
     Template["DoubleOhFiveQueueStaff"].events({
       "click .pick": function() {
-        Relsheets.call("pick", {
+        RelsheetsClient.call("pick", {
           call: this.call,
           user: this.user
         });
       },
       "click .forfeit": function() {
-        Relsheets.call("forfeit", {
+        RelsheetsClient.call("forfeit", {
           call: this.call,
           user: this.user
         });
       },
       "click .done": function() {
-        Relsheets.call("done", {
+        RelsheetsClient.call("done", {
           call: this.call
         });
       }
@@ -93,7 +93,7 @@ namespace Objsheets {
   }
 
   if (Meteor.isServer) {
-    Relsheets.procedures("005q", {
+    RelsheetsServer.procedures("005q", {
       enqueue: {
         params: [["name", "text"], ["issue", "text"], ["location", "text"]],
         body: "let q = new $Call\nq.time := d\"now\"\nq.name := name\nq.location := location\nq.issue := {s : $Skill | s.name = issue}"

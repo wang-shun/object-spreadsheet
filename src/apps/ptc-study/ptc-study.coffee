@@ -5,13 +5,13 @@ if Meteor.isClient
     return
 
   Template['PTC_study_login'].created = ->
-    Relsheets.open(@data?.sheet)  # no procedures
+    RelsheetsClient.open(@data?.sheet)  # no procedures
     return
 
   Template['PTC_study_login'].helpers
     root: ->
       try
-        Relsheets.readObj(
+        RelsheetsClient.readObj(
           T(rootColumnId,
             [T(parseObjectTypeRef('FamilyPage'),
                [T(parseColumnRef('FamilyPage:studentName')[0])])]))
@@ -27,11 +27,11 @@ if Meteor.isClient
     return
 
   Template['PTC_study_FamilyPage'].created = ->
-    Relsheets.open(@data?.sheet, 'ptc-study')
+    RelsheetsClient.open(@data?.sheet, 'ptc-study')
     return
 
   Template['PTC_study_FamilyPage'].helpers
-    FamilyPage: -> Relsheets.readSubtree('FamilyPage', @familyPage)
+    FamilyPage: -> RelsheetsClient.readSubtree('FamilyPage', @familyPage)
     formatDate: (d) -> valueToTextIgnoreErrors('date', d)
 
   blur = (jbutton) ->
@@ -42,11 +42,11 @@ if Meteor.isClient
   Template['PTC_study_FamilyPage'].events
     "click .schedule": (ev) ->
       blur($(ev.target))
-      Relsheets.call("parentScheduleMeeting", {block: this},
+      RelsheetsClient.call("parentScheduleMeeting", {block: this},
                      (error, result) -> $(ev.target).text('Schedule'); return)
       return
     "click .cancel": (ev) ->
       blur($(ev.target))
-      Relsheets.call("parentCancelMeeting", {block: this},
+      RelsheetsClient.call("parentCancelMeeting", {block: this},
                      (error, result) -> $(ev.target).text('Cancel'); return)
       return
