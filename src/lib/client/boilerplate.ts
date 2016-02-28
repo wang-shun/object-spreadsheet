@@ -76,8 +76,9 @@ namespace Objsheets {
       return this.readObj(layout, [], true);
     },
     readSubtree: function(columnStr, rootCellId) {
+      let columnTree;
       try {
-        let columnTree = View.drillDown(parseObjectTypeRef(columnStr));
+        columnTree = View.drillDown(parseObjectTypeRef(columnStr));
       } catch (e) {
         // Apparently the above can be attempted before the client has received the
         // entire Columns publication.  XXX: Avoid catching real errors.

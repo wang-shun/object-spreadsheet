@@ -333,8 +333,9 @@ namespace Objsheets {
   export function loadDumpIfExists(model, appName) {
     try {
       for (let [coll, collName] of [[Columns, "columns"], [Cells, "cells"], [Views, "views"]]) {
+        let dump;
         try {
-          let dump = Assets.getText(`dump/${appName}_${collName}.json`);
+          dump = Assets.getText(`dump/${appName}_${collName}.json`);
           console.log(`reading dump/${appName}_${collName}.json`);
         } catch (e) {
           // Assume there's no dump to load for this appName.  XXX: Be stricter?

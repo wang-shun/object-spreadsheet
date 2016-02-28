@@ -345,9 +345,9 @@ namespace Objsheets {
   }
 
   function upsertOne(collection, selector, modifier, callback) {
-    let doc = collection.findOne(selector);
+    let doc = collection.findOne(selector), id;
     if (doc) {
-      let id = doc._id;
+      id = doc._id;
     } else {
       id = collection.insert(selector);
     }

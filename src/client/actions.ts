@@ -455,8 +455,9 @@ namespace Objsheets {
             $exists: true
           }
         }).count();
+        let msg;
         if (col.typecheckError != null) {
-          let msg = "This will delete your formula.  ";
+          msg = "This will delete your formula.  ";
         } else {
           msg = "This will take a snapshot of the current computed data and delete your formula.";
           if (numErroneousFamilies) {

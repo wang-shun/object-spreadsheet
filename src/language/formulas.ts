@@ -279,8 +279,9 @@ namespace Objsheets {
     // XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
 
     // Go up.
+    let result;
     if (startCellsTset.type === targetColId) {
-      let result = startCellsTset;
+      result = startCellsTset;
     } else {
       let numIdStepsToDrop = $$.formulaEngine.goUpMemo.get(`${startCellsTset.type}-${targetColId}`, () => {
         let [upPath, downPath] = findCommonAncestorPaths(startCellsTset.type, targetColId);
@@ -343,12 +344,13 @@ namespace Objsheets {
       newRefsSeen.add(qCellId);
       let col = model.getColumn(type);
       let displayColId = fallback(col.referenceDisplayColumn, defaultReferenceDisplayColumn(col));
+      let displayTset;
       if (displayColId === null) {
         // Really nothing we can use?
         return "<reference>";
       } else if (displayColId === type && col.type !== "_token") {
         // The key of a keyed object.
-        let displayTset = getValues(model, new TypedSet(type, set([value])));
+        displayTset = getValues(model, new TypedSet(type, set([value])));
       } else if (col.children.indexOf(displayColId) >= 0 && !model.getColumn(displayColId).isObject) {
         displayTset = readFamilyForFormula(model, {
           columnId: displayColId,
@@ -924,8 +926,9 @@ namespace Objsheets {
   // Assumes formula has passed typechecking.
   // vars: EJSONKeyedMap<string, TypedSet>
   export function evaluateFormula(model, vars, formula) {
+    let result;
     try {
-      let result = dispatchFormula("evaluate", formula, model, vars);
+      result = dispatchFormula("evaluate", formula, model, vars);
     } catch (e) {
       if (e instanceof EvaluationError && model.isTracing) {
         if (formula.traces == null) {

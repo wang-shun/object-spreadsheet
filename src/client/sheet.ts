@@ -137,16 +137,16 @@ namespace Objsheets {
     }
 
     public prerenderHlist(cellId, value) {
-      let minHeight = 1;
+      let minHeight = 1, displayValue, error;
       try {
-        let displayValue = valueToText(liteModel, this.col.type, value);
+        displayValue = valueToText(liteModel, this.col.type, value);
         if (typeIsReference(this.col.type)) {
           displayValue = new CellReference({
             columnId: this.col.type,
             cellId: value
           }, displayValue);
         }
-        let error = null;
+        error = null;
       } catch (e) {
         displayValue = null;
         error = e.message;
@@ -161,8 +161,9 @@ namespace Objsheets {
         columnId: this.columnId,
         cellId: vlist.parentCellId
       };
+      let grid;
       if (vlist.hlists != null) {
-        let grid = [];
+        grid = [];
         for (let hlist of vlist.hlists) {
           gridVertExtend(grid, this.renderHlist(hlist, hlist.minHeight));
         }
@@ -330,14 +331,14 @@ namespace Objsheets {
       }
       if (this.col.type !== "_token") {
         let myFieldColorClass = (fieldMatchIdx = typeColors.get(this.col.type)) != null ? "rsHeaderMatch" + this.colorIndexForMatch(fieldMatchIdx) : myDepthClass;
-        fieldNameCell = new ViewCell(fallback(this.col.fieldName, ""), 1, 1, [(this.col.isObject ? "rsHeaderFieldNameKey" : "rsHeaderFieldNameLeaf"), myFieldColorClass]);
+        let fieldNameCell = new ViewCell(fallback(this.col.fieldName, ""), 1, 1, [(this.col.isObject ? "rsHeaderFieldNameKey" : "rsHeaderFieldNameLeaf"), myFieldColorClass]);
         fieldNameCell.columnId = this.columnId;
         fieldNameCell.kind = "below";
         let typeName = stringifyTypeForSheet(this.col.type);
         // The type is essential to interpret values in the column.  The rest of
         // the attributes are no more important than the formula itself, which we
         // currently show only in the action bar, so don't show them here.
-        typeCell = new ViewCell(typeName, 1, 1, [(this.col.isObject ? "rsHeaderTypeKey" : "rsHeaderTypeLeaf"), myFieldColorClass].concat(this.markDisplayClasses()));
+        let typeCell = new ViewCell(typeName, 1, 1, [(this.col.isObject ? "rsHeaderTypeKey" : "rsHeaderTypeLeaf"), myFieldColorClass].concat(this.markDisplayClasses()));
         typeCell.columnId = this.columnId;
         typeCell.kind = "type";
         gridHorizExtend(grid, [[fieldNameCell], [typeCell]]);
@@ -386,7 +387,7 @@ namespace Objsheets {
           makeCorner(false);  // may increase currentHeight so next condition holds
         }
         if (subsectionGrid.length < currentHeight) {
-          cssClasses = [myColorClass];
+          let cssClasses = [myColorClass];
           if (i < this.subsections.length - 1 && !this.amRootWithSeparateTables) {
             cssClasses.push("rsHeaderNonfinal");
           }
@@ -1232,8 +1233,8 @@ namespace Objsheets {
                 this.view.reorderColumn(ci, index + 1);
               }
             } else {
-              n = parentCol.children.length;
-              index = parentCol.children.indexOf(ci);
+              let n = parentCol.children.length;
+              let index = parentCol.children.indexOf(ci);
               if (event.which === 37 && index > 0) {  // Left
                 $$.call("reorderColumn", ci, index - 1, standardServerCallback);
               } else if (event.which === 39 && index < n - 1) {  // Right

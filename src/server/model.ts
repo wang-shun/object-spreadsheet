@@ -247,7 +247,7 @@ namespace Objsheets {
           if ((col.children != null ? col.children.length : null) !== 1) {
             throw new Meteor.Error("remove-object-has-children", "Object must have a single field before converting to values.");
           }
-          childId = col.children[0];
+          let childId = col.children[0];
           let childCol = this.getColumn(childId);
           if (childCol.isObject || (childCol.children != null ? childCol.children.length : null)) {
             throw new Meteor.Error("remove-object-complex-value", `Child '${fallback(fallback(childCol.objectName, childCol.fieldName), "(unnamed)")}' is not a simple value.`);
@@ -303,6 +303,7 @@ namespace Objsheets {
       if ((col.specifiedType === "_token") !== (specifiedType === "_token")) {
         throw new Meteor.Error("change-type-token", "Cannot change a column type to or from _token.");
       }
+      let newFamilies;
       if (col.formula == null) {
         if (col.isObject) {
           throw new Meteor.Error("change-type-state-keyed-object", "Oops... we haven't implemented changing the key type of a state object column " + "since we're deprecating state keyed objects.");
@@ -310,7 +311,7 @@ namespace Objsheets {
         // If we get here, there should be no descendant data to worry about.
         // Reparse existing data as the new type /before/ we invalidate computed
         // reference display columns.
-        let newFamilies = Cells.find({
+        newFamilies = Cells.find({
           column: columnId
         }).fetch().map((family) => {
           let newValues = [];
@@ -499,8 +500,9 @@ namespace Objsheets {
         if (col.typecheckError != null) {
           throw new EvaluationError(`Formula failed type checking: ${col.typecheckError}`);
         }
+        let result;
         if (compiled != null) {
-          let result = new TypedSet(col.type, compiled($$.formulaEngine, [qFamilyId.cellId]));
+          result = new TypedSet(col.type, compiled($$.formulaEngine, [qFamilyId.cellId]));
         } else {
           let vars = new EJSONKeyedMap([["this", new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]]);
           result = evaluateFormula(this, vars, col.formula);
