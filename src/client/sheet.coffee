@@ -897,7 +897,8 @@ class @ClientView
   # just the callback, so we maintain consistency in what command is offered.
 
   getAddCommandForCell: (c) ->
-    if c.qFamilyId? && columnIsState(col = getColumn(c.qFamilyId.columnId))
+    qf = c.qFamilyId
+    if qf? && columnIsState(col = getColumn(qf.columnId))
       objectName = objectNameWithFallback(col) ? '(unnamed)'
       if col.type == '_token'
         # A token column has only the object UI-column, though we don't set
@@ -905,7 +906,7 @@ class @ClientView
         return {
           name: "Add '#{objectName}' object here"
           callback: () =>
-            StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+            StateEdit.addCell(qf, null, standardServerCallback)
             return
         }
       else if col.type == '_unit'
@@ -918,7 +919,7 @@ class @ClientView
           return {
             name: 'Add X here'
             callback: () =>
-              StateEdit.addCell(c.qFamilyId, null, standardServerCallback)
+              StateEdit.addCell(qf, null, standardServerCallback)
               return
           }
       else
@@ -929,7 +930,7 @@ class @ClientView
             # ~ Matt 2015-11-22
             name: 'Add cell here'
             callback: () =>
-              new FamilyId(c.qFamilyId).addPlaceholder(standardServerCallback)
+              new FamilyId(qf).addPlaceholder(standardServerCallback)
               return
           }
     return null

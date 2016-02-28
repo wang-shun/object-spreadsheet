@@ -1077,7 +1077,8 @@ namespace Objsheets {
 
     public getAddCommandForCell(c) {
       var col;
-      if ((c.qFamilyId != null) && columnIsState(col = getColumn(c.qFamilyId.columnId))) {
+      let qf = c.qFamilyId;
+      if ((qf != null) && columnIsState(col = getColumn(qf.columnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
           // A token column has only the object UI-column, though we don't set
@@ -1085,7 +1086,7 @@ namespace Objsheets {
           return {
             name: `Add '${objectName}' object here`,
             callback: () => {
-              StateEdit.addCell(c.qFamilyId, null, standardServerCallback);
+              StateEdit.addCell(qf, null, standardServerCallback);
             }
           };
         } else if (col.type === "_unit") {
@@ -1106,7 +1107,7 @@ namespace Objsheets {
             return {
               name: "Add X here",
               callback: () => {
-                StateEdit.addCell(c.qFamilyId, null, standardServerCallback);
+                StateEdit.addCell(qf, null, standardServerCallback);
               }
             };
           }
@@ -1118,7 +1119,7 @@ namespace Objsheets {
               // ~ Matt 2015-11-22
               name: "Add cell here",
               callback: () => {
-                new FamilyId(c.qFamilyId).addPlaceholder(standardServerCallback);
+                new FamilyId(qf).addPlaceholder(standardServerCallback);
               }
             };
           }
