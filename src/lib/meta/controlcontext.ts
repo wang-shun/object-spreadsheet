@@ -48,22 +48,22 @@ let listeners = {
     }
 
     public run(func : any = () => {}) {
-        //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
-        return CallingContext.set(this, () => {
-          if (this.lock) {
-            this.scheduled.push(func);  // HACK
-          } else {
-            try {
-              this.lock = 1;
-              while (this.scheduled.length > 0) {
-                this.scheduled.pop().apply(this);
-              }
-            } finally {
-              this.lock = 0;
+      //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
+      return CallingContext.set(this, () => {
+        if (this.lock) {
+          this.scheduled.push(func);  // HACK
+        } else {
+          try {
+            this.lock = 1;
+            while (this.scheduled.length > 0) {
+              this.scheduled.pop().apply(this);
             }
-            return func.apply(this);
+          } finally {
+            this.lock = 0;
           }
-        });
+          return func.apply(this);
+        }
+      });
     }
 
     public "do"(task) {

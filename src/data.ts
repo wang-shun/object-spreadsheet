@@ -162,12 +162,12 @@ namespace Objsheets {
     }
 
     public value(set, callback : any = () => {}) {
-        if (set != null) {
-          this.remove();
-          this.family().add(set, callback);
-        } else {
-          return cellIdLastStep(this.cellId);
-        }
+      if (set != null) {
+        this.remove();
+        this.family().add(set, callback);
+      } else {
+        return cellIdLastStep(this.cellId);
+      }
     }
 
     public family(columnId) {
@@ -185,7 +185,7 @@ namespace Objsheets {
     }
 
     public remove(callback : any = () => {}) {
-        this.family().remove(this.value(), callback);
+      this.family().remove(this.value(), callback);
     }
 
     public ref() {
@@ -275,40 +275,40 @@ namespace Objsheets {
     }
 
     public remove(value, callback : any = () => {}) {
-        if (getColumn(this.columnId).isObject) {
-          Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
-        } else {
-          // optimization: deleting a single value is faster that way
-          // Use updateOne instead of update, since client is not allowed
-          // to update documents via selector, only by id
-          updateOne(Cells, {
-            column: this.columnId,
-            key: this.cellId
-          }, {
-            $pull: {
-              values: value
-            }
-          }, callback);
-        }
+      if (getColumn(this.columnId).isObject) {
+        Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
+      } else {
+        // optimization: deleting a single value is faster that way
+        // Use updateOne instead of update, since client is not allowed
+        // to update documents via selector, only by id
+        updateOne(Cells, {
+          column: this.columnId,
+          key: this.cellId
+        }, {
+          $pull: {
+            values: value
+          }
+        }, callback);
+      }
     }
 
     public addPlaceholder(callback : any = () => {}) {
-        // If the field is initially absent, $inc treats it as 0.
-        upsertOne(Cells, this.selector(), {
-          $inc: {
-            numPlaceholders: 1
-          }
-        }, callback);
+      // If the field is initially absent, $inc treats it as 0.
+      upsertOne(Cells, this.selector(), {
+        $inc: {
+          numPlaceholders: 1
+        }
+      }, callback);
     }
 
     public removePlaceholder(callback : any = () => {}) {
-        if (Cells.findOne(this.selector()) != null ? Cells.findOne(this.selector()).numPlaceholders : null) {  // XXX race
-          updateOne(Cells, this.selector(), {
-            $inc: {
-              numPlaceholders: -1
-            }
-          }, callback);
-        }
+      if (Cells.findOne(this.selector()) != null ? Cells.findOne(this.selector()).numPlaceholders : null) {  // XXX race
+        updateOne(Cells, this.selector(), {
+          $inc: {
+            numPlaceholders: -1
+          }
+        }, callback);
+      }
     }
   }
 
@@ -485,38 +485,39 @@ let _cnt = 0;
     }
 
     public remove(query, callback : any = () => {}) {
-        if ((column = query.column) != null) {
-          let byKey = this.byColumn[column];
-          if ((key = query.key) != null) {
-            if ((doc = byKey.get(key)) != null) {
-              this.stash(doc);
-              byKey["delete"](key);
-            }
-          } else {
-            if (byKey != null) {
-              for (let k in byKey.obj) {
-                let doc = byKey.obj[k];
-                this.stash(doc);
-              }
-              delete this.byColumn[column];
-            }
+      var column, doc, key;
+      if ((column = query.column) != null) {
+        let byKey = this.byColumn[column];
+        if ((key = query.key) != null) {
+          if ((doc = byKey.get(key)) != null) {
+            this.stash(doc);
+            byKey["delete"](key);
           }
         } else {
-          if ((key = query.key) != null) {
-            for (let k in this.byColumn) {
-              let v = this.byColumn[k];
-              this.remove({
-                column: k,
-                key: key
-              });
+          if (byKey != null) {
+            for (let k in byKey.obj) {
+              let doc = byKey.obj[k];
+              this.stash(doc);
             }
-          } else {
-            this.byColumn = {};
-            this.byId = {};
+            delete this.byColumn[column];
           }
         }
+      } else {
+        if ((key = query.key) != null) {
+          for (let k in this.byColumn) {
+            let v = this.byColumn[k];
+            this.remove({
+              column: k,
+              key: key
+            });
+          }
+        } else {
+          this.byColumn = {};
+          this.byId = {};
+        }
+      }
 
-        callback();
+      callback();
     }
 
     public stash(doc) {

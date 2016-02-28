@@ -462,19 +462,20 @@ namespace Objsheets {
     }
 
     public static modifyCell(qCellId, enteredValue, callback : any = () => {}) {
-        let cel = new CellId(qCellId);
-        let fam = cel.family();
-        if ((newValue = this.parseValueUi(fam, enteredValue)) != null) {
-          cel.value(newValue, (() => {
-            $$.call("notify", callback);
-          }));
-        }
+      var newValue;
+      let cel = new CellId(qCellId);
+      let fam = cel.family();
+      if ((newValue = this.parseValueUi(fam, enteredValue)) != null) {
+        cel.value(newValue, (() => {
+          $$.call("notify", callback);
+        }));
+      }
     }
 
     public static removeCell(qCellId, callback : any = () => {}) {
-        new CellId(qCellId).remove((() => {
-          $$.call("notify", callback);
-        }));
+      new CellId(qCellId).remove((() => {
+        $$.call("notify", callback);
+      }));
     }
 
     public static canEdit(columnId) {
