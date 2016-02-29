@@ -1,0 +1,14 @@
+#!/bin/bash
+# The TypeScript build plugin has an NPM dependency on a specific version of the
+# TypeScript compiler, which the Meteor build system automatically downloads.
+# We call this the "embedded" compiler.  This wrapper script allows other tools
+# to use the same compiler so we can standardize the version.
+
+tsc="$(dirname -- "$0")/../packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/.bin/tsc"
+if [ -x "$tsc" ]; then
+  exec "$tsc" "$@"
+else
+  echo >&2 'The embedded copy of the TypeScript compiler has not been downloaded.'
+  echo >&2 'Please run "meteor" once and try again.'
+  exit 127
+fi

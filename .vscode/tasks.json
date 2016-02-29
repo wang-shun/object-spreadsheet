@@ -16,8 +16,11 @@
 {
 	"version": "0.1.0",
 
-	// The command is tsc. Assumes that tsc has been installed using npm install -g typescript
-	"command": "tsc",
+	// Use the embedded copy of the TypeScript compiler.  Run "meteor" once to
+	// download it.  (Unfortunately, the semantics of "showOutput": "silent" do
+	// not appear to be such that the output window shows up when the wrapper
+	// script reports an error.) ~ Matt 2016-02-28
+	"command": "tests/tsc",
 
 	// The command is a shell script
 	"isShellCommand": true,
