@@ -495,7 +495,7 @@ namespace Objsheets {
           result = evaluateFormula(this, vars, col.formula);
         }
         if (0) {  //compiled?
-          let result1 = new TypedSet(col.type, compiled($$.formulaEngine, vars.get("this").set.elements()));
+          let result1 = new TypedSet(col.type, compiled($$.formulaEngine, [qFamilyId.cellId]));
           if (!EJSON.equals(result, result1)) {
             console.log(`Wrong output from compiler;\nformula=${s(col.formula)}]`);
             console.log(`> interpreter result = ${s(result)}`);
@@ -791,8 +791,8 @@ namespace Objsheets {
       let liveColumnIds = new EJSONKeyedSet();
       let scanColumnSubtree = (columnId) => {
         liveColumnIds.add(columnId);
-        let col = this.getColumn(columnId);
-        for (let childColId of col.children) {
+        let col1 = this.getColumn(columnId);
+        for (let childColId of col1.children) {
           scanColumnSubtree(childColId);
         }
       };
@@ -806,8 +806,8 @@ namespace Objsheets {
       let liveFamilies = new EJSONKeyedSet();  // {column, key}
       // Traversal code adapted from evaluateAll.
       let scanCellSubtree = (qCellId) => {
-        col = this.getColumn(qCellId.columnId);
-        for (let childColId of col.children) {
+        let col1 = this.getColumn(qCellId.columnId);
+        for (let childColId of col1.children) {
           let keyFields = {
             column: childColId,
             key: qCellId.cellId

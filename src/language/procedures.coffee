@@ -295,6 +295,7 @@ dispatch = {
       return
     execute: (model, mutableVars, bindVarName, fref) ->
       model.invalidateDataCache()
+      objects = []
       for parentCellId in fref.parentCellsTset.elements()
         for key in fref.keysTset.elements()
           # No-op if already exists

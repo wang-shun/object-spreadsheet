@@ -288,7 +288,7 @@ class @CellsInMemory
       else if k[0] == "$"
         throw Error "unimplemented [update(query=#{s query}, modifier=#{s modifier}, options=#{s options}) doc=#{s doc}]"
       else
-        doc[k] = _.clone(v)
+        doc[k] = _.clone(v0)
     #console.log "  >> #{JSON.stringify doc}"
     return
 
@@ -349,7 +349,7 @@ class TransactionCells
     
   update: (query, values, upsert=false) ->
     if _.size(values) != 1
-      throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+      throw new Error("unsupported update in transaction: '#{EJSON.stringify values}'")
     if values.$set?
       values = _.clone(values)
       values.$set.dirty = true
@@ -357,7 +357,7 @@ class TransactionCells
       values = _.clone(values)
       values.$set = {dirty: true}
     else
-      throw new Exception("unsupported update in transaction: '#{EJSON.stringify values}'")
+      throw new Error("unsupported update in transaction: '#{EJSON.stringify values}'")
     if upsert
       @mem.upsert(query, values)
     else

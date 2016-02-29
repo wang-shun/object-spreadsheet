@@ -1069,7 +1069,7 @@ view = null
   else
     view.reload() #viewDef
     view.hotReconfig()
-  exported {view}  # for debugging
+  @view = view  # for debugging
 
   Tracker.nonreactive(() ->
     # Nothing below should trigger rebuilding of the view if it reads reactive

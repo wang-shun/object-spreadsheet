@@ -1285,9 +1285,7 @@ namespace Objsheets {
       view.reload();  //viewDef
       view.hotReconfig();
     }
-    exported({
-      view: view  // for debugging
-    });
+    this.view = view;  // for debugging
 
     Tracker.nonreactive(() => {
       // Nothing below should trigger rebuilding of the view if it reads reactive

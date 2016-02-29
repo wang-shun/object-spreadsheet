@@ -339,6 +339,7 @@ namespace Objsheets {
       },
       execute: (model, mutableVars, bindVarName, fref) => {
         model.invalidateDataCache();
+        let objects = [];
         for (let parentCellId of fref.parentCellsTset.elements()) {
           for (let key of fref.keysTset.elements()) {
             // No-op if already exists

@@ -468,7 +468,7 @@ let _cnt = 0;
         } else if (k[0] === "$") {
           throw Error(`unimplemented [update(query=${s(query)}, modifier=${s(modifier)}, options=${s(options)}) doc=${s(doc)}]`);
         } else {
-          doc[k] = _.clone(v);
+          doc[k] = _.clone(v0);
         }
       }
       //console.log "  >> #{JSON.stringify doc}"
@@ -553,7 +553,7 @@ let _cnt = 0;
 
     public update(query, values, upsert : any = false) {
       if (_.size(values) !== 1) {
-        throw new Exception(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
+        throw new Error(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
       }
       if (values.$set != null) {
         values = _.clone(values);
@@ -564,7 +564,7 @@ let _cnt = 0;
           dirty: true
         };
       } else {
-        throw new Exception(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
+        throw new Error(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
       }
       if (upsert) {
         this.mem.upsert(query, values);

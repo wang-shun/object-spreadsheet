@@ -351,7 +351,7 @@ class @Model
           [['this', new TypedSet(col.parent, new EJSONKeyedSet([qFamilyId.cellId]))]])
         result = evaluateFormula(this, vars, col.formula)
       if 0 #compiled?
-        result1 = new TypedSet(col.type, compiled($$.formulaEngine, vars.get("this").set.elements()))
+        result1 = new TypedSet(col.type, compiled($$.formulaEngine, [qFamilyId.cellId]))
         if !EJSON.equals(result, result1)
           console.log "Wrong output from compiler;\nformula=#{s col.formula}]"
           console.log "> interpreter result = #{s result}"
@@ -567,8 +567,8 @@ class @Model
     liveColumnIds = new EJSONKeyedSet()
     scanColumnSubtree = (columnId) =>
       liveColumnIds.add(columnId)
-      col = @getColumn(columnId)
-      for childColId in col.children
+      col1 = @getColumn(columnId)
+      for childColId in col1.children
         scanColumnSubtree(childColId)
       return
     scanColumnSubtree(rootColumnId)
@@ -579,8 +579,8 @@ class @Model
     liveFamilies = new EJSONKeyedSet()  # {column, key}
     # Traversal code adapted from evaluateAll.
     scanCellSubtree = (qCellId) =>
-      col = @getColumn(qCellId.columnId)
-      for childColId in col.children
+      col1 = @getColumn(qCellId.columnId)
+      for childColId in col1.children
         keyFields = {column: childColId, key: qCellId.cellId}
         liveFamilies.add(keyFields)
         ce = Cells.findOne(keyFields)
