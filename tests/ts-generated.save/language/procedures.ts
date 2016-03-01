@@ -282,7 +282,7 @@ namespace Objsheets {
         // functionality is poorly tested since we introduced typechecking.
         model.invalidateDataCache();
         for (let objectId of objectsTset.elements()) {
-          recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId);
+          model.recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId);
         }
       },
       stringify: (model, mutableVars, objectsSinfo) => `delete ${objectsSinfo.str}\n`

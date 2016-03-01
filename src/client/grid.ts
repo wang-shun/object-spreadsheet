@@ -11,6 +11,9 @@ namespace Objsheets {
     public kind;
     public fullText;
     public isObjectHeader;
+    public isObjectCell;
+    public ancestorQCellId;
+    public isPlaceholder;
 
     constructor(public value : fixmeAny = null, public rowspan : fixmeAny = 1, public colspan : fixmeAny = 1, public cssClasses : fixmeAny = []) {
       this.qFamilyId = null;

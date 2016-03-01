@@ -7,6 +7,11 @@
  * These are the common (for client and server) modules and interfaces that can't be automatically generated from the Meteor data.js file
  */
 
+// Rewrite to allow primitives and arrays at the top and be consistent in our
+// treatment of top-level and nested objects (even if that means more false
+// positives!).  One can simply cast object literals that are intended to be
+// [E]JSONable. ~ Matt 2016-02-29
+/*
 interface EJSONable {
 	[key: string]: number | string | boolean | Object | number[] | string[] | Object[] | Date | Uint8Array | EJSON.CustomType;
 }
@@ -14,6 +19,11 @@ interface JSONable {
 	[key: string]: number | string | boolean | Object | number[] | string[] | Object[];
 }
 interface EJSON extends EJSONable {}
+*/
+// Using Array<EJSONable> gives a "Type alias circularly references itself" error. :()
+declare type EJSONable = number | string | boolean | {[n: number]: EJSONable} | {[key: string]: EJSONable} | Date | Uint8Array | EJSON.CustomType;
+declare type JSONable = number | string | boolean | {[n: number]: JSONable} | {[key: string]: JSONable};
+declare type EJSON = EJSONable;
 
 declare module Match {
 	var Any: any;
@@ -495,8 +505,10 @@ declare module EJSON {
 		new(): CustomType;
 	}
 	interface CustomType {
-		clone(): EJSON.CustomType;
-		equals(other: Object): boolean;
+		// These members are optional for custom types and aren't called by user
+		// code, so it doesn't make sense to declare them here. ~ Matt 2016-02-29
+		//clone(): EJSON.CustomType;
+		//equals(other: Object): boolean;
 		toJSONValue(): JSONable;
 		typeName(): string;
 	}

@@ -254,7 +254,7 @@ dispatch = {
       # functionality is poorly tested since we introduced typechecking.
       model.invalidateDataCache()
       for objectId in objectsTset.elements()
-        recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId)
+        model.recursiveDeleteStateCellNoInvalidate(objectsTset.type, objectId)
       return
     stringify: (model, mutableVars, objectsSinfo) ->
       "delete #{objectsSinfo.str}\n"

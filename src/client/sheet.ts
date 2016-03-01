@@ -47,7 +47,7 @@ namespace Objsheets {
   }
 
   class ViewVlist {
-    constructor(public parentCellId, public minHeight, public hlists, public numPlaceholders, public error) {}
+    constructor(public parentCellId, public minHeight, public hlists, public numPlaceholders?, public error?) {}
   }
 
   class ViewHlist {
@@ -79,7 +79,7 @@ namespace Objsheets {
       // Future: Consider rendering _unit with isObject = true specially to save
       // space, e.g., a single column of hollow bullets.  We'd need to figure out
       // how to make this not confusing.
-      this.width = (this.col.type !== "_token") + !!this.col.isObject;
+      this.width = (this.col.type !== "_token" ? 1 : 0) + (this.col.isObject ? 1 : 0);
       this.leftEdgeSingular = true;
       this.rightEdgeSingular = true;
       // field index -> string or null (class of extra column before this field)
@@ -693,7 +693,7 @@ namespace Objsheets {
           }
         }).call(this)),
         stretchH: "last",
-        cells: (row, col, prop) => {
+        cells: (row, col, prop) : fixmeAny => {
           var clsRow = this.cellClasses[row]; 
           var classes = clsRow != null ? clsRow[col] : null;
           if (!classes) {
@@ -843,7 +843,7 @@ namespace Objsheets {
           //return false;
         },
         contextMenu: {
-          build: () => {
+          build: () : fixmeAny => {
             var addCommand, ci, coords, deleteCommand, demoteCommand;
             if (ActionBar.hasUnsavedData()) {
               return false;
@@ -851,7 +851,7 @@ namespace Objsheets {
 
             let c = fallback(this.getSingleSelectedCell(), {});
 
-            let items = {};
+            let items = <fixmeAny>{};
 
             if ((ci = c.columnId) != null) {
               let col = getColumn(ci);
@@ -1311,12 +1311,12 @@ namespace Objsheets {
         op.apply(null, args);
       } catch (e) {
         if (e instanceof NotReadyError) {
-          window.why = e;
+          this.why = e;
           return;  // Let the autorun run again once we have the data.
         }
         throw e;
       }
-      window.why = null;
+      this.why = null;
     };
   }
 

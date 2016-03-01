@@ -139,11 +139,11 @@ class @CellId
       c = c.parent()
     ancestors
     
-  value: (set, callback=->) -> 
+  value: (set=undefined, callback=->) -> 
     if set? then @remove() ; @family().add(set, callback) ; return
     else cellIdLastStep(@cellId)
   
-  family: (columnId) ->
+  family: (columnId=undefined) ->
     if columnId?
       new FamilyId({columnId, @cellId})
     else
@@ -422,7 +422,7 @@ class TransactionCells
 
 class @Transaction
 
-  constructor: (dbCells) ->
+  constructor: (dbCells=undefined) ->
     @Cells = new TransactionCells(dbCells ? Cells)
 
   begin: ->

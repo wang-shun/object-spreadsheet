@@ -262,7 +262,7 @@
   insertCells(rootColumnId, rootCellId, sampleData)
 
   # Add some formula columns.
-  defineParsedFormulaColumn = (parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view) ->
+  defineParsedFormulaColumn = (parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view=undefined) ->
     # Ludicrously inefficient, but we need the column type fields to be set in
     # order to parse formulas.
     model.typecheckAll()

@@ -199,7 +199,7 @@ namespace Objsheets {
     }
 
     public ancestors() {
-      let c = this;
+      let c : CellId = this;
       let ancestors = [];
       while (c != null) {
         ancestors.push(c);
@@ -208,7 +208,7 @@ namespace Objsheets {
       return ancestors;
     }
 
-    public value(set, callback : fixmeAny = () => {}) {
+    public value(set?, callback : fixmeAny = () => {}) {
       if (set != null) {
         this.remove();
         this.family().add(set, callback);
@@ -217,7 +217,7 @@ namespace Objsheets {
       }
     }
 
-    public family(columnId) {
+    public family(columnId?) {
       return columnId != null ? new FamilyId({
         columnId: columnId,
         cellId: this.cellId
@@ -307,7 +307,7 @@ namespace Objsheets {
     }
 
     public add(value, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
-      let updates = {
+      let updates = <fixmeAny>{
         $addToSet: {
           values: value
         }
@@ -359,7 +359,7 @@ namespace Objsheets {
     }
   }
 
-  export var rootCell = CellId.ROOT = new CellId({
+  export var rootCell = new CellId({
     columnId: rootColumnId,
     cellId: rootCellId
   });
@@ -672,7 +672,7 @@ let _cnt = 0;
   export class Transaction {
     public Cells;
 
-    constructor(dbCells) {
+    constructor(dbCells?) {
       this.Cells = new TransactionCells(fallback(dbCells, Cells));
     }
 

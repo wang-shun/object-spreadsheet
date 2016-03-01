@@ -265,7 +265,7 @@ namespace Objsheets {
     insertCells(rootColumnId, rootCellId, sampleData);
 
     // Add some formula columns.
-    function defineParsedFormulaColumn(parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view) {
+    function defineParsedFormulaColumn(parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view?) {
       // Ludicrously inefficient, but we need the column type fields to be set in
       // order to parse formulas.
       model.typecheckAll();

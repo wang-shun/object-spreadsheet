@@ -611,25 +611,28 @@ class @Model
           Columns.update(col._id, col)
     return
 
+  # Used by procedures and the UI.
+  # Keeping this parallel with the other ways the UI modifies data, which don't
+  # call invalidateDataCache.  Move into Model to temporarily avoid a TypeScript
+  # error when procedures.ts is compiled for the client; this is now on par with
+  # other model methods, and we'll have to find another solution for all of them
+  # when we give "model" parameters a type. ~ Matt 2016-03-01
+  recursiveDeleteStateCellNoInvalidate: (columnId, cellId) ->
+    col = @getColumn(columnId)
+    for childColId in col.children
+      childCol = @getColumn(childColId)
+      unless childCol.formula?
+        # Empty families are only inserted during evaluateAll, so they may not yet
+        # exist for objects created in the same transaction.
+        if (ce = Cells.findOne({column: childColId, key: cellId}))?
+          for val in ce.values
+            # The Cells.update in here is subsumed by the Cells.remove below.  Oh well.
+            @recursiveDeleteStateCellNoInvalidate(childColId, cellIdChild(cellId, val))
+          Cells.remove({column: childColId, key: cellId})
+    Cells.update({column: columnId, key: cellIdParent(cellId)},
+                 {$pull: {values: cellIdLastStep(cellId)}})
+    return
 
-# Used by procedures and the UI.
-# Keeping this parallel with the other ways the UI modifies data, which don't go
-# through the model or call invalidateDataCache.  XXX: Fix this (lack of) API.
-@recursiveDeleteStateCellNoInvalidate = (columnId, cellId) ->
-  col = getColumn(columnId)
-  for childColId in col.children
-    childCol = getColumn(childColId)
-    unless childCol.formula?
-      # Empty families are only inserted during evaluateAll, so they may not yet
-      # exist for objects created in the same transaction.
-      if (ce = Cells.findOne({column: childColId, key: cellId}))?
-        for val in ce.values
-          # The Cells.update in here is subsumed by the Cells.remove below.  Oh well.
-          recursiveDeleteStateCellNoInvalidate(childColId, cellIdChild(cellId, val))
-        Cells.remove({column: childColId, key: cellId})
-  Cells.update({column: columnId, key: cellIdParent(cellId)},
-               {$pull: {values: cellIdLastStep(cellId)}})
-  return
 
 Meteor.startup () ->
   Tablespace.setupModelHook = (ts) ->
@@ -731,7 +734,7 @@ Meteor.methods
     return
   recursiveDeleteStateCellNoInvalidate: (cc, columnId, cellId) ->
     cc.run ->
-      recursiveDeleteStateCellNoInvalidate(columnId, cellId)
+      @model.recursiveDeleteStateCellNoInvalidate(columnId, cellId)
       return
     return
   notify: (cc) ->

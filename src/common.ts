@@ -148,7 +148,7 @@ namespace Objsheets {
       // override this behavior. :/
       throw new SemanticError("We currently do not support references to the root column.");
     }
-    let colId2 = [rootColumnId, false];
+    let colId2 : [string, boolean] = [rootColumnId, false];
     for (let n of s.split(":")) {
       if (colId2[1]) {
         throw new SemanticError(`Looking up child '${n}' of a value column.`);
@@ -254,7 +254,7 @@ namespace Objsheets {
     //@type: column ID or primitive, or TYPE_EMPTY if we don't know because the set is empty.
     //@set: EJSONKeyedSet<@type>
 
-    constructor(public type : fixmeAny = TYPE_EMPTY, public set : fixmeAny = new EJSONKeyedSet()) {}
+    constructor(public type : fixmeAny = TYPE_EMPTY, public set : EJSONKeyedSet = new EJSONKeyedSet()) {}
 
     // Note, these can make a meaningless mess if the types are mixed.  The caller
     // has to check @type afterwards.
@@ -280,7 +280,7 @@ namespace Objsheets {
     }
 
     public toJSONValue() {
-      return {
+      return <JSONable>{
         type: this.type,
         set: this.set.toJSONValue()
       };
@@ -332,29 +332,24 @@ namespace Objsheets {
   // Used on the server to reparse values in changeColumnSpecifiedType.
   export function parseValue(type, text) {
     if (typeIsReference(type)) {
-      //else
-      if (true) {  // getColumn(type).referenceDisplay?
-        // Ignore erroneous families: they do not contain any objects we can match against.
-        // Also ignore references that fail to convert to text.
-        let matchingCells = [];
-        for (let cellId of allCellIdsInColumnIgnoreErrors(type)) {
-          try {
-            if (text === valueToText(liteModel, type, cellId)) {
-              matchingCells.push(cellId);
-            }
-          } catch (e) {
-            // Skip
+      // Ignore erroneous families: they do not contain any objects we can match against.
+      // Also ignore references that fail to convert to text.
+      let matchingCells = [];
+      for (let cellId of allCellIdsInColumnIgnoreErrors(type)) {
+        try {
+          if (text === valueToText(liteModel, type, cellId)) {
+            matchingCells.push(cellId);
           }
+        } catch (e) {
+          // Skip
         }
-        if (matchingCells.length === 1) {
-          return matchingCells[0];
-        } else if (matchingCells.length > 1) {
-          throw new Error(`The entered text matches ${matchingCells.length} '${stringifyType(type)}' objects.  ` + `Choose a reference display column for '${stringifyType(type)}' that has unique values, ` + "or define a new computed column if necessary.");  // "or enter the @n notation instead"
-        } else {
-          throw new Error(`The entered text does not match any existing '${stringifyType(type)}' object.`);
-        }
+      }
+      if (matchingCells.length === 1) {
+        return matchingCells[0];
+      } else if (matchingCells.length > 1) {
+        throw new Error(`The entered text matches ${matchingCells.length} '${stringifyType(type)}' objects.  ` + `Choose a reference display column for '${stringifyType(type)}' that has unique values, ` + "or define a new computed column if necessary.");  // "or enter the @n notation instead"
       } else {
-        throw new Error("Malformed object reference.");
+        throw new Error(`The entered text does not match any existing '${stringifyType(type)}' object.`);
       }
     } else if (type === "_unit") {
       return "X";

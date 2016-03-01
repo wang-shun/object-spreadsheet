@@ -41,7 +41,7 @@ class @EJSONKeyedSet
   size: -> @map.size()
   elements: -> @map.keys()
   shallowClone: -> new EJSONKeyedSet(@elements())
-  typeName: 'EJSONKeyedSet'
+  typeName: -> 'EJSONKeyedSet'
   toJSONValue: -> @map.toJSONValue()
   @fromJSONValue: (json) ->
     s = new EJSONKeyedSet()
@@ -67,7 +67,7 @@ class @EJSONSmallSet
     return
   elements: -> @els
   shallowClone: -> new EJSONSmallSet(@els, true)
-  typeName: 'EJSONSmallSet'
+  typeName: -> 'EJSONSmallSet'
   toJSONValue: -> @els
   @fromJSONValue: (json) -> new EJSONSmallSet(json, true)
 EJSON.addType('EJSONSmallSet', EJSONSmallSet.fromJSONValue)
@@ -149,5 +149,5 @@ class @Memo
   for i in [0...length]
     arr[i] for arr in args
 
-@set = (x) -> new EJSONKeyedSet(x)
+@set = (x=undefined) -> new EJSONKeyedSet(x)
 @T = (args...) -> new Tree(args...)

@@ -479,7 +479,7 @@ namespace Objsheets {
 
   // Just enough of a generalization of singletonInfixOperator for '+' string
   // concatenation operator that automatically calls toText.
-  function infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) {
+  function infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames?) {
     return {
       paramNames: fallback(paramNames, ["left", "right"]),
       argAdapters: [EagerSubformula, EagerSubformula],
@@ -493,14 +493,14 @@ namespace Objsheets {
     };
   }
 
-  function singletonInfixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) {
+  function singletonInfixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames?) {
     function evaluateFn2(model, lhs, rhs) {
       return evaluateFn(singleElement(lhs.set), singleElement(rhs.set));
     }
     return infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn2, paramNames);
   }
 
-  function sameTypeSetsInfixPredicate(symbol, precedence, associativity, evaluateFn, paramNames) {
+  function sameTypeSetsInfixPredicate(symbol, precedence, associativity, evaluateFn, paramNames?) {
     return {
       paramNames: fallback(paramNames, ["left", "right"]),
       argAdapters: [EagerSubformula, EagerSubformula],

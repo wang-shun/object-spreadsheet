@@ -31,7 +31,7 @@ namespace Objsheets {
         }
       });
     }
-  }), {
+  }), <fixmeAny>{
     name: "index",
     onAfterAction: () => {
       document.title = "Object Spreadsheets";
@@ -52,11 +52,11 @@ namespace Objsheets {
 
   Template["Index_ConditionalExampleLink"].helpers({
     examplesNamePrefixWithDot: () => {
-      let examplesNamePrefix = Template.parentData().examplesNamePrefix;
+      let examplesNamePrefix = (<fixmeAny>Template.parentData()).examplesNamePrefix;
       return examplesNamePrefix ? examplesNamePrefix + "." : "";
     },
     shouldEnableExampleLinks: () => {
-      let examplesNamePrefix = Template.parentData().examplesNamePrefix;
+      let examplesNamePrefix = (<fixmeAny>Template.parentData()).examplesNamePrefix;
       return !indexMultiuser || examplesNamePrefix;
     }
   });

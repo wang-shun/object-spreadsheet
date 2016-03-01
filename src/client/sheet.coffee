@@ -32,7 +32,7 @@ class @CellReference
   if type == '_unit' then ['centered'] else []
 
 class ViewVlist
-  constructor: (@parentCellId, @minHeight, @hlists, @numPlaceholders, @error) ->
+  constructor: (@parentCellId, @minHeight, @hlists, @numPlaceholders=undefined, @error=undefined) ->
 
 class ViewHlist
   constructor: (@cellId, @minHeight, @value, @error, @vlists) ->

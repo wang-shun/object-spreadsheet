@@ -115,7 +115,7 @@ namespace Objsheets {
     }
 
     // Type _token: successive integer tokens for now.
-    function T(cellList) {
+    function O(cellList) {
       return cellList.map((cell, i) => [i.toString(), cell]);
     }
 
@@ -124,11 +124,11 @@ namespace Objsheets {
     }
 
     let sampleData = {
-      Person: T([
+      Person: O([
         {
           name: V("Severus Snape"),
           Teacher: U({
-            Slot: T([
+            Slot: O([
               {
                 time: V("2014-12-16 13:00")
               }, {
@@ -143,7 +143,7 @@ namespace Objsheets {
         }, {
           name: V("Filius Flitwick"),
           Teacher: U({
-            Slot: T([
+            Slot: O([
               {
                 time: V("2014-12-16 13:00")
               }, {
@@ -172,11 +172,11 @@ namespace Objsheets {
           name: V("Augustus Finnigan")
         }
       ]),
-      Class: T([
+      Class: O([
         {
           code: V("6.170"),
           name: V("Potions"),
-          Section: T([
+          Section: O([
             {
               teacher: V(I(0, "X")),
               Enrollment: V(I(2, "X"), I(3, "X"))
@@ -185,7 +185,7 @@ namespace Objsheets {
         }, {
           code: V("6.820"),
           name: V("Defence Against the Dark Arts"),
-          Section: T([
+          Section: O([
             {
               teacher: V(I(0, "X")),
               Enrollment: V(I(2, "X"), I(4, "X"))
@@ -194,7 +194,7 @@ namespace Objsheets {
         }, {
           code: V("6.005"),
           name: V("Charms"),
-          Section: T([
+          Section: O([
             {
               teacher: V(I(1, "X")),
               Enrollment: V(I(2, "X"))
@@ -202,7 +202,7 @@ namespace Objsheets {
           ])
         }
       ]),
-      Meeting: T([
+      Meeting: O([
         {
           enrollment: V(I(0, 0, I(2, "X"))),
           slot: V(I(0, "X", 1))
@@ -265,7 +265,7 @@ namespace Objsheets {
     insertCells(rootColumnId, rootCellId, sampleData);
 
     // Add some formula columns.
-    function defineParsedFormulaColumn(parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view) {
+    function defineParsedFormulaColumn(parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view?) {
       // Ludicrously inefficient, but we need the column type fields to be set in
       // order to parse formulas.
       model.typecheckAll();
@@ -301,14 +301,6 @@ namespace Objsheets {
 
     // Create a spreadsheet view, which we use to hold data for a web application
     // view.
-    function T(...args) {
-      return (function(func, args, ctor) {
-        ctor.prototype = func.prototype;
-        var child = new ctor, result = func.apply(child, args);
-        return Object(result) === result ? result : child;
-      })(Tree, args, function(){});
-    }
-
     let view1 = {
       _id: "1",
       layout: T(rootColumnId)
@@ -342,7 +334,7 @@ namespace Objsheets {
           continue;
         }
         let docs = EJSON.parse(dump);
-        for (let doc of docs) {
+        for (let doc of <fixmeAny>docs) {
           coll.upsert(doc._id, doc);  // upsert needed to overwrite root column
         }
       }

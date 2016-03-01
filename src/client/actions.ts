@@ -246,7 +246,7 @@ namespace Objsheets {
     }
     tracingView = null;
     let formulaStr = newFormulaStr.get();
-    let formulaInfo = {};
+    let formulaInfo = <fixmeAny>{};
     if (formulaStr === "") {
       formulaInfo.formula = DUMMY_FORMULA;
       // Do not construct a subformula tree.
@@ -328,7 +328,7 @@ namespace Objsheets {
         cells: (row, col, prop) => {
           let cell = this.grid[row] != null ? this.grid[row][col] : null;
           if (!cell) {
-            return {};  // Would like to understand why this is needed...
+            return <any>{};  // Would like to understand why this is needed...
           }
           return {
             className: cell.cssClasses.join(" ")

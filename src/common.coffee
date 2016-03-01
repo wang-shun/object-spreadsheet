@@ -266,27 +266,23 @@ EJSON.addType('TypedSet', TypedSet.fromJSONValue)
 # Used on the server to reparse values in changeColumnSpecifiedType.
 @parseValue = (type, text) ->
   if typeIsReference(type)
-    #else
-    if true  # getColumn(type).referenceDisplay?
-      # Ignore erroneous families: they do not contain any objects we can match against.
-      # Also ignore references that fail to convert to text.
-      matchingCells = []
-      for cellId in allCellIdsInColumnIgnoreErrors(type)
-        try
-          if text == valueToText(liteModel, type, cellId)
-            matchingCells.push(cellId)
-        catch e
-          # Skip
-      if matchingCells.length == 1
-        return matchingCells[0]
-      else if matchingCells.length > 1
-        throw new Error("The entered text matches #{matchingCells.length} '#{stringifyType(type)}' objects.  " +
-                        "Choose a reference display column for '#{stringifyType(type)}' that has unique values, " +
-                        "or define a new computed column if necessary.")  # "or enter the @n notation instead"
-      else
-        throw new Error("The entered text does not match any existing '#{stringifyType(type)}' object.")
+    # Ignore erroneous families: they do not contain any objects we can match against.
+    # Also ignore references that fail to convert to text.
+    matchingCells = []
+    for cellId in allCellIdsInColumnIgnoreErrors(type)
+      try
+        if text == valueToText(liteModel, type, cellId)
+          matchingCells.push(cellId)
+      catch e
+        # Skip
+    if matchingCells.length == 1
+      return matchingCells[0]
+    else if matchingCells.length > 1
+      throw new Error("The entered text matches #{matchingCells.length} '#{stringifyType(type)}' objects.  " +
+                      "Choose a reference display column for '#{stringifyType(type)}' that has unique values, " +
+                      "or define a new computed column if necessary.")  # "or enter the @n notation instead"
     else
-      throw new Error('Malformed object reference.')
+      throw new Error("The entered text does not match any existing '#{stringifyType(type)}' object.")
   else if type == '_unit'
     'X'
   else if type == '_token'

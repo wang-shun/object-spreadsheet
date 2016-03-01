@@ -47,7 +47,7 @@ namespace Objsheets {
   }
 
   class ViewVlist {
-    constructor(public parentCellId, public minHeight, public hlists, public numPlaceholders, public error) {}
+    constructor(public parentCellId, public minHeight, public hlists, public numPlaceholders?, public error?) {}
   }
 
   class ViewHlist {

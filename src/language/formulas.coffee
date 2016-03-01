@@ -448,7 +448,7 @@ binaryOperationStringify = (symbol, precedence, associativity) ->
 # Just enough of a generalization of singletonInfixOperator for '+' string
 # concatenation operator that automatically calls toText.
 infixOperator = (symbol, precedence, associativity,
-                 lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
+                 lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames=undefined) ->
   paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->
@@ -460,11 +460,11 @@ infixOperator = (symbol, precedence, associativity,
   stringify: binaryOperationStringify(symbol, precedence, associativity)
 
 singletonInfixOperator = (symbol, precedence, associativity,
-                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames) ->
+                          lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames=undefined) ->
   evaluateFn2 = (model, lhs, rhs) -> evaluateFn(singleElement(lhs.set), singleElement(rhs.set))
   infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn2, paramNames)
 
-sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, paramNames) ->
+sameTypeSetsInfixPredicate = (symbol, precedence, associativity, evaluateFn, paramNames=undefined) ->
   paramNames: paramNames ? ['left', 'right']
   argAdapters: [EagerSubformula, EagerSubformula]
   typecheck: (model, vars, lhsType, rhsType) ->

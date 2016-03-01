@@ -201,7 +201,7 @@ namespace Objsheets {
       return ancestors;
     }
 
-    public value(set, callback : fixmeAny = () => {}) {
+    public value(set?, callback : fixmeAny = () => {}) {
       if (set != null) {
         this.remove();
         this.family().add(set, callback);
@@ -210,7 +210,7 @@ namespace Objsheets {
       }
     }
 
-    public family(columnId) {
+    public family(columnId?) {
       return columnId != null ? new FamilyId({
         columnId: columnId,
         cellId: this.cellId
@@ -665,7 +665,7 @@ let _cnt = 0;
   export class Transaction {
     public Cells;
 
-    constructor(dbCells) {
+    constructor(dbCells?) {
       this.Cells = new TransactionCells(fallback(dbCells, Cells));
     }
 

@@ -39,7 +39,7 @@ namespace Objsheets {
       return this instanceof HtmlOptgroup;
     },
     isSelected: function() {
-      let parent = Template.parentData(1);
+      let parent = <fixmeAny>Template.parentData(1);
       if (parent instanceof HtmlOptgroup) {
         parent = Template.parentData(2);
       }

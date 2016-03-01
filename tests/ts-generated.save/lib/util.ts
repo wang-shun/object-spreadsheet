@@ -121,7 +121,9 @@ namespace Objsheets {
       return new EJSONKeyedSet(this.elements());
     }
 
-    public typeName = "EJSONKeyedSet";
+    public typeName() {
+      return "EJSONKeyedSet";
+    }
 
     public toJSONValue() {
       return this.map.toJSONValue();
@@ -175,7 +177,9 @@ namespace Objsheets {
       return new EJSONSmallSet(this.els, true);
     }
 
-    public typeName = "EJSONSmallSet";
+    public typeName() {
+      return "EJSONSmallSet";
+    }
 
     public toJSONValue() {
       return this.els;
@@ -320,7 +324,7 @@ namespace Objsheets {
     return _.range(0, length).map((i) => args.map((arr) => arr[i]));
   }
 
-  export function set(x) {
+  export function set(x?) {
     return new EJSONKeyedSet(x);
   }
   export function T(...args) {
