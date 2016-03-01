@@ -412,7 +412,7 @@ let _cnt = 0;
             throw Error(`unimplemented [findOne(query=${JSON.stringify(query)})]`);
           }
         } else {
-          return null;
+          return undefined;
         }
       } else {
         throw Error(`unimplemented [findOne(query=${JSON.stringify(query)})]`);
@@ -596,7 +596,11 @@ let _cnt = 0;
         if (!this.mem.findOne(doc._id)) {
           raw.remove({
             _id: doc._id
-          }, (err) => err != null ? console.log(`remove: ${err}`) : null);
+          }, (err) => {
+            if (err != null) {
+              console.log(`remove: ${err}`);
+            }
+          });
           //@dbCells.remove(doc._id)
         }
       });
@@ -608,7 +612,11 @@ let _cnt = 0;
           _id: doc._id
         }, doc, {
           upsert: true
-        }, (err) => err != null ? console.log(`remove: ${err}`) : null);
+        }, (err) => {
+          if (err != null) {
+            console.log(`remove: ${err}`);
+          }
+        });
         //@dbCells.upsert(doc._id, doc)
       });
     }

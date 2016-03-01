@@ -378,12 +378,12 @@ class TransactionCells
     raw = @dbCells.rawCollection()
     @dbCells.find().forEach (doc) =>
       if ! @mem.findOne(doc._id)
-        raw.remove({_id: doc._id}, (err) -> if err? then console.log "remove: #{err}")
+        raw.remove({_id: doc._id}, (err) -> (if err? then console.log "remove: #{err}"); return)
         #@dbCells.remove(doc._id)
       return
     @mem.find({dirty: true}).forEach (doc) =>
       delete doc.dirty
-      raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> if err? then console.log "remove: #{err}")
+      raw.update({_id: doc._id}, doc, {upsert: true}, (err) -> (if err? then console.log "remove: #{err}"); return)
       #@dbCells.upsert(doc._id, doc)
       return
     return

@@ -56,7 +56,7 @@ namespace Objsheets {
         if (tracingView != null) {
           tracingView.destroy();
         }
-        return tracingView = null;
+        tracingView = null;
       }
     });
     this.autorun(() => {

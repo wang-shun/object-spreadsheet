@@ -21,11 +21,13 @@
   unless cond
     throw new FormulaValidationError(
       if _.isString(message) then message else message())
+  return
 
 evalAssert = (cond, message) ->
   unless cond
     throw new EvaluationError(
       if _.isString(message) then message else message())
+  return
 
 readFamilyForFormula = (model, qFamilyId) ->
   tset = model.evaluateFamily(qFamilyId)

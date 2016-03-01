@@ -14,13 +14,13 @@ namespace Objsheets {
         callback();
       }
     },
-    call: (transaction, argsObj, callback : any = null) => {
+    call: (transaction, argsObj, callback : any = undefined) => {
       $$.call("executeCannedTransaction", transaction, glue(argsObj), standardServerCallbackThen(callback));
     },
     onOpen: (callback) => {
       openCallbacks.push(callback);
     },
-    readObj: function(t, rootCellId : any = [], expandRefs : any = false, keyField : any = null, visited : any = null) {
+    readObj: function(t, rootCellId : any = [], expandRefs : any = false, keyField : any = undefined, visited : any = undefined) {
       var v;
       let obj = {
         qCellId: {
@@ -71,7 +71,7 @@ namespace Objsheets {
       return obj;
     },
     // Future: Deprecate this in favor of something like readSubtree?
-    read: function(viewId : any = null) {
+    read: function(viewId : any = undefined) {
       let layout = viewId != null ? ((new View(viewId).def()) != null ? (new View(viewId).def()).layout : null) || new Tree(rootColumnId) : View.rootLayout();
       return this.readObj(layout, [], true);
     },

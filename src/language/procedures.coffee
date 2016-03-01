@@ -317,6 +317,7 @@ dispatch = {
     execute: (model, mutableVars, conditionTset) ->
       unless singleElement(conditionTset.set)
         throw new EvaluationError('check condition failed')
+      return
     stringify: (model, mutableVars, conditionSinfo) ->
       "check #{conditionSinfo.str}\n"
 }

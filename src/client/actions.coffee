@@ -55,6 +55,7 @@ Template['changeColumn'].rendered = () ->
         newFormulaInfo.set(info)
       tracingView?.destroy()
       tracingView = null
+    return
     )
   @autorun(() =>
     shouldShowFormulaBar = newFormulaStr.get()?

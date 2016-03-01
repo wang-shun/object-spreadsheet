@@ -34,5 +34,5 @@ Template['DearBeta'].events
     RelsheetsClient.call(
       "hintAdd",
       {at: [@Hint.qFamilyId.cellId], text: [event.target.text.value]},
-      (error, result) -> if !error? then event.target.reset(); return)
+      (error, result) -> (if !error? then event.target.reset()); return)
     false

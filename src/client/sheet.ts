@@ -988,6 +988,8 @@ namespace Objsheets {
         [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
         [c1, c2] = [Math.min(c1, c2), Math.max(c1, c2)];
         return [r1, c1, r2, c2];
+      } else {
+        return null;
       }
     }
 
