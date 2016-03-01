@@ -3,7 +3,7 @@ namespace Objsheets {
   let openCallbacks = [];
   export var RelsheetsClient = {
     open: (sheet, proceduresAppName : fixmeAny = null) => {
-      Tablespace["default"] = Tablespace.get(sheet);
+      Tablespace.defaultTablespace = Tablespace.get(sheet);
       $$.call("open", () => {
         if (proceduresAppName != null) {
           $$.call("compileProcedures", proceduresAppName);
@@ -108,7 +108,6 @@ namespace Objsheets {
         let v = argsobj[k];
         this[k] = arg(v);
       }
-      return null;
     };
   }
 

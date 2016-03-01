@@ -1,7 +1,7 @@
 openCallbacks = []
 @RelsheetsClient =
   open: (sheet, proceduresAppName=null) ->
-    Tablespace.default = Tablespace.get(sheet)
+    Tablespace.defaultTablespace = Tablespace.get(sheet)
     $$.call('open', () ->
       if proceduresAppName?
         $$.call('compileProcedures', proceduresAppName)

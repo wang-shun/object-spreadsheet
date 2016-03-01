@@ -24,23 +24,66 @@ namespace Objsheets {
     })(coll);  // Work around JavaScript variable capture semantics
   }
 
-  export class Tablespace extends ControlContext {
+  declare class CallingContext {
+    static get: () => any;
+    static set: (cc: any, func: () => {}) => {};
+  }
+
+  export class Tablespace {
+    public lock;
+    public scheduled;
     public formulaEngine;
     public Columns;
     public Cells;
     public Views;
     public Procedures;
+    public static defaultTablespace;
+
+    public static instances = {};
+
+    public static get(id?) {
+      var v;
+      return id == null ? (Meteor.isServer && CallingContext.get()) || Tablespace.defaultTablespace : (v = Tablespace.instances[id]) != null ? v : Tablespace.instances[id] = new Tablespace(id);
+    }
+
+    public run(func : fixmeAny = () => {}) {
+      //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
+      return CallingContext.set(this, () => {
+        if (this.lock) {
+          this.scheduled.push(func);  // HACK
+        } else {
+          try {
+            this.lock = 1;
+            while (this.scheduled.length > 0) {
+              this.scheduled.pop().apply(this);
+            }
+          } finally {
+            this.lock = 0;
+          }
+          return func.apply(this);
+        }
+      });
+    }
+
+    // Convenience method;
+    // calls a Meteor method, passing the current cc as first argument
+
+    public call(method, ...args) {
+      return Meteor.call.apply(Meteor, [method, this].concat(args));
+    }
 
     constructor(public id) {
-      super();
+      this.scheduled = [];
+      this.lock = 0;
       if (Meteor.isServer) {
         // The constructor is called during Meteor method EJSON conversion, and
         // creating Mongo.Collections during that process causes various errors.
         // Defer until the control context is actually activated as part of the
         // Meteor method call.
-        // Notice that model.coffee uses @do to initialize the model. @setupCollections
-        // must happen before that. Hence this is a hack.
-        this["do"](this.setupCollections);
+        this.scheduled.push(() => {
+          this.setupCollections();
+          Tablespace.setupModelHook(this);
+        });
       }
       if (Meteor.isClient) {
         // This is safe, and the client does not activate control contexts.
@@ -74,6 +117,10 @@ namespace Objsheets {
         });
       }
     }
+
+    // Set by model.coffee
+
+    public static setupModelHook = null;
 
     public publish(collection) {
       // Do not inline this into the same function as the loop over collections, or

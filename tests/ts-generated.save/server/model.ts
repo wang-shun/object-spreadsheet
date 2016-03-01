@@ -897,26 +897,24 @@ namespace Objsheets {
 
   Meteor.startup(() => {
     var tspace;
-    Tablespace.onCreate(function() {
-      this["do"](function() {
-        console.log(`creating model of [${this.id}]`);
-        this.model = new Model;
-        this.formulaEngine = new FormulaEngine;
-        let appName = /(?:^|\.)([^.]+)$/.exec(this.id) != null ? /(?:^|\.)([^.]+)$/.exec(this.id)[1] : null;
-        if (this.model.wasEmpty) {
-          //if appName == 'ptc' then loadPTCData(@model)
-          //else
-          loadDumpIfExists(this.model, appName);
-          // TO MAKE A DUMP:
-          // ./private/scripts/mkdump APPNAME
-        }
-        this.model.repair();
-        this.model.evaluateAll();
-      });
-    });
+    Tablespace.setupModelHook = (ts) => {
+      console.log(`creating model of [${ts.id}]`);
+      ts.model = new Model;
+      ts.formulaEngine = new FormulaEngine;
+      let appName = /(?:^|\.)([^.]+)$/.exec(ts.id) != null ? /(?:^|\.)([^.]+)$/.exec(ts.id)[1] : null;
+      if (ts.model.wasEmpty) {
+        //if appName == 'ptc' then loadPTCData(ts.model)
+        //else
+        loadDumpIfExists(ts.model, appName);
+        // TO MAKE A DUMP:
+        // ./private/scripts/mkdump APPNAME
+      }
+      ts.model.repair();
+      ts.model.evaluateAll();
+    };
 
     if (Meteor.isServer) {  // this condition is here to allow standalone mode
-      Tablespace["default"] = tspace = Tablespace.get("ptc");  // mostly for use in the shell
+      Tablespace.defaultTablespace = tspace = Tablespace.get("ptc");  // mostly for use in the shell
       //tspace.run()  # Slows down server startup.
     }
 

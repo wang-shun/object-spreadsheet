@@ -632,25 +632,23 @@ class @Model
   return
 
 Meteor.startup () ->
-  Tablespace.onCreate ->
-    @do ->
-      console.log "creating model of [#{@id}]"
-      @model = new Model
-      @formulaEngine = new FormulaEngine
-      appName = /(?:^|\.)([^.]+)$/.exec(@id)?[1]
-      if @model.wasEmpty
-        #if appName == 'ptc' then loadPTCData(@model)
-        #else
-        loadDumpIfExists(@model, appName)
-        # TO MAKE A DUMP:
-        # ./private/scripts/mkdump APPNAME
-      @model.repair()
-      @model.evaluateAll()
-      return
+  Tablespace.setupModelHook = (ts) ->
+    console.log "creating model of [#{ts.id}]"
+    ts.model = new Model
+    ts.formulaEngine = new FormulaEngine
+    appName = /(?:^|\.)([^.]+)$/.exec(ts.id)?[1]
+    if ts.model.wasEmpty
+      #if appName == 'ptc' then loadPTCData(ts.model)
+      #else
+      loadDumpIfExists(ts.model, appName)
+      # TO MAKE A DUMP:
+      # ./private/scripts/mkdump APPNAME
+    ts.model.repair()
+    ts.model.evaluateAll()
     return
 
   if Meteor.isServer   # this condition is here to allow standalone mode
-    Tablespace.default = tspace = Tablespace.get('ptc')  # mostly for use in the shell
+    Tablespace.defaultTablespace = tspace = Tablespace.get('ptc')  # mostly for use in the shell
     #tspace.run()  # Slows down server startup.
 
   return

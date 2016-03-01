@@ -15,17 +15,46 @@ for coll in ['Columns', 'Cells', 'Views', 'Procedures']
   )(coll)
 
 
-class @Tablespace extends ControlContext
+class @Tablespace
+  @instances: {}
+  @get: (id=undefined) ->
+    if !id?
+      (Meteor.isServer && CallingContext.get()) || Tablespace.defaultTablespace
+    else if (v = Tablespace.instances[id])?
+      v
+    else
+      Tablespace.instances[id] = new Tablespace(id)
+
+  run: (func=->) ->
+    #Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
+    CallingContext.set @, =>
+      if @lock then @scheduled.push func; return  # HACK
+      else
+        try
+          @lock = 1
+          while @scheduled.length > 0
+            @scheduled.pop().apply @
+        finally
+          @lock = 0
+        func.apply @
+
+  # Convenience method;
+  # calls a Meteor method, passing the current cc as first argument
+  call: (method, args...) ->
+    Meteor.call method, @, args...
+
   constructor: (@id) ->
-    super()
+    @scheduled = []
+    @lock = 0
     if Meteor.isServer
       # The constructor is called during Meteor method EJSON conversion, and
       # creating Mongo.Collections during that process causes various errors.
       # Defer until the control context is actually activated as part of the
       # Meteor method call.
-      # Notice that model.coffee uses @do to initialize the model. @setupCollections
-      # must happen before that. Hence this is a hack.
-      @do(@setupCollections)
+      @scheduled.push(() =>
+        @setupCollections()
+        Tablespace.setupModelHook(this)
+        return)
     if Meteor.isClient
       # This is safe, and the client does not activate control contexts.
       @setupCollections()
@@ -46,6 +75,9 @@ class @Tablespace extends ControlContext
       @Cells.allow { insert: (-> true), update: (-> true), remove: (-> true) }
       @Views.allow { insert: (-> true), update: (-> true), remove: (-> true) }
     return
+
+  # Set by model.coffee
+  @setupModelHook: null
 
   publish: (collection) ->
     # Do not inline this into the same function as the loop over collections, or
