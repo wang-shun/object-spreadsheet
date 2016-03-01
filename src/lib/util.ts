@@ -15,7 +15,7 @@ namespace Objsheets {
   export class EJSONKeyedMap {
     public obj;
 
-    constructor(ents : any = []) {
+    constructor(ents : fixmeAny = []) {
       // Future: Change to ECMAScript 6 Map when supported by all relevant JS
       // engines and CoffeeScript.
       this.obj = {};
@@ -86,7 +86,7 @@ namespace Objsheets {
   export class EJSONKeyedSet {
     public map;
 
-    constructor(els : any = []) {
+    constructor(els : fixmeAny = []) {
       this.map = new EJSONKeyedMap();
       for (let x of els) {
         this.add(x);
@@ -138,7 +138,7 @@ namespace Objsheets {
   export class EJSONSmallSet {
     public els;
 
-    constructor(els : any = [], _trustMeDistinct : any = false) {
+    constructor(els : fixmeAny = [], _trustMeDistinct : fixmeAny = false) {
       if (_trustMeDistinct) {
         this.els = els.slice(0);
       } else {
@@ -230,7 +230,7 @@ namespace Objsheets {
   }
 
   export class Tree {
-    constructor(public root, public subtrees : any = []) {}
+    constructor(public root, public subtrees : fixmeAny = []) {}
 
     //# applies op to the root of each subtree
 

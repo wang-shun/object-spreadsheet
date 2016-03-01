@@ -254,7 +254,7 @@ namespace Objsheets {
     //@type: column ID or primitive, or TYPE_EMPTY if we don't know because the set is empty.
     //@set: EJSONKeyedSet<@type>
 
-    constructor(public type : any = TYPE_EMPTY, public set : any = new EJSONKeyedSet()) {}
+    constructor(public type : fixmeAny = TYPE_EMPTY, public set : fixmeAny = new EJSONKeyedSet()) {}
 
     // Note, these can make a meaningless mess if the types are mixed.  The caller
     // has to check @type afterwards.

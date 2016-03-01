@@ -330,7 +330,7 @@ namespace Objsheets {
   // refsSeen contains qCellIds.  Since we have to use the equivalent of
   // EJSON.equals to compare them, we use an EJSONKeyedSet rather than implementing
   // our own list membership test.
-  export function valueToText(model, type, value, refsSeen : any = new EJSONKeyedSet()) {
+  export function valueToText(model, type, value, refsSeen : fixmeAny = new EJSONKeyedSet()) {
     if (typeIsReference(type)) {
       let qCellId = {
         columnId: type,
@@ -367,7 +367,7 @@ namespace Objsheets {
     return elements.length === 1 ? formatOne(elements[0]) : "{" + (elements.map((e) => formatOne(e))).join(", ") + "}";
   }
 
-  function tsetToText(model, tset, refsSeen : any = new EJSONKeyedSet()) {
+  function tsetToText(model, tset, refsSeen : fixmeAny = new EJSONKeyedSet()) {
     return genericSetToText(tset.elements(), (e) => valueToText(model, tset.type, e, refsSeen));
   }
 

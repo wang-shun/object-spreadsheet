@@ -53,7 +53,7 @@ namespace Objsheets {
       return fallback(this.columnCache[columnId], Columns.findOne(columnId));
     }
 
-    public getAllColumns(columnId : any = rootColumnId) {
+    public getAllColumns(columnId : fixmeAny = rootColumnId) {
       var _ref;
       let col = this.getColumn(columnId);
       // A bit of auto-repair in case some columns were deleted

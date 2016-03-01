@@ -161,7 +161,7 @@ namespace Objsheets {
       return ancestors;
     }
 
-    public value(set, callback : any = () => {}) {
+    public value(set, callback : fixmeAny = () => {}) {
       if (set != null) {
         this.remove();
         this.family().add(set, callback);
@@ -184,7 +184,7 @@ namespace Objsheets {
       return fallback(getColumn(this.columnId) != null ? getColumn(this.columnId).children : null, []).map((childId) => this.family(childId));
     }
 
-    public remove(callback : any = () => {}) {
+    public remove(callback : fixmeAny = () => {}) {
       this.family().remove(this.value(), callback);
     }
 
@@ -259,7 +259,7 @@ namespace Objsheets {
       };
     }
 
-    public add(value, callback : any = (() => {}), consumePlaceholder : any = false) {
+    public add(value, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
       let updates = {
         $addToSet: {
           values: value
@@ -274,7 +274,7 @@ namespace Objsheets {
       return this.child(value);
     }
 
-    public remove(value, callback : any = () => {}) {
+    public remove(value, callback : fixmeAny = () => {}) {
       if (getColumn(this.columnId).isObject) {
         Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
       } else {
@@ -292,7 +292,7 @@ namespace Objsheets {
       }
     }
 
-    public addPlaceholder(callback : any = () => {}) {
+    public addPlaceholder(callback : fixmeAny = () => {}) {
       // If the field is initially absent, $inc treats it as 0.
       upsertOne(Cells, this.selector(), {
         $inc: {
@@ -301,7 +301,7 @@ namespace Objsheets {
       }, callback);
     }
 
-    public removePlaceholder(callback : any = () => {}) {
+    public removePlaceholder(callback : fixmeAny = () => {}) {
       if (Cells.findOne(this.selector()) != null ? Cells.findOne(this.selector()).numPlaceholders : null) {  // XXX race
         updateOne(Cells, this.selector(), {
           $inc: {
@@ -484,7 +484,7 @@ let _cnt = 0;
       });
     }
 
-    public remove(query, callback : any = () => {}) {
+    public remove(query, callback : fixmeAny = () => {}) {
       var column, doc, key;
       if ((column = query.column) != null) {
         let byKey = this.byColumn[column];
@@ -552,7 +552,7 @@ let _cnt = 0;
       this.mem.insert(doc);
     }
 
-    public update(query, values, upsert : any = false) {
+    public update(query, values, upsert : fixmeAny = false) {
       if (_.size(values) !== 1) {
         throw new Error(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
       }
@@ -578,15 +578,15 @@ let _cnt = 0;
       this.update(query, values, true);
     }
 
-    public remove(query : any = {}) {
+    public remove(query : fixmeAny = {}) {
       this.mem.remove(query);  // nothing fancy here...
     }
 
-    public find(query : any = {}) {
+    public find(query : fixmeAny = {}) {
       return this.mem.find(query);
     }
 
-    public findOne(query : any = {}) {
+    public findOne(query : fixmeAny = {}) {
       return this.mem.findOne(query);
     }
 

@@ -47,7 +47,7 @@ let listeners = {
       return id == null ? (Meteor.isServer && CallingContext.get()) || this["default"] : OnDemand.get.call(this, id);
     }
 
-    public run(func : any = () => {}) {
+    public run(func : fixmeAny = () => {}) {
       //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
       return CallingContext.set(this, () => {
         if (this.lock) {

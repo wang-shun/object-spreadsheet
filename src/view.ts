@@ -11,7 +11,7 @@ namespace Objsheets {
       };
     }
 
-    public addColumn(columnId, own : any = false) {
+    public addColumn(columnId, own : fixmeAny = false) {
       let def = this.def();
       let parentId = Columns.findOne(columnId) != null ? Columns.findOne(columnId).parent : null;
       if (parentId != null) {

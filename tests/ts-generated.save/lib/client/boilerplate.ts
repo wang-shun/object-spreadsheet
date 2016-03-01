@@ -2,7 +2,7 @@ namespace Objsheets {
 
   let openCallbacks = [];
   export var RelsheetsClient = {
-    open: (sheet, proceduresAppName : any = null) => {
+    open: (sheet, proceduresAppName : fixmeAny = null) => {
       Tablespace["default"] = Tablespace.get(sheet);
       $$.call("open", () => {
         if (proceduresAppName != null) {
@@ -14,13 +14,13 @@ namespace Objsheets {
         callback();
       }
     },
-    call: (transaction, argsObj, callback : any = undefined) => {
+    call: (transaction, argsObj, callback?) => {
       $$.call("executeCannedTransaction", transaction, glue(argsObj), standardServerCallbackThen(callback));
     },
     onOpen: (callback) => {
       openCallbacks.push(callback);
     },
-    readObj: function(t, rootCellId : any = [], expandRefs : any = false, keyField : any = undefined, visited : any = undefined) {
+    readObj: function(t, rootCellId : fixmeAny = [], expandRefs : fixmeAny = false, keyField?, visited?) {
       var v;
       let obj = {
         qCellId: {
@@ -71,7 +71,7 @@ namespace Objsheets {
       return obj;
     },
     // Future: Deprecate this in favor of something like readSubtree?
-    read: function(viewId : any = undefined) {
+    read: function(viewId?) {
       let layout = viewId != null ? ((new View(viewId).def()) != null ? (new View(viewId).def()).layout : null) || new Tree(rootColumnId) : View.rootLayout();
       return this.readObj(layout, [], true);
     },

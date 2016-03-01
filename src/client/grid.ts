@@ -12,7 +12,7 @@ namespace Objsheets {
     public fullText;
     public isObjectHeader;
 
-    constructor(public value : any = null, public rowspan : any = 1, public colspan : any = 1, public cssClasses : any = []) {
+    constructor(public value : fixmeAny = null, public rowspan : fixmeAny = 1, public colspan : fixmeAny = 1, public cssClasses : fixmeAny = []) {
       this.qFamilyId = null;
       this.qCellId = null;
       this.columnId = null;
@@ -43,7 +43,7 @@ namespace Objsheets {
 
   // Return a grid consisting of one "height x width" merged cell and enough dummy
   // 1x1 cells.  You can mutate the upper-left cell as desired.
-  export function gridMergedCell(height, width, value : any = "", cssClasses : any = []) {
+  export function gridMergedCell(height, width, value : fixmeAny = "", cssClasses : fixmeAny = []) {
     let grid = _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(null)));
     grid[0][0].rowspan = height;
     grid[0][0].colspan = width;

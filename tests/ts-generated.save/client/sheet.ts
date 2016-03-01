@@ -67,7 +67,7 @@ namespace Objsheets {
     public amRootWithSeparateTables;
     public headerMinHeight;
 
-    constructor(public layoutTree, public options : any = {}) {
+    constructor(public layoutTree, public options : fixmeAny = {}) {
       this.columnId = this.layoutTree.root;
       this.col = getColumn(this.columnId);
       // Typechecking should always fill in a type, even 'error'.
@@ -452,7 +452,7 @@ namespace Objsheets {
       }
     }
 
-    public static addCell(qFamilyId, enteredValue, callback : any = (() => {}), consumePlaceholder : any = false) {
+    public static addCell(qFamilyId, enteredValue, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
       var newValue;
       if ((newValue = this.parseValueUi(qFamilyId, enteredValue)) != null) {
         new FamilyId(qFamilyId).add(newValue, (() => {
@@ -461,7 +461,7 @@ namespace Objsheets {
       }
     }
 
-    public static modifyCell(qCellId, enteredValue, callback : any = () => {}) {
+    public static modifyCell(qCellId, enteredValue, callback : fixmeAny = () => {}) {
       var newValue;
       let cel = new CellId(qCellId);
       let fam = cel.family();
@@ -472,7 +472,7 @@ namespace Objsheets {
       }
     }
 
-    public static removeCell(qCellId, callback : any = () => {}) {
+    public static removeCell(qCellId, callback : fixmeAny = () => {}) {
       new CellId(qCellId).remove((() => {
         $$.call("notify", callback);
       }));
