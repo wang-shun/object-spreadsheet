@@ -55,6 +55,7 @@ os.chdir(os.path.dirname(sys.argv[0]))
 # No arguments accepted.
 assert len(sys.argv) == 1
 
+pfx_input = 'tests/src-coffeescript/'
 pfx_live = 'src/'
 pfx_tsg_save = 'tests/ts-generated.save/'
 pfx_tsg_new = 'tests/ts-generated.new/'
@@ -128,7 +129,7 @@ subprocess.check_call(('rm', '-rf', pfx_tsg_new))
 try:
   subprocess.check_call(
     ('tests/coffeescript-to-typescript/bin/coffee',
-     '-cma', '--namespace', 'Objsheets', '-o', pfx_tsg_new, pfx_live))
+     '-cma', '--namespace', 'Objsheets', '-o', pfx_tsg_new, pfx_input))
   with TemporaryIndexFile():
     subprocess.check_call(('git', 'add', pfx_tsg_new))
     ls_tsg_new = git_ls_files()
