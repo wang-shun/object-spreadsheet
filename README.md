@@ -15,23 +15,26 @@ This is a research prototype and we do not recommend relying on it for anything 
 * [Git](https://git-scm.com/)
 * [Umongo](https://github.com/agirbal/umongo) (Option)
 
+### Installing on Linux ###
+
+```
+curl https://install.meteor.com/ | sh
+git clone --recursive https://bitbucket.org/objsheets/objsheets
+cd objsheets
+meteor
+```
+
 ### Installing on Windows
 
-* [Install Meteor Package](https://www.meteor.com/install)
-* git clone $(Object Spread Sheets Git Link)
-* Using Windoes Command Line windows (cmd)
+* [Install Git](https://git-scm.com/downloads) and choose "Use Git from the Windows Command Prompt".
+* [Install Meteor](https://www.meteor.com/install).
+* Using the Windows command prompt (cmd):
 
+        git clone --recursive https://bitbucket.org/objsheets/objsheets
+        cd objsheets
+        meteor
 
-    cd $(Local_Object_Spread_Sheets_PATH)
-
-    meteor
-
-### installing on Ubuntu 14.04 ###
-
-    #git clone $(Object Spread Sheets Git Link)
-    #curl https://install.meteor.com/ | sh
-    #cd $(Local_Object_Spread_Sheets_PATH)
-    #meteor
+(This is not the only way to do it, but it's one that we've tested.)
 
 ### Docker Image ###
 You can build docker image by yourself or Pull from docker hub
