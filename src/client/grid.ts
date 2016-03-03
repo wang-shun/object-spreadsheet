@@ -48,10 +48,12 @@ namespace Objsheets {
   // 1x1 cells.  You can mutate the upper-left cell as desired.
   export function gridMergedCell(height, width, value : fixmeAny = "", cssClasses : fixmeAny = []) {
     let grid = _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(null)));
-    grid[0][0].rowspan = height;
-    grid[0][0].colspan = width;
-    grid[0][0].value = value;
-    grid[0][0].cssClasses = cssClasses;
+    if (width > 0) {
+      grid[0][0].rowspan = height;
+      grid[0][0].colspan = width;
+      grid[0][0].value = value;
+      grid[0][0].cssClasses = cssClasses;
+    }
     return grid;
   }
 

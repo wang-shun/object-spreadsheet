@@ -58,6 +58,7 @@ namespace Objsheets {
     public columnId;
     public col;
     public relationSingular;
+    public showBullets;
     public width;
     public leftEdgeSingular;
     public rightEdgeSingular;
@@ -79,7 +80,9 @@ namespace Objsheets {
       // Future: Consider rendering _unit with isObject = true specially to save
       // space, e.g., a single column of hollow bullets.  We'd need to figure out
       // how to make this not confusing.
-      this.width = (this.col.type !== "_token" ? 1 : 0) + (this.col.isObject ? 1 : 0);
+      this.showBullets = this.col.isObject &&
+        (this.options.showBullets || this.layoutTree.subtrees.length == 0);
+      this.width = (this.col.type !== "_token" ? 1 : 0) + (this.showBullets ? 1 : 0);
       this.leftEdgeSingular = true;
       this.rightEdgeSingular = true;
       // field index -> string or null (class of extra column before this field)
@@ -172,8 +175,10 @@ namespace Objsheets {
         }
         for (let i = 0; i < vlist.numPlaceholders; i++) {
           let placeholder = gridMergedCell(1, this.width, "", ["dataPadding"]);
-          placeholder[0][0].qFamilyId = qFamilyId;
-          placeholder[0][0].isPlaceholder = true;
+          if (this.width > 0) {
+            placeholder[0][0].qFamilyId = qFamilyId;
+            placeholder[0][0].isPlaceholder = true;
+          }
           gridVertExtend(grid, placeholder);
         }
         if (grid.length < height) {
@@ -188,14 +193,17 @@ namespace Objsheets {
           } else {
             // Add blank cell at bottom
             let bottomGrid = gridMergedCell(height - grid.length, this.width, "", ["dataPadding"]);
-            bottomGrid[0][0].qFamilyId = qFamilyId;
+            if (this.width > 0)
+              bottomGrid[0][0].qFamilyId = qFamilyId;
             gridVertExtend(grid, bottomGrid);
           }
         }
       } else {
         grid = gridMergedCell(height, this.width, "error", ["dataError"]);
-        grid[0][0].fullText = "Error: " + vlist.error;
-        grid[0][0].qFamilyId = qFamilyId;
+        if (this.width > 0) {
+          grid[0][0].fullText = "Error: " + vlist.error;
+          grid[0][0].qFamilyId = qFamilyId;
+        }
       }
       return grid;
     }
@@ -243,7 +251,7 @@ namespace Objsheets {
         columnId: this.columnId,
         cellId: cellIdParent(hlist.cellId)
       };
-      if (this.col.isObject) {
+      if (this.showBullets) {
         // Object
         let gridObject = gridMergedCell(height, 1, this.objectSymbol(), ["centered"]);
         gridObject[0][0].qCellId = qCellId;
@@ -310,7 +318,7 @@ namespace Objsheets {
       // argue we should generate two classes and let the CSS deal with it.
       let myColorClass = (matchIdx = typeColors.get(this.columnId)) != null ? "rsHeaderMatch" + this.colorIndexForMatch(matchIdx) : myDepthClass;
       let grid = [[], []];  // c.f. renderHlist
-      if (this.col.isObject) {
+      if (this.showBullets) {
         let fieldNameCell = new ViewCell("", 1, 1, ["rsHeaderFieldNameObject"].concat((this.col.type !== "_token" ? ["rsHeaderFieldNameKeyedObject"] : []), [myColorClass]));
         fieldNameCell.columnId = this.columnId;
         fieldNameCell.isObjectHeader = true;
@@ -359,9 +367,11 @@ namespace Objsheets {
         }
         classes.push(myColorClass);
         let corner = gridMergedCell(height - 2, grid[0].length, fallback(this.col.objectName, ""), classes);
-        corner[0][0].columnId = this.columnId;
-        corner[0][0].isObjectHeader = true;
-        corner[0][0].kind = "top";
+        if (grid[0].length > 0) {
+          corner[0][0].columnId = this.columnId;
+          corner[0][0].isObjectHeader = true;
+          corner[0][0].kind = "top";
+        }
         gridVertExtend(corner, grid);
         grid = corner;
         currentHeight = height;
@@ -527,6 +537,10 @@ namespace Objsheets {
         palette: "alternating",
         // Matching colors for fields of reference type and their target object columns.
         colorReferences: true,
+        // If true, show bullets for every object type.  If false, hide bullets except
+        // for object types with no children (for UI prototyping; not all functionality
+        // works in this mode).
+        showBullets: true,
         // Separator column between every pair of adjacent incomparable columns
         // (except ones that are in separate tables when separateTables is on).
         // Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
@@ -582,7 +596,7 @@ namespace Objsheets {
 
       //gridCaption = []
       if (this.options.headerExpandable) {
-        if (headerHeight > 2) {
+        if (headerHeight > 2 && this.mainSection.showBullets) {
           let toggleHtml = `<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">\n  <path style="stroke: black; fill: black" d="${headerExpanded.get() ? "M 1 4 l 8 0 l -4 4 z" : "M 3 1 l 4 4 l -4 4 z"}"/>\n</svg>`;
           grid[0][0].value = toggleHtml;
           grid[0][0].cssClasses.push("rsRoot");
