@@ -507,11 +507,6 @@ namespace Objsheets {
     }
   }
 
-  let headerExpanded = new ReactiveVar(true);
-  function toggleHeaderExpanded() {
-    headerExpanded.set(!headerExpanded.get());
-  }
-
   export class ClientView {
     public options;
     public hot;
@@ -531,8 +526,9 @@ namespace Objsheets {
         // Consider turning this off when we guess the type based on entered data.
         // ~ Matt 2015-12-03
         showTypes: true,
-        // Show arrow button to open hierarchical header
-        headerExpandable: true,
+        // Pretty self-explanatory...
+        headerInitiallyExpanded: true,
+        canToggleHeaderExpansion: true,
         // 'boring' for grey, 'alternating' for two greys, 'rainbow' for dazzling colors
         palette: "alternating",
         // Matching colors for fields of reference type and their target object columns.
@@ -550,6 +546,8 @@ namespace Objsheets {
         // Developers only (print some logs with timestamps)
         profile: false
       };
+
+      this.headerExpanded = new ReactiveVar(this.options.headerInitiallyExpanded);
       this.hot = null;
       this.savedSelection = null;
       this.pending = [];
@@ -574,7 +572,7 @@ namespace Objsheets {
         this.mainSection.findTypesToColor(typeColors);
         this.mainSection.assignTypeColors(0, typeColors);
       }
-      let grid = this.mainSection.renderHeader(headerExpanded.get(), headerExpanded.get() ? this.mainSection.headerMinHeight : 3, 0, typeColors);
+      let grid = this.mainSection.renderHeader(this.headerExpanded.get(), this.headerExpanded.get() ? this.mainSection.headerMinHeight : 3, 0, typeColors);
       for (let row of grid) {
         for (let cell of row) {
           cell.cssClasses.push("htBottom", "rsHeader");  // easiest to do here
@@ -595,9 +593,9 @@ namespace Objsheets {
       gridVertExtend(grid, gridData);
 
       //gridCaption = []
-      if (this.options.headerExpandable) {
+      if (this.options.canToggleHeaderExpansion) {
         if (headerHeight > 2 && this.mainSection.showBullets) {
-          let toggleHtml = `<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">\n  <path style="stroke: black; fill: black" d="${headerExpanded.get() ? "M 1 4 l 8 0 l -4 4 z" : "M 3 1 l 4 4 l -4 4 z"}"/>\n</svg>`;
+          let toggleHtml = `<svg class="toggleHeaderExpanded" style="height: 11px; width: 10px">\n  <path style="stroke: black; fill: black" d="${this.headerExpanded.get() ? "M 1 4 l 8 0 l -4 4 z" : "M 3 1 l 4 4 l -4 4 z"}"/>\n</svg>`;
           grid[0][0].value = toggleHtml;
           grid[0][0].cssClasses.push("rsRoot");
         }
@@ -700,7 +698,7 @@ namespace Objsheets {
           // otherwise the fixed clone of the left column sometimes reduced the
           // objectName row to zero height because it wasn't constrained by the
           // content of the real table.  We can look out for any similar glitches.
-          if (headerExpanded.get()) {
+          if (this.headerExpanded.get()) {
             return _.range(0, this.grid.length).map((i) => i < headerHeight - (2 + this.options.showTypes) ? 11 : 24);
           } else {
             return _.range(0, this.grid.length).map((i) => 24);
@@ -1286,6 +1284,12 @@ namespace Objsheets {
       }
       return false;
     }
+
+    public headerExpanded;
+    public toggleHeaderExpanded() {
+      this.headerExpanded.set(!this.headerExpanded.get());
+    }
+
   }
 
   let view = null;
@@ -1354,7 +1358,7 @@ namespace Objsheets {
 
   Template["Spreadsheet"].events = {
     "click .toggleHeaderExpanded": () => {
-      toggleHeaderExpanded();
+      view.toggleHeaderExpanded();
     }
   };
 
