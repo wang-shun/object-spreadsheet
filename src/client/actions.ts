@@ -379,7 +379,9 @@ namespace Objsheets {
       // XXX It would be cleaner for traceColumnFormula to ensure "traces" was
       // created at least as an empty list on all subformulas, but more work to
       // implement.
-      for (let [varValues, outcome] of formula.traces != null ? formula.traces.entries() : null) {
+      var /*closure*/ varValues;
+      let outcome;
+      for ([varValues, outcome] of formula.traces != null ? formula.traces.entries() : null) {
         let line = varsAndTypesList.map(([name, _]) => {
           let val = varValues.get(name).elements()[0];
           return new ViewCell(valueToTextIgnoreErrors(varValues.get(name).type, val));

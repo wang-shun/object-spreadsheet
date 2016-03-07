@@ -502,12 +502,12 @@ let _cnt = 0;
           }
         } else if (k === "$pull") {
           for (let k in v0) {
-            let v = v0[k];
+            var /*closure*/ v = v0[k];
             doc[k] = doc[k].filter((x) => !EJSON.equals(x, v));
           }
         } else if (k === "$addToSet") {
           for (let k in v0) {
-            let v = v0[k];
+            var /*closure*/ v = v0[k];
             let l = doc[k];
             if (l.every((x) => !EJSON.equals(x, v))) {
               l.push(v);

@@ -39,8 +39,9 @@ namespace Objsheets {
       if (keyField != null) {
         obj[keyField] = cellIdLastStep(rootCellId);
       }
-      for (let x of t.subtrees) {
-        let c = Columns.findOne(x.root);
+      var /*closure*/ x;
+      for (x of t.subtrees) {
+        var /*closure*/ c = Columns.findOne(x.root);
         if (c != null) {
           let vals = new FamilyId({
             cellId: rootCellId,
@@ -60,7 +61,7 @@ namespace Objsheets {
             // is a security problem.  Remove this feature and update all affected
             // applications.  (Doesn't really matter until we have authentication.)
             if (expandRefs && (c.type != null) && typeIsReference(c.type)) {
-              let ot = View.drillDown(c.type);
+              var /*closure*/ ot = View.drillDown(c.type);
               vals = vals.map((v) => this.readObj(ot, v, expandRefs, Columns.findOne(ot.root) != null ? Columns.findOne(ot.root).fieldName : null, visited));
             }
             obj[c.fieldName] = vals;
