@@ -340,6 +340,14 @@ namespace Objsheets {
     }
 
     public addPlaceholder(callback : fixmeAny = () => {}) {
+      // Careful... if we add a Cells entry in a state column with no "values"
+      // property, evaluateAll won't automatically add the "values" property,
+      // and the missing property will confuse various readers.
+      if (Cells.findOne(this.selector()) == null) {
+        let ce = <fixmeAny>this.selector();
+        ce.values = [];
+        Cells.insert(ce);
+      }
       // If the field is initially absent, $inc treats it as 0.
       upsertOne(Cells, this.selector(), {
         $inc: {

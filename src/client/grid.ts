@@ -4,7 +4,6 @@
 namespace Objsheets {
 
   export class ViewCell {
-    public qFamilyId;
     public qCellId;
     public columnId;
     public isObject;
@@ -13,10 +12,13 @@ namespace Objsheets {
     public isObjectHeader;
     public isObjectCell;
     public ancestorQCellId;
+    // If set to a state column, then data can be added to this cell, and
+    // any missing ancestors will be automatically created up to
+    // ancestorQCellId.
+    public addColumnId : string;
     public isPlaceholder;
 
     constructor(public value : fixmeAny = null, public rowspan : fixmeAny = 1, public colspan : fixmeAny = 1, public cssClasses : fixmeAny = []) {
-      this.qFamilyId = null;
       this.qCellId = null;
       this.columnId = null;
       // Use in combination with columnId or qCellId to distinguish key and object

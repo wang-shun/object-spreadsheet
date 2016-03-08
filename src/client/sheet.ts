@@ -164,22 +164,24 @@ namespace Objsheets {
         columnId: this.columnId,
         cellId: vlist.parentCellId
       };
+      let ancestorQCellId = {
+        columnId: this.col.parent,
+        cellId: vlist.parentCellId
+      };
       let grid;
       if (vlist.hlists != null) {
         grid = [];
         for (let hlist of vlist.hlists) {
-          gridVertExtend(grid, this.renderHlist(hlist, hlist.minHeight));
+          gridVertExtend(grid, this.renderHlist(hlist, ancestorQCellId, hlist.minHeight));
         }
         for (let cell of gridBottomRow(grid)) {
           cell.cssClasses.push("vlast");
         }
         for (let i = 0; i < vlist.numPlaceholders; i++) {
-          let placeholder = gridMergedCell(1, this.width, "", ["dataPadding"]);
-          if (this.width > 0) {
-            placeholder[0][0].qFamilyId = qFamilyId;
-            placeholder[0][0].isPlaceholder = true;
-          }
-          gridVertExtend(grid, placeholder);
+          // This should occur only in value columns, so gridPlaceholder should be 1x1.
+          let gridPlaceholder = this.renderHlist(null, ancestorQCellId, 1);
+          gridPlaceholder[0][0].isPlaceholder = true;
+          gridVertExtend(grid, gridPlaceholder);
         }
         if (grid.length < height) {
           if (grid.length === 1) {
@@ -191,18 +193,14 @@ namespace Objsheets {
               cell.rowspan = height;
             }
           } else {
-            // Add blank cell at bottom
-            let bottomGrid = gridMergedCell(height - grid.length, this.width, "", ["dataPadding"]);
-            if (this.width > 0)
-              bottomGrid[0][0].qFamilyId = qFamilyId;
-            gridVertExtend(grid, bottomGrid);
+            while (grid.length < height)
+              gridVertExtend(grid, this.renderHlist(null, ancestorQCellId, 1));
           }
         }
       } else {
         grid = gridMergedCell(height, this.width, "error", ["dataError"]);
         if (this.width > 0) {
           grid[0][0].fullText = "Error: " + vlist.error;
-          grid[0][0].qFamilyId = qFamilyId;
         }
       }
       return grid;
@@ -239,23 +237,21 @@ namespace Objsheets {
       return nextColor;
     }
 
-    public renderHlist(hlist, height) {
+    // Can be called with hlist == null for an empty row.
+    public renderHlist(hlist, ancestorQCellId, height) {
       let grid = _.range(0, height).map((i) => []);
-      let qCellId = {
+      let qCellId = (hlist == null) ? null : {
         columnId: this.columnId,
         cellId: hlist.cellId
       };
-      // This logic could be in a ViewCell accessor instead, but for now it isn't
-      // duplicated so there's no need.
-      let qFamilyId = this.columnId === rootColumnId ? null : {
-        columnId: this.columnId,
-        cellId: cellIdParent(hlist.cellId)
-      };
       if (this.showBullets) {
         // Object
-        let gridObject = gridMergedCell(height, 1, this.objectSymbol(), ["centered"]);
+        let gridObject = gridMergedCell(height, 1,
+          hlist == null ? "" : this.objectSymbol(),
+          [hlist == null ? "dataPadding" : "centered"]);
+        gridObject[0][0].ancestorQCellId = ancestorQCellId;
+        gridObject[0][0].addColumnId = this.columnId;
         gridObject[0][0].qCellId = qCellId;
-        gridObject[0][0].qFamilyId = qFamilyId;
         gridObject[0][0].isObjectCell = true;
         // For debugging and calling canned transactions from the console.
         //gridObject[0][0].fullText = 'Object ID: ' + JSON.stringify(hlist.cellId)
@@ -266,24 +262,29 @@ namespace Objsheets {
       }
       if (this.col.type !== "_token") {
         // Value
-        let gridValue = gridMergedCell(height, 1, fallback(hlist.value, "<?>"));
-        if (this.subsections.length === 0) {
-          gridValue[0][0].cssClasses.push("leaf");
-        }
-        if (hlist.value != null) {
-          for (let displayClass of this.markDisplayClasses()) {
-            gridValue[0][0].cssClasses.push(displayClass);
-          }
-          if (typeIsReference(this.col.type)) {
-            gridValue[0][0].cssClasses.push("reference");
-          }
-        }
-        if (hlist.error != null) {
-          gridValue[0][0].cssClasses.push("dataError");
-          gridValue[0][0].fullText = "Error converting to text: " + hlist.error;
-        }
+        let gridValue = gridMergedCell(height, 1,
+          hlist == null ? "" : fallback(hlist.value, "<?>"),
+          hlist == null ? ["dataPadding"] : []);
+        gridValue[0][0].ancestorQCellId = ancestorQCellId;
+        gridValue[0][0].addColumnId = this.columnId;
         gridValue[0][0].qCellId = qCellId;
-        gridValue[0][0].qFamilyId = qFamilyId;
+        if (hlist != null) {
+          if (this.subsections.length === 0) {
+            gridValue[0][0].cssClasses.push("leaf");
+          }
+          if (hlist.value != null) {
+            for (let displayClass of this.markDisplayClasses()) {
+              gridValue[0][0].cssClasses.push(displayClass);
+            }
+            if (typeIsReference(this.col.type)) {
+              gridValue[0][0].cssClasses.push("reference");
+            }
+          }
+          if (hlist.error != null) {
+            gridValue[0][0].cssClasses.push("dataError");
+            gridValue[0][0].fullText = "Error converting to text: " + hlist.error;
+          }
+        }
         gridHorizExtend(grid, gridValue);
       }
       // Subsections
@@ -295,11 +296,14 @@ namespace Objsheets {
             // not table separator cells for the root object).  Do not set qCellId
             // as that would allow "Delete object", which would be a little
             // surprising.
-            extraCells[0][0].ancestorQCellId = qCellId;
+            extraCells[0][0].ancestorQCellId = fallback(qCellId, ancestorQCellId);
           }
           gridHorizExtend(grid, extraCells);
         }
-        let subsectionGrid = subsection.renderVlist(hlist.vlists[i], height);
+        let subsectionGrid =
+          (hlist == null)
+            ? subsection.renderHlist(null, ancestorQCellId, height)
+            : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
       return grid;
@@ -440,10 +444,17 @@ namespace Objsheets {
   // This may hold a reference to a ViewCell object from an old View.  Weird but
   // shouldn't cause any problem and not worth doing differently.
   let selectedCell = null;
+  let pendingSelectionPredicate = null;
+  function postSelectionPredicate(predicate) {
+    if (view != null && view.selectMatchingCell(predicate))
+      pendingSelectionPredicate = null;
+    else
+      pendingSelectionPredicate = predicate;
+  }
 
   export class StateEdit {
-    public static parseValue(qFamilyId, text) {
-      let type = getColumn(qFamilyId.columnId).type;
+    public static parseValue(columnId, text) {
+      let type = getColumn(columnId).type;
       //if typeIsReference(type)
       //  if (m = /^@(\d+)$/.exec(text))
       //    wantRowNum = Number.parseInt(m[1])
@@ -454,29 +465,50 @@ namespace Objsheets {
       return parseValue(type, text);
     }
 
-    public static parseValueUi(qFamilyId, text) {
+    public static parseValueUi(columnId, text) {
       try {
-        return this.parseValue(qFamilyId, text);
+        return this.parseValue(columnId, text);
       } catch (e) {
         alert("Invalid value: " + e.message);
         throw e;
       }
     }
 
-    public static addCell(qFamilyId, enteredValue, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
+    public static PLACEHOLDER = {};
+
+    public static addCell(addColumnId, ancestorQCellId, enteredValue, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
       var newValue;
-      if ((newValue = this.parseValueUi(qFamilyId, enteredValue)) != null) {
-        new FamilyId(qFamilyId).add(newValue, (() => {
-          $$.call("notify", callback);
-        }), consumePlaceholder);
+      if (enteredValue == StateEdit.PLACEHOLDER) {
+        newValue = null;
+      } else {
+        newValue = this.parseValueUi(addColumnId, enteredValue);
+        if (newValue == null)
+          return;
       }
+      $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder,
+        (error, result) => {
+          if (error == null) {
+            // Try to move the selection to the added cell, once it shows up.
+            let predicate;
+            if (enteredValue == StateEdit.PLACEHOLDER) {
+              predicate = (c) =>
+                c.addColumnId == addColumnId &&
+                EJSON.equals(c.ancestorQCellId, {columnId: getColumn(addColumnId).parent, cellId: result}) &&
+                c.isPlaceholder;
+            } else {
+              predicate = (c) =>
+                EJSON.equals(c.qCellId, {columnId: addColumnId, cellId: cellIdChild(result, newValue)});
+            }
+            postSelectionPredicate(predicate);
+          }
+          callback(error, result);
+        });
     }
 
     public static modifyCell(qCellId, enteredValue, callback : fixmeAny = () => {}) {
       var newValue;
       let cel = new CellId(qCellId);
-      let fam = cel.family();
-      if ((newValue = this.parseValueUi(fam, enteredValue)) != null) {
+      if ((newValue = this.parseValueUi(cel.columnId, enteredValue)) != null) {
         cel.value(newValue, (() => {
           $$.call("notify", callback);
         }));
@@ -543,6 +575,7 @@ namespace Objsheets {
         sepcols: false,
         // Show children of the root as separate tables.
         separateTables: true,
+        rootSpareRows: 10,
         // Developers only (print some logs with timestamps)
         profile: false
       };
@@ -567,6 +600,8 @@ namespace Objsheets {
       // Display the root column for completeness.  However, it doesn't have a real
       // value.
       let hlist = this.mainSection.prerenderHlist([], "");
+      // XXX This is in addition to any placeholders.  Desirable?
+      hlist.minHeight += this.options.rootSpareRows;
       let typeColors = new EJSONKeyedMap();
       if (this.options.colorReferences) {
         this.mainSection.findTypesToColor(typeColors);
@@ -589,7 +624,7 @@ namespace Objsheets {
           }
         });
       }
-      let gridData = this.mainSection.renderHlist(hlist, hlist.minHeight);
+      let gridData = this.mainSection.renderHlist(hlist, null, hlist.minHeight);
       gridVertExtend(grid, gridData);
 
       //gridCaption = []
@@ -658,17 +693,18 @@ namespace Objsheets {
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
           classes.push(`ref-${refc}`);
         }
-        if ((cell.qFamilyId != null ? cell.qFamilyId.cellId.length : null) === 0) {  // seems to work; == undefined if qFamilyId doesn't exist
-          classes.push("parent-root");
-        }
-        if (cell.ancestorQCellId) console.log(cell.ancestorQCellId);
-        let ancestors = cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.qFamilyId != null ? new FamilyId(cell.qFamilyId).ancestors() : [];
+        let ancestors = cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : [];
         for (let ancestor of ancestors) {
           if ((refc = this.refId(ancestor.q())) != null) {
             classes.push(`ancestor-${refc}`);
           }
         }
-        if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) || (cell.qFamilyId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
+        if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId
+            || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId)
+            // We don't have state columns as descendants of formula columns, so
+            // if we can edit addColumnId, we'll also be able to insert the
+            // ancestors.
+            || (cell.addColumnId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.addColumnId))
           classes.push("editable");
         return cell.cssClasses.concat(classes);
       }))
@@ -733,7 +769,6 @@ namespace Objsheets {
             //
             // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
             readOnly: classes.indexOf("editable") == -1 
-            //!((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId) || (cell.qFamilyId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qFamilyId.columnId))
           };
         },
         autoColumnSize: {
@@ -833,9 +868,9 @@ namespace Objsheets {
                   }
                   //StateEdit.removeCell cell.qCellId, standardServerCallback
                 }
-              } else if ((cell.qFamilyId != null) && !cell.isObjectCell) {
-                if (newVal || getColumn(cell.qFamilyId.columnId).type === "text") {
-                  StateEdit.addCell(cell.qFamilyId, newVal, revertingCallback, cell.isPlaceholder);
+              } else if ((cell.addColumnId != null) && !cell.isObjectCell) {
+                if (newVal || getColumn(cell.addColumnId).type === "text") {
+                  StateEdit.addCell(cell.addColumnId, cell.ancestorQCellId, newVal, revertingCallback, cell.isPlaceholder);
                 }
               }
             }
@@ -1092,49 +1127,48 @@ namespace Objsheets {
 
     public getAddCommandForCell(c) {
       var col;
-      let qf = c.qFamilyId;
-      if ((qf != null) && columnIsState(col = getColumn(qf.columnId))) {
+      if ((c.addColumnId != null) && columnIsState(col = getColumn(c.addColumnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
           // A token column has only the object UI-column, though we don't set
           // isObjectCell on family padding cells.  So don't check it.
           return {
             name: `Add '${objectName}' object here`,
+            allowEnter: true,
             callback: () => {
-              StateEdit.addCell(qf, null, standardServerCallback);
+              StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
             }
           };
         } else if (col.type === "_unit") {
           // Adding a duplicate value has no effect, but disallow it as a
-          // hint to the user.  !selectedCell.isObjectCell is in principle a
+          // hint to the user.  !c.isObjectCell is in principle a
           // requirement, though it ends up being redundant because the only way
           // to select an object cell is to already have a unit value present.
-          if (!selectedCell.isObjectCell && !(Cells.findOne({
-            column: qf.columnId,
-            key: qf.cellId
-          }) != null ? Cells.findOne({
-            column: qf.columnId,
-            key: qf.cellId
-          }).values != null ? Cells.findOne({
-            column: qf.columnId,
-            key: qf.cellId
-          }).values.length : null : null)) {
+          let fam;
+          if (!c.isObjectCell && !(
+                col.parent == c.ancestorQCellId.columnId &&
+                (fam = Cells.findOne({column: col._id, key: c.ancestorQCellId.cellId})) != null &&
+                fam.values != null && fam.values.length > 0)) {
             return {
               name: "Add X here",
+              allowEnter: true,
               callback: () => {
-                StateEdit.addCell(qf, null, standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
               }
             };
           }
         } else {
-          if (!selectedCell.isObjectCell) {
+          if (!c.isObjectCell) {
             return {
               // I'd like to make clear that this doesn't actually add the value yet
               // (e.g., "Make room to add a value here"), but Daniel won't like that.
               // ~ Matt 2015-11-22
               name: "Add cell here",
+              // We want enter to start editing instead.
+              // XXX Share code with the calculation of the "editable" class.
+              allowEnter: false,
               callback: () => {
-                new FamilyId(qf).addPlaceholder(standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, StateEdit.PLACEHOLDER, standardServerCallback);
               }
             };
           }
@@ -1149,7 +1183,9 @@ namespace Objsheets {
         return {
           name: "Delete cell",
           callback: () => {
-            new FamilyId(c.qFamilyId).removePlaceholder(standardServerCallback);
+            new FamilyId({columnId: c.addColumnId,
+                          cellId: c.ancestorQCellId.cellId})
+              .removePlaceholder(standardServerCallback);
           }
         };
       } else if ((c.qCellId != null) && columnIsState(col = getColumn(c.qCellId.columnId))) {
@@ -1196,20 +1232,18 @@ namespace Objsheets {
         Handsontable.Dom.stopImmediatePropagation(event);
       } else if (!event.altKey && !event.ctrlKey && !event.metaKey) {
         if (event.which === 13) {  // Enter
-          // Like the "add by editing" case of hotConfig.readOnly but handles the rest of the types.
-          if (((qf = selectedCell != null ? selectedCell.qFamilyId : null) != null) && columnIsState(col = getColumn(qf.columnId)) && (col.type === "_token" || col.type === "_unit")) {
+          let cmd = this.getAddCommandForCell(selectedCell);
+          if (cmd != null && cmd.allowEnter) {
             Handsontable.Dom.stopImmediatePropagation(event);
-            this.getAddCommandForCell(selectedCell).callback();
+            cmd.callback();
           }
         } else if (event.which === 46 || event.which === 8) {  // Delete / Backspace
           // Be careful not to hijack focus when an editor is open
           if (this.hot.getActiveEditor().state !== "STATE_EDITING") {
             Handsontable.Dom.stopImmediatePropagation(event);
             for (let cell of this.getMultipleSelectedCells()) {
-              if (((qf = cell != null ? cell.qFamilyId : null) != null) && columnIsState(col = getColumn(qf.columnId))) {
-                if (this.getDeleteCommandForCell(cell) != null) {
-                  this.getDeleteCommandForCell(cell).callback();
-                }
+              if (this.getDeleteCommandForCell(cell) != null) {
+                this.getDeleteCommandForCell(cell).callback();
               }
             }
           }
@@ -1311,9 +1345,23 @@ namespace Objsheets {
       // Nothing below should trigger rebuilding of the view if it reads reactive
       // data sources.  (Ouch!)
 
-      // Try to select a cell similar to the one previously selected.
-      if (selectedCell != null) {
-        ((selectedCell.qCellId != null) && view.selectMatchingCell((c) => EJSON.equals(selectedCell.qCellId, c.qCellId) && selectedCell.isObjectCell === c.isObjectCell)) || ((selectedCell.qFamilyId != null) && view.selectMatchingCell((c) => EJSON.equals(selectedCell.qFamilyId, c.qFamilyId))) || ((selectedCell.qFamilyId != null) && view.selectMatchingCell((c) => (c.kind === "below" || c.kind === "tokenObject-below") && EJSON.equals(selectedCell.qFamilyId.columnId, c.columnId))) || ((selectedCell.kind != null) && view.selectMatchingCell((c) => selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) || false;
+      if (pendingSelectionPredicate != null &&
+          view.selectMatchingCell(pendingSelectionPredicate)) {
+        pendingSelectionPredicate = null;
+      } else if (selectedCell != null) {
+        // Try to select a cell similar to the one previously selected.
+        ((selectedCell.qCellId != null) && view.selectMatchingCell((c) =>
+            EJSON.equals(selectedCell.qCellId, c.qCellId) &&
+            selectedCell.isObjectCell === c.isObjectCell)) ||
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c) =>
+            selectedCell.addColumnId == c.addColumnId &&
+            EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c) =>
+            (c.kind === "below" || c.kind === "tokenObject-below") &&
+            EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
+        ((selectedCell.kind != null) && view.selectMatchingCell((c) =>
+            selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
+        false;
       }
       // Make sure various things are consistent with change in table data or
       // selection (view.selectMatchingCell doesn't always seem to trigger this).

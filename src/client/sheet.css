@@ -277,16 +277,16 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
   box-shadow: inset 0px 0px 1px 2px #EEE;
 }
 
-.handsontable td.dataPadding:not(.area):not(.selected-object):not(.parent-root):not(.pending) {
+.handsontable td.dataPadding:not(.area):not(.selected-object):not(.pending) {
   background: #FBFBFB;
 }
-.handsontable td.dataPadding:not(.parent-root) {
+.handsontable td.dataPadding {
   box-shadow: inset 0px 0px 3px 2px #DDD;
 }
-.handsontable td.dataPadding.area:not(.parent-root) {
+.handsontable td.dataPadding.area {
   box-shadow: inset 0px 0px 3px 2px #CCF;
 }
-.handsontable td.dataPadding.selected-object:not(.parent-root) {
+.handsontable td.dataPadding.selected-object {
   box-shadow: inset 0px 0px 3px 2px #E8E8A0;
 }
 .handsontable td.dataPadding.parent-root {

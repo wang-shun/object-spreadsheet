@@ -910,6 +910,34 @@ namespace Objsheets {
         }
       });
     }
+
+    private newObjectRecursive(columnId, ancestorQCellId) {
+      if (columnId == ancestorQCellId.columnId) {
+        return ancestorQCellId.cellId;
+      } else {
+        let col = this.getColumn(columnId);
+        let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
+        let token = Random.id();
+        new FamilyId({columnId: columnId, cellId: parentCellId}).add(token);
+        return cellIdChild(parentCellId, token);
+      }
+    }
+
+    // value == null means add a placeholder.
+    public addCellRecursive(addColumnId, ancestorQCellId, value, consumePlaceholder) {
+      let col = getColumn(addColumnId);
+      let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
+      let fam = new FamilyId({columnId: addColumnId, cellId: parentCellId});
+      if (value == null) {
+        fam.addPlaceholder();
+      } else {
+        fam.add(value);
+      }
+      // XXX Avoid if we didn't actually change the data model?
+      this.invalidateDataCache();
+      this.evaluateAll();
+      return parentCellId;
+    }
   }
 
   Meteor.startup(() => {
@@ -1017,6 +1045,11 @@ namespace Objsheets {
     recursiveDeleteStateCellNoInvalidate: (cc, columnId, cellId) => {
       cc.run(function() {
         this.model.recursiveDeleteStateCellNoInvalidate(columnId, cellId);
+      });
+    },
+    addCellRecursive: (cc, addColumnId, ancestorQCellId, value, consumePlaceholder) => {
+      return cc.run(function() {
+        return this.model.addCellRecursive(addColumnId, ancestorQCellId, value, consumePlaceholder);
       });
     },
     notify: (cc) => {
