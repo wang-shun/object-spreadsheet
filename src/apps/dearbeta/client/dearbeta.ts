@@ -52,11 +52,11 @@ namespace Objsheets {
         at: [this.qCellId.cellId]
       });
     },
-    "submit form": function(event) {
+    "submit form": function(event: fixmeAny) {
       RelsheetsClient.call("hintAdd", {
         at: [this.Hint.qFamilyId.cellId],
         text: [event.target.text.value]
-      }, (error, result) => {
+      }, (error: fixmeAny, result: fixmeAny) => {
         if (error == null) {
           event.target.reset();
         }

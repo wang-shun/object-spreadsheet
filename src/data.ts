@@ -8,16 +8,16 @@
 
 namespace Objsheets {
 
-  function scoped(obj, name, prop) {
+  function scoped(obj: fixmeAny, name: fixmeAny, prop: fixmeAny) {
     Object.defineProperty(obj, name, prop);
   }
 
-  export var $$, Columns, Cells, Views, Procedures;
+  export var $$: fixmeAny, Columns: fixmeAny, Cells: fixmeAny, Views: fixmeAny, Procedures: fixmeAny;
   scoped(Objsheets, "$$", {
     get: () => Tablespace.get()
   });
   for (let coll of ["Columns", "Cells", "Views", "Procedures"]) {
-    ((coll) => {
+    ((coll: fixmeAny) => {
       scoped(Objsheets, coll, {
         get: () => $$[coll]
       });
@@ -30,23 +30,23 @@ namespace Objsheets {
   }
 
   export class Tablespace {
-    public lock;
-    public scheduled;
-    public formulaEngine;
-    public Columns;
-    public Cells;
-    public Views;
-    public Procedures;
-    public static defaultTablespace;
+    public lock: fixmeAny;
+    public scheduled: fixmeAny;
+    public formulaEngine: fixmeAny;
+    public Columns: fixmeAny;
+    public Cells: fixmeAny;
+    public Views: fixmeAny;
+    public Procedures: fixmeAny;
+    public static defaultTablespace: fixmeAny;
 
-    public static instances = {};
+    public static instances: {[id: string]: Tablespace} = {};
 
-    public static get(id?) {
-      var v;
+    public static get(id?: fixmeAny) {
+      var v: fixmeAny;
       return id == null ? (Meteor.isServer && CallingContext.get()) || Tablespace.defaultTablespace : (v = Tablespace.instances[id]) != null ? v : Tablespace.instances[id] = new Tablespace(id);
     }
 
-    public run(func : fixmeAny = () => {}) {
+    public run(func: fixmeAny = () => {}) {
       //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
       return CallingContext.set(this, () => {
         if (this.lock) {
@@ -68,11 +68,11 @@ namespace Objsheets {
     // Convenience method;
     // calls a Meteor method, passing the current cc as first argument
 
-    public call(method, ...args) {
+    public call(method: fixmeAny, ...args: fixmeAny[]) {
       return Meteor.call.apply(Meteor, [method, this].concat(args));
     }
 
-    constructor(public id) {
+    constructor(public id: fixmeAny) {
       this.scheduled = [];
       this.lock = 0;
       if (Meteor.isServer) {
@@ -120,9 +120,9 @@ namespace Objsheets {
 
     // Set by model.coffee
 
-    public static setupModelHook = null;
+    public static setupModelHook: fixmeAny = null;
 
-    public publish(collection) {
+    public publish(collection: fixmeAny) {
       // Do not inline this into the same function as the loop over collections, or
       // the reference to "collection" from the publish function will see the wrong
       // value of the variable (insane JavaScript semantics).
@@ -135,7 +135,7 @@ namespace Objsheets {
       }
     }
 
-    public runTransaction(op) {
+    public runTransaction(op: fixmeAny) {
       return this.run(() => {
         let t = new Transaction;
         t.begin();
@@ -160,20 +160,20 @@ namespace Objsheets {
       };
     }
 
-    public static fromJSONValue(json) {
+    public static fromJSONValue(json: fixmeAny) {
       return Tablespace.get(json.id);
     }
   }
 
   EJSON.addType("Tablespace", Tablespace.fromJSONValue);
 
-  function _toColumnId(selector) {
+  function _toColumnId(selector: fixmeAny) {
     return fallback(selector._id, _.isRegExp(selector) ? parseColumnRef(selector.source)[0] : selector);
   }
 
   export class CellId {
-    public columnId;
-    public cellId;
+    public columnId: fixmeAny;
+    public cellId: fixmeAny;
 
     constructor({
         columnId: columnId,
@@ -200,7 +200,7 @@ namespace Objsheets {
 
     public ancestors() {
       let c : CellId = this;
-      let ancestors = [];
+      let ancestors: fixmeAny = [];
       while (c != null) {
         ancestors.push(c);
         c = c.parent();
@@ -208,7 +208,7 @@ namespace Objsheets {
       return ancestors;
     }
 
-    public value(set?, callback : fixmeAny = () => {}) {
+    public value(set?: fixmeAny, callback: fixmeAny = () => {}) {
       if (set != null) {
         this.remove();
         this.family().add(set, callback);
@@ -217,7 +217,7 @@ namespace Objsheets {
       }
     }
 
-    public family(columnId?) {
+    public family(columnId?: fixmeAny) {
       return columnId != null ? new FamilyId({
         columnId: columnId,
         cellId: this.cellId
@@ -231,7 +231,7 @@ namespace Objsheets {
       return fallback(getColumn(this.columnId) != null ? getColumn(this.columnId).children : null, []).map((childId) => this.family(childId));
     }
 
-    public remove(callback : fixmeAny = () => {}) {
+    public remove(callback: fixmeAny = () => {}) {
       this.family().remove(this.value(), callback);
     }
 
@@ -241,8 +241,8 @@ namespace Objsheets {
   }
 
   export class FamilyId {
-    public columnId;
-    public cellId;
+    public columnId: fixmeAny;
+    public cellId: fixmeAny;
 
     constructor({
         columnId: columnId,
@@ -283,10 +283,10 @@ namespace Objsheets {
     }
 
     public typedValues() {
-      return new TypedSet(this.type(), set(this.values()));
+      return new TypedSet(this.type(), <fixmeAny>set(this.values()));
     }
 
-    public child(value) {
+    public child(value: fixmeAny) {
       return new CellId({
         columnId: this.columnId,
         cellId: cellIdChild(this.cellId, value)
@@ -294,7 +294,7 @@ namespace Objsheets {
     }
 
     public children() {
-      return this.values().map((v) => this.child(v));
+      return this.values().map((v: fixmeAny) => this.child(v));
     }
 
     // XXX: Should we change the database format so this is just a qFamilyId?
@@ -306,7 +306,7 @@ namespace Objsheets {
       };
     }
 
-    public add(value, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
+    public add(value: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
       let updates = <fixmeAny>{
         $addToSet: {
           values: value
@@ -321,7 +321,7 @@ namespace Objsheets {
       return this.child(value);
     }
 
-    public remove(value, callback : fixmeAny = () => {}) {
+    public remove(value: fixmeAny, callback: fixmeAny = () => {}) {
       if (getColumn(this.columnId).isObject) {
         Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
       } else {
@@ -339,7 +339,7 @@ namespace Objsheets {
       }
     }
 
-    public addPlaceholder(callback : fixmeAny = () => {}) {
+    public addPlaceholder(callback: fixmeAny = () => {}) {
       // Careful... if we add a Cells entry in a state column with no "values"
       // property, evaluateAll won't automatically add the "values" property,
       // and the missing property will confuse various readers.
@@ -356,7 +356,7 @@ namespace Objsheets {
       }, callback);
     }
 
-    public removePlaceholder(callback : fixmeAny = () => {}) {
+    public removePlaceholder(callback: fixmeAny = () => {}) {
       if (Cells.findOne(this.selector()) != null ? Cells.findOne(this.selector()).numPlaceholders : null) {  // XXX race
         updateOne(Cells, this.selector(), {
           $inc: {
@@ -372,11 +372,11 @@ namespace Objsheets {
     cellId: rootCellId
   });
 
-  export function allCellIdsInColumnIgnoreErrors(columnId) {
+  export function allCellIdsInColumnIgnoreErrors(columnId: fixmeAny) {
     if (columnId === rootColumnId) {
       return [rootCellId];
     }
-    let cellIds = [];
+    let cellIds: fixmeAny = [];
     for (let family of Cells.find({
       column: columnId
     }).fetch()) {
@@ -392,15 +392,15 @@ namespace Objsheets {
   // Helpers to access collections from the client, which is only allowed to select
   // documents by ID.
 
-  function updateOne(collection, selector, modifier, callback) {
-    var doc;
+  function updateOne(collection: fixmeAny, selector: fixmeAny, modifier: fixmeAny, callback: fixmeAny) {
+    var doc: fixmeAny;
     if ((doc = collection.findOne(selector)) != null) {
       collection.update(doc._id, modifier, callback);
     }
   }
 
-  function upsertOne(collection, selector, modifier, callback) {
-    let doc = collection.findOne(selector), id;
+  function upsertOne(collection: fixmeAny, selector: fixmeAny, modifier: fixmeAny, callback: fixmeAny) {
+    let doc = collection.findOne(selector), id: fixmeAny;
     if (doc) {
       id = doc._id;
     } else {
@@ -415,9 +415,9 @@ let _cnt = 0;
       return `cim.${_cnt}`;
     };
   export class CellsInMemory {
-    public byColumn;
-    public byId;
-    public recycle;
+    public byColumn: fixmeAny;
+    public byId: fixmeAny;
+    public recycle: fixmeAny;
 
 
 
@@ -427,9 +427,9 @@ let _cnt = 0;
       this.recycle = new EJSONKeyedMap;
     }
 
-    public insert(doc) {
+    public insert(doc: fixmeAny) {
       //console.log "[insert(#{JSON.stringify doc})]"
-      var byKey;
+      var byKey: fixmeAny;
       if (doc._id == null) {
         doc._id = this.mkId(doc);
       }
@@ -442,8 +442,8 @@ let _cnt = 0;
       return doc._id;
     }
 
-    public mkId(doc) {
-      var fid, rec;
+    public mkId(doc: fixmeAny) {
+      var fid: fixmeAny, rec: fixmeAny;
       if ((rec = this.recycle.get([doc.column, doc.key])) != null) {
         return rec;
       } else {
@@ -454,8 +454,8 @@ let _cnt = 0;
       }
     }
 
-    public findOne(query) {
-      var column, key;
+    public findOne(query: fixmeAny) {
+      var column: fixmeAny, key: fixmeAny;
       if (_.isString(query)) {
         return this.byId[query];
       } else if ((column = query.column) != null) {
@@ -474,9 +474,9 @@ let _cnt = 0;
       }
     }
 
-    public find(query) {
+    public find(query: fixmeAny) {
       return {
-        forEach: (cb) => {
+        forEach: (cb: fixmeAny) => {
           for (let _id in this.byId) {
             let doc = this.byId[_id];
             if (doc.dirty === query.dirty) {
@@ -487,7 +487,7 @@ let _cnt = 0;
       };
     }
 
-    public update(query, modifier, options) {
+    public update(query: fixmeAny, modifier: fixmeAny, options: fixmeAny) {
       //console.log "[update(#{JSON.stringify query}, #{JSON.stringify modifier}, #{JSON.stringify options})]"
       let doc = this.findOne(query);
       //console.log "  << #{JSON.stringify doc}"
@@ -511,13 +511,13 @@ let _cnt = 0;
         } else if (k === "$pull") {
           for (let k in v0) {
             var /*closure*/ v = v0[k];
-            doc[k] = doc[k].filter((x) => !EJSON.equals(x, v));
+            doc[k] = doc[k].filter((x: fixmeAny) => !EJSON.equals(x, v));
           }
         } else if (k === "$addToSet") {
           for (let k in v0) {
             var /*closure*/ v = v0[k];
             let l = doc[k];
-            if (l.every((x) => !EJSON.equals(x, v))) {
+            if (l.every((x: fixmeAny) => !EJSON.equals(x, v))) {
               l.push(v);
             }
           }
@@ -530,7 +530,7 @@ let _cnt = 0;
       //console.log "  >> #{JSON.stringify doc}"
     }
 
-    public upsert(query, modifier, options) {
+    public upsert(query: fixmeAny, modifier: fixmeAny, options: fixmeAny) {
       if (options != null) {
         throw Error("unimplemented upsert(..., options)");
       }
@@ -539,8 +539,8 @@ let _cnt = 0;
       });
     }
 
-    public remove(query, callback : fixmeAny = () => {}) {
-      var column, doc, key;
+    public remove(query: fixmeAny, callback: fixmeAny = () => {}) {
+      var column: fixmeAny, doc: fixmeAny, key: fixmeAny;
       if ((column = query.column) != null) {
         let byKey = this.byColumn[column];
         if ((key = query.key) != null) {
@@ -575,7 +575,7 @@ let _cnt = 0;
       callback();
     }
 
-    public stash(doc) {
+    public stash(doc: fixmeAny) {
       //console.log "  stash[doc=#{JSON.stringify doc}]"
       delete this.byId[doc._id];
       this.recycle.set([doc.column, doc.key], doc._id);
@@ -588,9 +588,9 @@ let _cnt = 0;
   // changes back to the Mongo collection.
   //
   class TransactionCells {
-    public mem;
+    public mem: fixmeAny;
 
-    constructor(public dbCells) {
+    constructor(public dbCells: fixmeAny) {
       //@mem = new Mongo.Collection(null)
       this.mem = new CellsInMemory;
     }
@@ -601,13 +601,13 @@ let _cnt = 0;
       }
     }
 
-    public insert(doc) {
+    public insert(doc: fixmeAny) {
       doc = _.clone(doc);
       doc.dirty = true;
       this.mem.insert(doc);
     }
 
-    public update(query, values, upsert : fixmeAny = false) {
+    public update(query: fixmeAny, values: fixmeAny, upsert: fixmeAny = false) {
       if (_.size(values) !== 1) {
         throw new Error(`unsupported update in transaction: '${EJSON.stringify(values)}'`);
       }
@@ -629,29 +629,29 @@ let _cnt = 0;
       }
     }
 
-    public upsert(query, values) {
+    public upsert(query: fixmeAny, values: fixmeAny) {
       this.update(query, values, true);
     }
 
-    public remove(query : fixmeAny = {}) {
+    public remove(query: fixmeAny = {}) {
       this.mem.remove(query);  // nothing fancy here...
     }
 
-    public find(query : fixmeAny = {}) {
+    public find(query: fixmeAny = {}) {
       return this.mem.find(query);
     }
 
-    public findOne(query : fixmeAny = {}) {
+    public findOne(query: fixmeAny = {}) {
       return this.mem.findOne(query);
     }
 
     public commit() {
       let raw = this.dbCells.rawCollection();
-      this.dbCells.find().forEach((doc) => {
+      this.dbCells.find().forEach((doc: fixmeAny) => {
         if (!this.mem.findOne(doc._id)) {
           raw.remove({
             _id: doc._id
-          }, (err) => {
+          }, (err: fixmeAny) => {
             if (err != null) {
               console.log(`remove: ${err}`);
             }
@@ -661,13 +661,13 @@ let _cnt = 0;
       });
       this.mem.find({
         dirty: true
-      }).forEach((doc) => {
+      }).forEach((doc: fixmeAny) => {
         delete doc.dirty;
         raw.update({
           _id: doc._id
         }, doc, {
           upsert: true
-        }, (err) => {
+        }, (err: fixmeAny) => {
           if (err != null) {
             console.log(`remove: ${err}`);
           }
@@ -678,9 +678,9 @@ let _cnt = 0;
   }
 
   export class Transaction {
-    public Cells;
+    public Cells: fixmeAny;
 
-    constructor(dbCells?) {
+    constructor(dbCells?: fixmeAny) {
       this.Cells = new TransactionCells(fallback(dbCells, Cells));
     }
 

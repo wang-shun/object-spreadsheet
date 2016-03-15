@@ -17,7 +17,7 @@ namespace Objsheets {
   });
 
   class NotReadyError_ {
-    constructor(public message) {}
+    constructor(public message: fixmeAny) {}
   }
   let NotReadyError = Meteor.makeErrorType("NotReadyError", NotReadyError_);
 
@@ -25,11 +25,11 @@ namespace Objsheets {
   // resolution of the target cell ID to a row number.  I'm a terrible person for
   // taking advantage of heterogeneous fields in JavaScript... ~ Matt
   export class CellReference {
-    constructor(public qCellId, public display) {}
+    constructor(public qCellId: fixmeAny, public display: fixmeAny) {}
   }
 
-  export function stringifyTypeForSheet(type) {
-    var col, name;
+  export function stringifyTypeForSheet(type: fixmeAny) {
+    var col: fixmeAny, name: fixmeAny;
     if (type === "_unit") {
       return "X";
     } else if (!typeIsReference(type)) {
@@ -42,33 +42,33 @@ namespace Objsheets {
     }
   }
 
-  export function markDisplayClassesForType(type) {
+  export function markDisplayClassesForType(type: fixmeAny) {
     return type === "_unit" ? ["centered"] : [];
   }
 
   class ViewVlist {
-    constructor(public parentCellId, public minHeight, public hlists, public numPlaceholders?, public error?) {}
+    constructor(public parentCellId: fixmeAny, public minHeight: fixmeAny, public hlists: fixmeAny, public numPlaceholders?: fixmeAny, public error?: fixmeAny) {}
   }
 
   class ViewHlist {
-    constructor(public cellId, public minHeight, public value, public error, public vlists) {}
+    constructor(public cellId: fixmeAny, public minHeight: fixmeAny, public value: fixmeAny, public error: fixmeAny, public vlists: fixmeAny) {}
   }
 
   class ViewSection {
-    public columnId;
-    public col;
-    public relationSingular;
-    public showBullets;
-    public width;
-    public leftEdgeSingular;
-    public rightEdgeSingular;
-    public extraColClassBefore;
-    public subsections;
-    public headerHeightBelow;
-    public amRootWithSeparateTables;
-    public headerMinHeight;
+    public columnId: fixmeAny;
+    public col: fixmeAny;
+    public relationSingular: fixmeAny;
+    public showBullets: fixmeAny;
+    public width: fixmeAny;
+    public leftEdgeSingular: fixmeAny;
+    public rightEdgeSingular: fixmeAny;
+    public extraColClassBefore: fixmeAny;
+    public subsections: fixmeAny;
+    public headerHeightBelow: fixmeAny;
+    public amRootWithSeparateTables: fixmeAny;
+    public headerMinHeight: fixmeAny;
 
-    constructor(public layoutTree, public options : fixmeAny = {}) {
+    constructor(public layoutTree: fixmeAny, public options: fixmeAny = {}) {
       this.columnId = this.layoutTree.root;
       this.col = getColumn(this.columnId);
       // Typechecking should always fill in a type, even 'error'.
@@ -91,7 +91,7 @@ namespace Objsheets {
       // @headerHeightBelow and @headerMinHeight refer to the expanded header.
       this.headerHeightBelow = 2;  // fieldName, type
       this.amRootWithSeparateTables = this.options.separateTables && this.columnId === rootColumnId;
-      this.layoutTree.subtrees.forEach((sublayout, i) => {
+      this.layoutTree.subtrees.forEach((sublayout: fixmeAny, i: fixmeAny) => {
         let subsection = new ViewSection(sublayout, this.options);
         this.subsections.push(subsection);
         let nextLeftEdgeSingular = subsection.relationSingular && subsection.leftEdgeSingular;
@@ -111,13 +111,13 @@ namespace Objsheets {
       }
     }
 
-    public prerenderVlist(parentCellId) {
+    public prerenderVlist(parentCellId: fixmeAny) {
       let ce = Cells.findOne({
         column: this.columnId,
         key: parentCellId
       });
       if ((ce != null ? ce.values : null) != null) {
-        let hlists = ce.values.map((value) => this.prerenderHlist(cellIdChild(parentCellId, value), value));
+        let hlists = ce.values.map((value: fixmeAny) => this.prerenderHlist(cellIdChild(parentCellId, value), value));
         let minHeight = 0;
         for (let hlist of hlists) {
           minHeight += hlist.minHeight;
@@ -139,8 +139,8 @@ namespace Objsheets {
       }
     }
 
-    public prerenderHlist(cellId, value) {
-      let minHeight = 1, displayValue, error;
+    public prerenderHlist(cellId: fixmeAny, value: fixmeAny) {
+      let minHeight = 1, displayValue: fixmeAny, error: fixmeAny;
       try {
         displayValue = valueToText(liteModel, this.col.type, value);
         if (typeIsReference(this.col.type)) {
@@ -154,12 +154,12 @@ namespace Objsheets {
         displayValue = null;
         error = e.message;
       }
-      let vlists = this.subsections.map((subsection) => subsection.prerenderVlist(cellId));
-      minHeight = Math.max.apply(Math, [1].concat(vlists.map((vlist) => vlist.minHeight)));
+      let vlists = this.subsections.map((subsection: fixmeAny) => subsection.prerenderVlist(cellId));
+      minHeight = Math.max.apply(Math, [1].concat(vlists.map((vlist: fixmeAny) => vlist.minHeight)));
       return new ViewHlist(cellId, minHeight, displayValue, error, vlists);
     }
 
-    public renderVlist(vlist, height) {
+    public renderVlist(vlist: fixmeAny, height: fixmeAny) {
       let qFamilyId = {
         columnId: this.columnId,
         cellId: vlist.parentCellId
@@ -168,7 +168,7 @@ namespace Objsheets {
         columnId: this.col.parent,
         cellId: vlist.parentCellId
       };
-      let grid;
+      let grid: fixmeAny;
       if (vlist.hlists != null) {
         grid = [];
         for (let hlist of vlist.hlists) {
@@ -218,7 +218,7 @@ namespace Objsheets {
 
     // typeColors: EJSONKeyedMap<string, int>
 
-    public findTypesToColor(typeColors) {
+    public findTypesToColor(typeColors: fixmeAny) {
       if (typeIsReference(this.col.type)) {
         typeColors.set(this.col.type, "TBD");
       }
@@ -227,7 +227,7 @@ namespace Objsheets {
       }
     }
 
-    public assignTypeColors(nextColor, typeColors) {
+    public assignTypeColors(nextColor: fixmeAny, typeColors: fixmeAny) {
       if (typeColors.get(this.columnId) === "TBD") {
         typeColors.set(this.columnId, nextColor++);
       }
@@ -238,7 +238,7 @@ namespace Objsheets {
     }
 
     // Can be called with hlist == null for an empty row.
-    public renderHlist(hlist, ancestorQCellId, height) {
+    public renderHlist(hlist: fixmeAny, ancestorQCellId: fixmeAny, height: fixmeAny) {
       let grid = _.range(0, height).map((i) => []);
       let qCellId = (hlist == null) ? null : {
         columnId: this.columnId,
@@ -288,7 +288,7 @@ namespace Objsheets {
         gridHorizExtend(grid, gridValue);
       }
       // Subsections
-      this.subsections.forEach((subsection, i) => {
+      this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         if (this.extraColClassBefore[i] != null) {
           let extraCells = gridMergedCell(height, 1, "", [this.extraColClassBefore[i]]);
           if (this.extraColClassBefore[i] === "separator") {
@@ -314,14 +314,14 @@ namespace Objsheets {
     // If !expanded, then the requested height should always be 3.  Leaves render
     // at height 2 anyway.
 
-    public renderHeader(expanded, height, depth, typeColors) {
+    public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: fixmeAny) {
       // Part that is always the same.
-      var fieldMatchIdx, matchIdx;
+      var fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
       let myDepthClass = "rsHeaderDepth" + this.colorIndexForDepth(this.col.isObject ? depth : depth - 1);
       // Currently matching-colored header cells don't depend on depth.  You could
       // argue we should generate two classes and let the CSS deal with it.
       let myColorClass = (matchIdx = typeColors.get(this.columnId)) != null ? "rsHeaderMatch" + this.colorIndexForMatch(matchIdx) : myDepthClass;
-      let grid = [[], []];  // c.f. renderHlist
+      let grid: fixmeAny = [[], []];  // c.f. renderHlist
       if (this.showBullets) {
         let fieldNameCell = new ViewCell("", 1, 1, ["rsHeaderFieldNameObject"].concat((this.col.type !== "_token" ? ["rsHeaderFieldNameKeyedObject"] : []), [myColorClass]));
         fieldNameCell.columnId = this.columnId;
@@ -364,7 +364,7 @@ namespace Objsheets {
       let currentHeight = 2;  // should always be 2 or height
       // "Corner" here is the upper left corner cell, which actually spans all the
       // way across in some cases (indicated by isFinal).
-      let makeCorner = (isFinal) => {
+      let makeCorner = (isFinal: fixmeAny) => {
         let classes = ["rsHeaderCorner"];
         if (!isFinal) {
           classes.push("rsHeaderNonfinal");
@@ -381,7 +381,7 @@ namespace Objsheets {
         currentHeight = height;
       };
 
-      this.subsections.forEach((subsection, i) => {
+      this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         if (this.extraColClassBefore[i] != null) {
           if (this.extraColClassBefore[i] === "tableSeparator" && currentHeight === 2) {
             // Close off the corner for the root object so we can draw a complete
@@ -417,7 +417,7 @@ namespace Objsheets {
       return grid;
     }
 
-    public colorIndexForDepth(depth) {
+    public colorIndexForDepth(depth: fixmeAny) {
       switch (this.options.palette) {
         case "rainbow":
           return depth % 6;
@@ -428,7 +428,7 @@ namespace Objsheets {
       }
     }
 
-    public colorIndexForMatch(matchIdx) {
+    public colorIndexForMatch(matchIdx: fixmeAny) {
       // The cost example uses 8 so it repeats colors.  If we use more different
       // colors, they will start to look similar; would it still be worth doing
       // compared to repeating colors?
@@ -443,9 +443,9 @@ namespace Objsheets {
 
   // This may hold a reference to a ViewCell object from an old View.  Weird but
   // shouldn't cause any problem and not worth doing differently.
-  let selectedCell = null;
-  let pendingSelectionPredicate = null;
-  function postSelectionPredicate(predicate) {
+  let selectedCell: fixmeAny = null;
+  let pendingSelectionPredicate: fixmeAny = null;
+  function postSelectionPredicate(predicate: fixmeAny) {
     if (view != null && view.selectMatchingCell(predicate))
       pendingSelectionPredicate = null;
     else
@@ -453,7 +453,7 @@ namespace Objsheets {
   }
 
   export class StateEdit {
-    public static parseValue(columnId, text) {
+    public static parseValue(columnId: fixmeAny, text: fixmeAny) {
       let type = getColumn(columnId).type;
       //if typeIsReference(type)
       //  if (m = /^@(\d+)$/.exec(text))
@@ -465,7 +465,7 @@ namespace Objsheets {
       return parseValue(type, text);
     }
 
-    public static parseValueUi(columnId, text) {
+    public static parseValueUi(columnId: fixmeAny, text: fixmeAny) {
       try {
         return this.parseValue(columnId, text);
       } catch (e) {
@@ -476,8 +476,8 @@ namespace Objsheets {
 
     public static PLACEHOLDER = {};
 
-    public static addCell(addColumnId, ancestorQCellId, enteredValue, callback : fixmeAny = (() => {}), consumePlaceholder : fixmeAny = false) {
-      var newValue;
+    public static addCell(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
+      var newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
       } else {
@@ -486,17 +486,17 @@ namespace Objsheets {
           return;
       }
       $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder,
-        (error, result) => {
+        (error: fixmeAny, result: fixmeAny) => {
           if (error == null) {
             // Try to move the selection to the added cell, once it shows up.
-            let predicate;
+            let predicate: fixmeAny;
             if (enteredValue == StateEdit.PLACEHOLDER) {
-              predicate = (c) =>
+              predicate = (c: fixmeAny) =>
                 c.addColumnId == addColumnId &&
                 EJSON.equals(c.ancestorQCellId, {columnId: getColumn(addColumnId).parent, cellId: result}) &&
                 c.isPlaceholder;
             } else {
-              predicate = (c) =>
+              predicate = (c: fixmeAny) =>
                 EJSON.equals(c.qCellId, {columnId: addColumnId, cellId: cellIdChild(result, newValue)});
             }
             postSelectionPredicate(predicate);
@@ -505,8 +505,8 @@ namespace Objsheets {
         });
     }
 
-    public static modifyCell(qCellId, enteredValue, callback : fixmeAny = () => {}) {
-      var newValue;
+    public static modifyCell(qCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = () => {}) {
+      var newValue: fixmeAny;
       let cel = new CellId(qCellId);
       if ((newValue = this.parseValueUi(cel.columnId, enteredValue)) != null) {
         cel.value(newValue, (() => {
@@ -515,20 +515,20 @@ namespace Objsheets {
       }
     }
 
-    public static removeCell(qCellId, callback : fixmeAny = () => {}) {
+    public static removeCell(qCellId: fixmeAny, callback: fixmeAny = () => {}) {
       new CellId(qCellId).remove((() => {
         $$.call("notify", callback);
       }));
     }
 
-    public static canEdit(columnId) {
+    public static canEdit(columnId: fixmeAny) {
       let col = getColumn(columnId);
       // May as well not let the user try to edit _unit.
       return (col != null) && columnIsState(col) && (col.type !== "_token" && col.type !== "_unit");
     }
   }
 
-  function insertBlankColumn(parentId, index, isObject, view) {
+  function insertBlankColumn(parentId: fixmeAny, index: fixmeAny, isObject: fixmeAny, view: fixmeAny) {
     // Obey the restriction on a state column as child of a formula column.
     // Although changeColumnFormula allows this to be bypassed anyway... :(
     let formula = getColumn(parentId).formula != null ? DUMMY_FORMULA : null;
@@ -540,18 +540,18 @@ namespace Objsheets {
   }
 
   export class ClientView {
-    public options;
-    public hot;
-    public savedSelection;
-    public layoutTree;
-    public mainSection;
-    public qCellIdToGridCoords;
-    public grid;
-    public colClasses;
-    public cellClasses;
+    public options: fixmeAny;
+    public hot: fixmeAny;
+    public savedSelection: fixmeAny;
+    public layoutTree: fixmeAny;
+    public mainSection: fixmeAny;
+    public qCellIdToGridCoords: fixmeAny;
+    public grid: fixmeAny;
+    public colClasses: fixmeAny;
+    public cellClasses: fixmeAny;
     private pending: Array<String>;
 
-    constructor(public view) {
+    constructor(public view: fixmeAny) {
       this.options = {
         // Show type row in header
         // Currently shown, otherwise users too often forget to set the type.
@@ -594,7 +594,7 @@ namespace Objsheets {
     }
 
     public hotConfig() {
-      var _ref, _results;
+      var _ref: fixmeAny, _results: fixmeAny;
       let thisView = this;
       if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid started  --- `);
       // Display the root column for completeness.  However, it doesn't have a real
@@ -616,7 +616,7 @@ namespace Objsheets {
       let headerHeight = grid.length;
       if (!this.options.showTypes) {  // HACK: Delete the last header row
         grid.pop();
-        grid.forEach((row, i) => {
+        grid.forEach((row: fixmeAny, i: fixmeAny) => {
           for (let cell of row) {
             if (cell.rowspan > grid.length - i) {
               cell.rowspan = grid.length - i;
@@ -642,7 +642,7 @@ namespace Objsheets {
       }
 
       // Add last column that will stretch horizontally
-      let sentinel = grid.map((row) => [new ViewCell("", 1, 1, ["rsSentinel"])]);
+      let sentinel = grid.map((row: fixmeAny) => [new ViewCell("", 1, 1, ["rsSentinel"])]);
       sentinel[0][0].columnId = rootColumnId;
       sentinel[0][0].rowspan = sentinel.length;
       gridHorizExtend(grid, sentinel);
@@ -650,8 +650,8 @@ namespace Objsheets {
       // Resolve cell cross-references.
       // @ notation disabled; relevant code commented out. ~ Matt 2015-11-10
       this.qCellIdToGridCoords = new EJSONKeyedMap();
-      grid.forEach((rowCells, i) => {
-        rowCells.forEach((cell, j) => {
+      grid.forEach((rowCells: fixmeAny, i: fixmeAny) => {
+        rowCells.forEach((cell: fixmeAny, j: fixmeAny) => {
           if ((cell.qCellId != null) && cell.isObjectCell) {
             this.qCellIdToGridCoords.set(cell.qCellId, {
               row: i,
@@ -674,7 +674,7 @@ namespace Objsheets {
       if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid finished  --- `);
 
       this.colClasses = _.range(0, grid[0].length).map((col) => {
-        let colCls = null;
+        let colCls: fixmeAny = null;
         for (let row = 0; row < grid.length; row++) {
           for (let cls of grid[row][col].cssClasses) {
             if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator") {
@@ -686,8 +686,8 @@ namespace Objsheets {
         return colCls;
       });
 
-      this.cellClasses = grid.map((dataRow, row) => dataRow.map((cell, col) => {
-        var refc;
+      this.cellClasses = grid.map((dataRow: fixmeAny, row: fixmeAny) => dataRow.map((cell: fixmeAny, col: fixmeAny) => {
+        var refc: fixmeAny;
         let adjcol = col + cell.colspan;
         let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
@@ -710,7 +710,7 @@ namespace Objsheets {
       }))
 
       return {
-        data: grid.map((row) => row.map((cell) => fallback(cell.display, cell.value))),
+        data: grid.map((row: fixmeAny) => row.map((cell: fixmeAny) => fallback(cell.display, cell.value))),
         // Future: Fixing the ancestors of the leftmost visible column would be
         // clever, though with carefully designed individual views, we may never
         // need it.  We may also want to fix the header for large data sets.
@@ -741,7 +741,7 @@ namespace Objsheets {
           }
         }).call(this)),
         stretchH: "last",
-        cells: (row, col, prop) : fixmeAny => {
+        cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
           var clsRow = this.cellClasses[row]; 
           var classes = clsRow != null ? clsRow[col] : null;
           if (!classes) {
@@ -777,7 +777,7 @@ namespace Objsheets {
           // ~ Matt 2015-11-21
           syncLimit: "100%"
         },
-        mergeCells: (_ref = []).concat.apply(_ref, grid.map((row, i) => {
+        mergeCells: (_ref = []).concat.apply(_ref, grid.map((row: fixmeAny, i: fixmeAny) => {
           _results = [];
           for (let j = 0; j < row.length; j++) {
             let cell = row[j];
@@ -807,16 +807,16 @@ namespace Objsheets {
         afterDeselect: () => {
           thisView.onSelection();
         },
-        afterSelection: (r1, c1, r2, c2) => {
+        afterSelection: (r1: fixmeAny, c1: fixmeAny, r2: fixmeAny, c2: fixmeAny) => {
           thisView.onSelection();
         },
-        beforeKeyDown: (event) => {
+        beforeKeyDown: (event: fixmeAny) => {
           thisView.onKeyDown(event);
         },
-        afterRender: (isForced) => {
+        afterRender: (isForced: fixmeAny) => {
           if (isForced) this.pending = []; // this is the best way to make sure no "dirt" is left
         },
-        beforeChange: (changes, source) => {
+        beforeChange: (changes: fixmeAny, source: fixmeAny) => {
           if (!source) return;   // Run this handler only for interactive edits
 
           var fail = false;
@@ -824,7 +824,7 @@ namespace Objsheets {
             if (oldVal === newVal) continue;
             
             let cell = this.grid[row][col];
-            let revertingCallback = ((row, col, oldVal) => (error, result) => {
+            let revertingCallback = ((row: fixmeAny, col: fixmeAny, oldVal: fixmeAny) => (error: fixmeAny, result: fixmeAny) => {
               if (error) {
                 fail = true;  // prevent race condition in case we're still in this function
                 this.pending = [];
@@ -890,8 +890,8 @@ namespace Objsheets {
           //return false;
         },
         contextMenu: {
-          build: () : fixmeAny => {
-            var addCommand, ci, coords, deleteCommand, demoteCommand;
+          build: (): fixmeAny => {
+            var addCommand: fixmeAny, ci: fixmeAny, coords: fixmeAny, deleteCommand: fixmeAny, demoteCommand: fixmeAny;
             if (ActionBar.hasUnsavedData()) {
               return false;
             }
@@ -971,7 +971,7 @@ namespace Objsheets {
               }
             }
 
-            function isEmpty(o) {
+            function isEmpty(o: fixmeAny) {
               for (let k in o) {
                 return false;
               }
@@ -992,7 +992,7 @@ namespace Objsheets {
       };
     }
 
-    public hotCreate(domElement) {
+    public hotCreate(domElement: fixmeAny) {
       let cfg = this.hotConfig();
       this.hot = new Handsontable(domElement, cfg);
       $(domElement).addClass(`pal-${this.options.palette}`);
@@ -1000,7 +1000,7 @@ namespace Objsheets {
         $(domElement).addClass("showTypes");
       }
       // Monkey patch: Don't let the user merge or unmerge cells.
-      this.hot.mergeCells.mergeOrUnmergeSelection = (cellRange) => {};
+      this.hot.mergeCells.mergeOrUnmergeSelection = (cellRange: fixmeAny) => {};
     }
 
     public hotReconfig() {
@@ -1029,7 +1029,7 @@ namespace Objsheets {
     }
 
     public getSelected = () => {
-      var s;
+      var s: fixmeAny;
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
         [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
@@ -1056,7 +1056,7 @@ namespace Objsheets {
     }
 
     public getMultipleSelectedCells = () => {
-      let cells = [];
+      let cells: fixmeAny = [];
       for (let coord of this.hot.getSelectedRange().getAll()) {
         let cell = this.grid[coord.row][coord.col];
         if (cell.value != null) {
@@ -1066,7 +1066,7 @@ namespace Objsheets {
       return cells;
     }
 
-    public refId(qCellId) {
+    public refId(qCellId: fixmeAny) {
       //if qCellId.columnId == rootColumnId
       //  "root"
       //else
@@ -1074,8 +1074,8 @@ namespace Objsheets {
       return loc != null ? `${loc.row}-${loc.col}` : null;
     }
 
-    public highlightReferent(referent) {
-      var refc;
+    public highlightReferent(referent: fixmeAny) {
+      var refc: fixmeAny;
       $(".referent").removeClass("referent");
       $(".referent-object").removeClass("referent-object");
       if ((referent != null) && ((refc = this.refId(referent)) != null)) {
@@ -1084,8 +1084,8 @@ namespace Objsheets {
       }
     }
 
-    public highlightObject(obj) {
-      var refc;
+    public highlightObject(obj: fixmeAny) {
+      var refc: fixmeAny;
       $(".selected-object").removeClass("selected-object");
       if ((obj != null) && ((refc = this.refId(obj)) != null)) {
         $(`.ancestor-${refc}`).addClass("selected-object");
@@ -1093,7 +1093,7 @@ namespace Objsheets {
     }
 
     public onSelection() {
-      var ci, _ref;
+      var ci: fixmeAny, _ref: fixmeAny;
       let selection = this.hot.getSelected();
       if (EJSON.equals(selection, this.savedSelection)) {
         return;
@@ -1125,8 +1125,8 @@ namespace Objsheets {
     // get*CommandForCell return a context menu item, but onKeyDown also uses
     // just the callback, so we maintain consistency in what command is offered.
 
-    public getAddCommandForCell(c) {
-      var col;
+    public getAddCommandForCell(c: fixmeAny) {
+      var col: fixmeAny;
       if ((c.addColumnId != null) && columnIsState(col = getColumn(c.addColumnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
@@ -1144,7 +1144,7 @@ namespace Objsheets {
           // hint to the user.  !c.isObjectCell is in principle a
           // requirement, though it ends up being redundant because the only way
           // to select an object cell is to already have a unit value present.
-          let fam;
+          let fam: fixmeAny;
           if (!c.isObjectCell && !(
                 col.parent == c.ancestorQCellId.columnId &&
                 (fam = Cells.findOne({column: col._id, key: c.ancestorQCellId.cellId})) != null &&
@@ -1177,8 +1177,8 @@ namespace Objsheets {
       return null;
     }
 
-    public getDeleteCommandForCell(c) {
-      var col;
+    public getDeleteCommandForCell(c: fixmeAny) {
+      var col: fixmeAny;
       if (c.isPlaceholder) {  // Should only exist in state value columns.
         return {
           name: "Delete cell",
@@ -1203,7 +1203,7 @@ namespace Objsheets {
       }
     }
 
-    public getDemoteCommandForColumn(col) {
+    public getDemoteCommandForColumn(col: fixmeAny) {
       if (col._id !== rootColumnId && col.isObject && col.children.length === (col.type === "_token" ? 1 : 0)) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         //parentName = objectNameWithFallback(getColumn(col.parent)) ? '(unnamed)'
@@ -1222,8 +1222,8 @@ namespace Objsheets {
       return null;
     }
 
-    public onKeyDown(event) {
-      var ci, col, parentCol, qf;
+    public onKeyDown(event: fixmeAny) {
+      var ci: fixmeAny, col: fixmeAny, parentCol: fixmeAny, qf: fixmeAny;
       if (ActionBar.hasUnsavedData()) {
         return;
       }
@@ -1302,12 +1302,12 @@ namespace Objsheets {
       }
     }
 
-    public selectSingleCell(r1, c1) {
+    public selectSingleCell(r1: fixmeAny, c1: fixmeAny) {
       let cell = this.grid[r1][c1];
       this.hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1);
     }
 
-    public selectMatchingCell(predicate) {
+    public selectMatchingCell(predicate: fixmeAny) {
       for (let i = 0; i < this.grid.length; i++) {
         for (let j = 0; j < this.grid[i].length; j++) {
           if (predicate(this.grid[i][j])) {
@@ -1319,16 +1319,16 @@ namespace Objsheets {
       return false;
     }
 
-    public headerExpanded;
+    public headerExpanded: fixmeAny;
     public toggleHeaderExpanded() {
       this.headerExpanded.set(!this.headerExpanded.get());
     }
 
   }
 
-  let view = null;
+  let view: fixmeAny = null;
 
-  export function rebuildView(viewId) {
+  export function rebuildView(viewId: fixmeAny) {
     if (!view || !view.hot) {
       if ((view != null ? view.hot : null) != null) {
         view.hot.destroy();
@@ -1350,16 +1350,16 @@ namespace Objsheets {
         pendingSelectionPredicate = null;
       } else if (selectedCell != null) {
         // Try to select a cell similar to the one previously selected.
-        ((selectedCell.qCellId != null) && view.selectMatchingCell((c) =>
+        ((selectedCell.qCellId != null) && view.selectMatchingCell((c: fixmeAny) =>
             EJSON.equals(selectedCell.qCellId, c.qCellId) &&
             selectedCell.isObjectCell === c.isObjectCell)) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c) =>
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
             selectedCell.addColumnId == c.addColumnId &&
             EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c) =>
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
             (c.kind === "below" || c.kind === "tokenObject-below") &&
             EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
-        ((selectedCell.kind != null) && view.selectMatchingCell((c) =>
+        ((selectedCell.kind != null) && view.selectMatchingCell((c: fixmeAny) =>
             selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
         false;
       }
@@ -1371,8 +1371,8 @@ namespace Objsheets {
   }
 
   // Helper decorator for use with Tracker.autorun
-  export function guarded(op) {
-    return (...args) => {
+  export function guarded(op: fixmeAny) {
+    return (...args: fixmeAny[]) => {
       try {
         op.apply(null, args);
       } catch (e) {

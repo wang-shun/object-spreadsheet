@@ -1,6 +1,6 @@
 namespace Objsheets {
 
-  export function loadPTCData(model) {
+  export function loadPTCData(model: fixmeAny) {
     // Sample schema and data in a more human-friendly hierarchical format.
 
     let sampleSchema = [
@@ -105,21 +105,21 @@ namespace Objsheets {
     // Shorthands:
 
     // Simple value(s)
-    function V(...args) {
+    function V(...args: fixmeAny[]) {
       return args.map((val) => [val, {}]);
     }
 
     // Type _unit
-    function U(cell) {
+    function U(cell: fixmeAny) {
       return [["X", cell]];
     }
 
     // Type _token: successive integer tokens for now.
-    function O(cellList) {
-      return cellList.map((cell, i) => [i.toString(), cell]);
+    function O(cellList: fixmeAny) {
+      return cellList.map((cell: fixmeAny, i: fixmeAny) => [i.toString(), cell]);
     }
 
-    function I(...args) {
+    function I(...args: fixmeAny[]) {
       return args.map((x) => typeof x === "number" ? x.toString() : x);
     }
 
@@ -230,11 +230,11 @@ namespace Objsheets {
 
     console.log(`Loading sample data into tablespace '${$$.id}'`);
 
-    function scanColumns(parentId, schema) {
+    function scanColumns(parentId: fixmeAny, schema: fixmeAny) {
       if (schema.children == null) {
         schema.children = [];
       }
-      schema.children.forEach((columnDef, i) => {
+      schema.children.forEach((columnDef: fixmeAny, i: fixmeAny) => {
         // parseTypeStr only works because all of the types in our sample dataset refer to
         // columns that come earlier in preorder.  We can probably live with this
         // until we implement full validation of acyclic type usage.
@@ -245,12 +245,12 @@ namespace Objsheets {
     scanColumns(rootColumnId, superSchema);
 
     // Insert cells into columns.
-    function insertCells(columnId, cellId, cellData) {
+    function insertCells(columnId: fixmeAny, cellId: fixmeAny, cellData: fixmeAny) {
       for (let childColumnName in fallback(cellData, {})) {
         let childCells = fallback(cellData, {})[childColumnName];
         // The sample data set uses the internal model with key and leaf columns
         // treated the same, so we don't care about the isValues part of the result.
-        let childColumnId = columnLogicalChildrenByName(columnId, childColumnName)[0][0];
+        let childColumnId = columnLogicalChildrenByName(columnId, childColumnName)[0][0][0];
         let fam = new FamilyId({
           columnId: childColumnId,
           cellId: cellId
@@ -265,7 +265,7 @@ namespace Objsheets {
     insertCells(rootColumnId, rootCellId, sampleData);
 
     // Add some formula columns.
-    function defineParsedFormulaColumn(parentRef, order, fieldName, specifiedType, isObject, objectName, formulaStr, view?) {
+    function defineParsedFormulaColumn(parentRef: fixmeAny, order: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, isObject: fixmeAny, objectName: fixmeAny, formulaStr: fixmeAny, view?: fixmeAny) {
       // Ludicrously inefficient, but we need the column type fields to be set in
       // order to parse formulas.
       model.typecheckAll();
@@ -322,10 +322,10 @@ namespace Objsheets {
     defineParsedFormulaColumn("ParentView:[student]:[enrollment]:[availableSlot]", 0, "slotTime", null, false, null, "availableSlot.time", "1");
   }
 
-  export function loadDumpIfExists(model, appName) {
+  export function loadDumpIfExists(model: fixmeAny, appName: fixmeAny) {
     try {
       for (let [coll, collName] of [[Columns, "columns"], [Cells, "cells"], [Views, "views"]]) {
-        let dump;
+        let dump: fixmeAny;
         try {
           dump = Assets.getText(`dump/${appName}_${collName}.json`);
           console.log(`reading dump/${appName}_${collName}.json`);

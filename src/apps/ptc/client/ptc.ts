@@ -58,7 +58,7 @@ namespace Objsheets {
     root: () => RelsheetsClient.readObj(((new View("1").def()) != null ? (new View("1").def()).layout : null) || new Tree(rootColumnId))
   });
 
-  function blur(jbutton) {
+  function blur(jbutton: fixmeAny) {
     jbutton.width(jbutton.width());
     jbutton.text("∙ ∙ ∙");
   }
@@ -72,22 +72,22 @@ namespace Objsheets {
     // integrity constraints, it definitely seems preferable to define them
     // directly and infer the valid choices to show in the view from them (if
     // possible).  Further experience should inform the design here.
-    "click .schedule": function(ev) {
+    "click .schedule": function(ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCreateMeeting", {
         clientUser: [this.clientUser],
         enr: [this.enrollment],
         slot: [this.slot]
-      }, (error, result) => {
+      }, (error: fixmeAny, result: fixmeAny) => {
         $(ev.target).text("Schedule");
       });
     },
-    "click .cancel": function(ev) {
+    "click .cancel": function(ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCancelMeeting", {
         clientUser: [this.clientUser],
         meeting: this.meeting
-      }, (error, result) => {
+      }, (error: fixmeAny, result: fixmeAny) => {
         $(ev.target).text("Cancel");
       });
     }

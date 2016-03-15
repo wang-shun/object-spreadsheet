@@ -1,8 +1,8 @@
 namespace Objsheets {
 
-  let openCallbacks = [];
+  let openCallbacks: fixmeAny = [];
   export var RelsheetsClient = {
-    open: (sheet, proceduresAppName : fixmeAny = null) => {
+    open: (sheet: fixmeAny, proceduresAppName: fixmeAny = null) => {
       Tablespace.defaultTablespace = Tablespace.get(sheet);
       $$.call("open", () => {
         if (proceduresAppName != null) {
@@ -14,15 +14,15 @@ namespace Objsheets {
         callback();
       }
     },
-    call: (transaction, argsObj, callback?) => {
+    call: (transaction: fixmeAny, argsObj: fixmeAny, callback?: fixmeAny) => {
       $$.call("executeCannedTransaction", transaction, glue(argsObj), standardServerCallbackThen(callback));
     },
-    onOpen: (callback) => {
+    onOpen: (callback: fixmeAny) => {
       openCallbacks.push(callback);
     },
-    readObj: function(t, rootCellId : fixmeAny = [], expandRefs : fixmeAny = false, keyField?, visited?) {
-      var v;
-      let obj = {
+    readObj: function(t: fixmeAny, rootCellId: fixmeAny = [], expandRefs: fixmeAny = false, keyField?: fixmeAny, visited?: fixmeAny) {
+      var v: fixmeAny;
+      let obj = <fixmeAny>{
         qCellId: {
           columnId: t.root,
           cellId: rootCellId
@@ -39,7 +39,7 @@ namespace Objsheets {
       if (keyField != null) {
         obj[keyField] = cellIdLastStep(rootCellId);
       }
-      var /*closure*/ x;
+      var /*closure*/ x: fixmeAny;
       for (x of t.subtrees) {
         var /*closure*/ c = Columns.findOne(x.root);
         if (c != null) {
@@ -48,7 +48,7 @@ namespace Objsheets {
             columnId: x.root
           }).values();
           if (c.isObject) {
-            let fam = vals.map((v) => this.readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited));
+            let fam = vals.map((v: fixmeAny) => this.readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited));
             fam.qFamilyId = {
               columnId: x.root,
               cellId: rootCellId
@@ -62,7 +62,7 @@ namespace Objsheets {
             // applications.  (Doesn't really matter until we have authentication.)
             if (expandRefs && (c.type != null) && typeIsReference(c.type)) {
               var /*closure*/ ot = View.drillDown(c.type);
-              vals = vals.map((v) => this.readObj(ot, v, expandRefs, Columns.findOne(ot.root) != null ? Columns.findOne(ot.root).fieldName : null, visited));
+              vals = vals.map((v: fixmeAny) => this.readObj(ot, v, expandRefs, Columns.findOne(ot.root) != null ? Columns.findOne(ot.root).fieldName : null, visited));
             }
             obj[c.fieldName] = vals;
           }
@@ -72,12 +72,12 @@ namespace Objsheets {
       return obj;
     },
     // Future: Deprecate this in favor of something like readSubtree?
-    read: function(viewId?) {
+    read: function(viewId?: fixmeAny) {
       let layout = viewId != null ? ((new View(viewId).def()) != null ? (new View(viewId).def()).layout : null) || new Tree(rootColumnId) : View.rootLayout();
       return this.readObj(layout, [], true);
     },
-    readSubtree: function(columnStr, rootCellId) {
-      let columnTree;
+    readSubtree: function(columnStr: fixmeAny, rootCellId: fixmeAny) {
+      let columnTree: fixmeAny;
       try {
         columnTree = View.drillDown(parseObjectTypeRef(columnStr));
       } catch (e) {
@@ -97,19 +97,19 @@ namespace Objsheets {
     }
   };
 
-  function glue(argsobj) {
-    function value(a) {
+  function glue(argsobj: fixmeAny) {
+    function value(a: fixmeAny) {
       return a.qCellId != null ? a.qCellId.cellId : a;
     }
-    function arg(a) {
+    function arg(a: fixmeAny) {
       return _.isArray(a) ? a.map(value) : [value(a)];
     }
-    return new function() {
-      for (let k in argsobj) {
-        let v = argsobj[k];
-        this[k] = arg(v);
-      }
-    };
+    let o = <fixmeAny>new Object();
+    for (let k in argsobj) {
+      let v = argsobj[k];
+      o[k] = arg(v);
+    }
+    return o;
   }
 
 }

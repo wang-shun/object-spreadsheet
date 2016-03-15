@@ -1,7 +1,7 @@
 namespace Objsheets {
 
   export class View {
-    constructor(public id) {}
+    constructor(public id: fixmeAny) {}
 
     public def() {
       return this.id != null ? Views.findOne(this.id) || {
@@ -11,7 +11,7 @@ namespace Objsheets {
       };
     }
 
-    public addColumn(columnId, own : fixmeAny = false) {
+    public addColumn(columnId: fixmeAny, own: fixmeAny = false) {
       let def = this.def();
       let parentId = Columns.findOne(columnId) != null ? Columns.findOne(columnId).parent : null;
       if (parentId != null) {
@@ -31,13 +31,13 @@ namespace Objsheets {
       }
     }
 
-    public removeColumn(columnId) {
+    public removeColumn(columnId: fixmeAny) {
       let def = this.def();
-      def.layout = def.layout.filter((x) => x !== columnId);
+      def.layout = def.layout.filter((x: fixmeAny) => x !== columnId);
       Views.update(this.id, def);
     }
 
-    public reorderColumn(columnId, newIndex) {
+    public reorderColumn(columnId: fixmeAny, newIndex: fixmeAny) {
       let def = this.def();
       let parentId = Columns.findOne(columnId) != null ? Columns.findOne(columnId).parent : null;
       if (parentId != null) {
@@ -45,7 +45,7 @@ namespace Objsheets {
         let layoutSubtreeParent = layoutTree.find(parentId);
         let layoutSubtreeChild = layoutTree.find(columnId);
         if ((layoutSubtreeParent != null) && (layoutSubtreeChild != null)) {
-          layoutSubtreeParent.subtrees = layoutSubtreeParent.subtrees.filter((x) => x.root !== columnId);
+          layoutSubtreeParent.subtrees = layoutSubtreeParent.subtrees.filter((x: fixmeAny) => x.root !== columnId);
           layoutSubtreeParent.subtrees.splice(newIndex, 0, layoutSubtreeChild);
           Views.update(this.id, {
             $set: {
@@ -62,17 +62,17 @@ namespace Objsheets {
       return this.drillDown(rootColumnId).filter((x) => this.ownerOf(x) == null);
     }
 
-    public static drillDown(startingColumnId) {
+    public static drillDown(startingColumnId: fixmeAny) {
       let children = (Columns.findOne(startingColumnId) != null ? Columns.findOne(startingColumnId).children : null) || [];
-      return new Tree(startingColumnId, children.map((child) => this.drillDown(child)));
+      return new Tree(startingColumnId, children.map((child: fixmeAny) => this.drillDown(child)));
     }
 
-    public static ownerOf(columnId) {
+    public static ownerOf(columnId: fixmeAny) {
       return Columns.findOne(columnId) != null ? Columns.findOne(columnId).view : null;
     }
 
-    public static removeColumnFromAll(columnId) {
-      Views.find().forEach((view) => {
+    public static removeColumnFromAll(columnId: fixmeAny) {
+      Views.find().forEach((view: fixmeAny) => {
         if (view.layout.find(columnId) != null) {
           new View(view._id).removeColumn(columnId);
         }

@@ -2,10 +2,10 @@ namespace Objsheets {
 
   export var RelsheetsServer = {
     _procedures: {},
-    procedures: function(appName, defs) {
+    procedures: function(appName: fixmeAny, defs: fixmeAny) {
       this._procedures[appName] = defs;
     },
-    compile: function(appName) {
+    compile: function(appName: fixmeAny) {
       // This may run multiple times; it should overwrite and not cause any problems.
       for (let name in this._procedures[appName]) {
         let preProc = this._procedures[appName][name];
@@ -13,7 +13,7 @@ namespace Objsheets {
           // NOTE: This is an interim implementation.  Once we have a basic
           // procedure editor, procedures will be loaded from dumps just like
           // column formulas.
-          let params = preProc.params.map((p) => ({
+          let params = preProc.params.map((p: fixmeAny) => ({
               name: p[0],
               type: parseTypeStr(p[1]),
               singular: fallback(p[2], true)
@@ -42,7 +42,7 @@ namespace Objsheets {
   };
 
   Meteor.methods({
-    compileProcedures: (cc, appName) => {
+    compileProcedures: (cc: fixmeAny, appName: fixmeAny) => {
       cc.run(() => {
         RelsheetsServer.compile(appName);
       });

@@ -28,10 +28,10 @@ namespace Objsheets {
     isNext: function() {
       return this.isNext[0];
     },
-    sameAs: function(o) {
+    sameAs: function(o: fixmeAny) {
       return EJSON.equals(this.qCellId, o[0] != null ? o[0].qCellId : null);
     },
-    stringify: (a) => JSON.stringify(a)
+    stringify: (a: fixmeAny) => JSON.stringify(a)
   });
 
   Template["MilkMaid"].events({

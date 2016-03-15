@@ -3,11 +3,11 @@
 // There's a partial type definition that doesn't include the Handsontable
 // class.  Declare a stub, and then see what we can wire up and what we have to
 // add.
-declare var Handsontable;
+declare var Handsontable: fixmeAny;
 
 // I didn't find a type definition for Jison at all.  We could start one.
 // ~ Matt 2016-02-28
-declare var Jison;
+declare var Jison: fixmeAny;
 
 declare module Meteor {
   // Unsound but probably the most reasonable way to write this.

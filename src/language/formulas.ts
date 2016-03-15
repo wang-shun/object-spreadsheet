@@ -20,19 +20,19 @@
 
 namespace Objsheets {
 
-  export function valAssert(cond, message) {
+  export function valAssert(cond: fixmeAny, message: fixmeAny) {
     if (!cond) {
       throw new FormulaValidationError(_.isString(message) ? message : message());
     }
   }
 
-  function evalAssert(cond, message) {
+  function evalAssert(cond: fixmeAny, message: fixmeAny) {
     if (!cond) {
       throw new EvaluationError(_.isString(message) ? message : message());
     }
   }
 
-  function readFamilyForFormula(model, qFamilyId) {
+  function readFamilyForFormula(model: fixmeAny, qFamilyId: fixmeAny) {
     let tset = model.evaluateFamily(qFamilyId);
     if (tset != null) {
       return tset;
@@ -47,7 +47,7 @@ namespace Objsheets {
   // Based on model.evaluateFamily{,1}.
   // TODO: Assuming we do want the client to be able to evaluate formulas (for now
   // at least), factor out that code so the client can use it in read-only mode.
-  function evaluateFamilyReadOnly(qFamilyId) {
+  function evaluateFamilyReadOnly(qFamilyId: fixmeAny) {
     let keyFields = {
       column: qFamilyId.columnId,
       key: qFamilyId.cellId
@@ -62,13 +62,13 @@ namespace Objsheets {
       }
     }
     if (ce.values != null) {
-      return new TypedSet(this.getColumn(qFamilyId.columnId).type, new EJSONKeyedSet(ce.values));
+      return new TypedSet(this.getColumn(qFamilyId.columnId).type, <fixmeAny>new EJSONKeyedSet(<fixmeAny>ce.values));
     } else {
       return null;
     }
   }
 
-  function readColumnTypeForFormula(model, columnId) {
+  function readColumnTypeForFormula(model: fixmeAny, columnId: fixmeAny) {
     let type = model.typecheckColumn(columnId);
     valAssert(type != null, "column '${columnId}': type missing");
     valAssert(type !== TYPE_ERROR, `Reference to column '${stringifyColumnRef([columnId, true])}' of unknown type.  ` + "Correct its formula or manually specify the type if needed to break a cycle.");
@@ -76,26 +76,26 @@ namespace Objsheets {
     return type;
   }
 
-  export function valExpectType(what, actualType, expectedType) {
+  export function valExpectType(what: fixmeAny, actualType: fixmeAny, expectedType: fixmeAny) {
     valAssert(commonSupertype(actualType, expectedType) === expectedType, `${what} has type '${actualType}', wanted '${expectedType}'`);
   }
 
-  export function singleElement(set) {
+  export function singleElement(set: fixmeAny) {
     let elements = set.elements();
     evalAssert(elements.length === 1, "Expected a singleton");
     return elements[0];
   }
 
   export class FormulaEngine {
-    public goUpMemo;
-    public compiled;
+    public goUpMemo: fixmeAny;
+    public compiled: fixmeAny;
 
     constructor() {
       this.goUpMemo = new Memo;
       this.compiled = {};
     }
 
-    public readFamily(column, key) {
+    public readFamily(column: fixmeAny, key: fixmeAny) {
       // FIXME propagate errors
       // TODO merge with readFamilyForFormula
       return (Cells.findOne({
@@ -107,7 +107,7 @@ namespace Objsheets {
       }).values : null) || [];
     }
 
-    public calcLevelsUp(sourceColId, targetColId) {
+    public calcLevelsUp(sourceColId: fixmeAny, targetColId: fixmeAny) {
       return this.goUpMemo.get(`${sourceColId}-${targetColId}`, () => {
         let [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId);
         return upPath.length - 1;
@@ -126,28 +126,28 @@ namespace Objsheets {
   let EagerSubformula = {
     // Note, we can't eta-contract these because the functions aren't defined at
     // this point in the file.  Better ideas welcome.
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       validateSubformula(vars, arg);
     },
-    typecheck: (model, vars, arg) => typecheckFormula(model, vars, arg),
-    evaluate: (model, vars, arg) => evaluateFormula(model, vars, arg),
-    stringify: (model, vars, arg) => stringifySubformula(model, vars, arg),
-    getSubformulas: (arg) => [arg]
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => typecheckFormula(model, vars, arg),
+    evaluate: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => evaluateFormula(model, vars, arg),
+    stringify: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => stringifySubformula(model, vars, arg),
+    getSubformulas: (arg: fixmeAny) => [arg]
   };
   let OptionalEagerSubformula = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       if (arg != null) {
         validateSubformula(vars, arg);
       }
     },
-    typecheck: (model, vars, arg) => arg != null ? typecheckFormula(model, vars, arg) : null,
-    evaluate: (model, vars, arg) => arg != null ? evaluateFormula(model, vars, arg) : null,
-    stringify: (model, vars, arg) => arg != null ? stringifySubformula(model, vars, arg) : null,
-    getSubformulas: (arg) => arg != null ? [arg] : []
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => arg != null ? typecheckFormula(model, vars, arg) : null,
+    evaluate: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => arg != null ? evaluateFormula(model, vars, arg) : null,
+    stringify: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => arg != null ? stringifySubformula(model, vars, arg) : null,
+    getSubformulas: (arg: fixmeAny) => arg != null ? [arg] : []
   };
   let EagerSubformulaCells = {
     validate: EagerSubformula.validate,
-    typecheck: (model, vars, arg) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => {
       let type = typecheckFormula(model, vars, arg);
       // stringifyType(type) fails if type is the root.
       valAssert(typeIsReference(type), () => `Expected a set of cells, got set of '${stringifyType(type)}'`);
@@ -158,13 +158,13 @@ namespace Objsheets {
     getSubformulas: EagerSubformula.getSubformulas
   };
   let HomogeneousEagerSubformulaList = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       valAssert(_.isArray(arg), "Expected a list of subformulas");
       for (let item of arg) {
         validateSubformula(vars, item);
       }
     },
-    typecheck: (model, vars, termFmlas) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, termFmlas: fixmeAny) => {
       let typeSoFar = TYPE_EMPTY;
       for (let fmla of termFmlas) {
         let termType = typecheckFormula(model, vars, fmla);
@@ -174,9 +174,9 @@ namespace Objsheets {
       }
       return typeSoFar;
     },
-    evaluate: (model, vars, termFmlas) => termFmlas.map((fmla) => evaluateFormula(model, vars, fmla)),
-    stringify: (model, vars, termFmlas) => termFmlas.map((fmla) => stringifySubformula(model, vars, fmla)),
-    getSubformulas: (termFmlas) => termFmlas
+    evaluate: (model: fixmeAny, vars: fixmeAny, termFmlas: fixmeAny) => termFmlas.map((fmla: fixmeAny) => evaluateFormula(model, vars, fmla)),
+    stringify: (model: fixmeAny, vars: fixmeAny, termFmlas: fixmeAny) => termFmlas.map((fmla: fixmeAny) => stringifySubformula(model, vars, fmla)),
+    getSubformulas: (termFmlas: fixmeAny) => termFmlas
   };
   let LazySubformula = {
     validate: EagerSubformula.validate,
@@ -188,7 +188,7 @@ namespace Objsheets {
   // It might be nicer on the users to not require the extra 2-element array in the
   // input, but for now this goes with our framework.
   let Lambda = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       valAssert(_.isArray(arg) && arg.length === 2, "Lambda subformula must be a two-element array");
       let [varName, body] = arg;
       valAssert(_.isString(varName), "Bound variable must be a string");
@@ -198,20 +198,20 @@ namespace Objsheets {
       newVars.add(varName);
       validateSubformula(newVars, body);
     },
-    typecheck: (model, vars, [varName, body]) => (argType) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return typecheckFormula(model, newVars, body);
       },
-    evaluate: (model, vars, [varName, body]) => {
+    evaluate: (model: fixmeAny, vars: fixmeAny, [varName, body]) => {
       // he he he!
-      return (arg) => {
+      return (arg: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, arg);
         return evaluateFormula(model, newVars, body);
       };
     },
-    stringify: (model, vars, [varName, body]) => (argType) => {
+    stringify: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return [stringifyIdent(varName), stringifySubformula(model, newVars, body)];
@@ -219,28 +219,28 @@ namespace Objsheets {
     getSubformulas: ([varName, body]) => [body]
   };
   let ColumnId = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       valAssert(_.isString(arg), "Column ID must be a string");
     },
-    typecheck: (model, vars, arg) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => {
       // XXX: Disallow the root column and add a special case for '$'?
       valAssert(model.getColumn(arg) != null, `No column exists with ID '${arg}'`);
       return arg;
     }
   };
   let StringArg = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       valAssert(_.isString(arg), "Must be a string");
     },
-    typecheck: (model, vars, arg) => arg
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => arg
   };
   let Type = {
-    validate: (vars, arg) => {
+    validate: (vars: fixmeAny, arg: fixmeAny) => {
       valAssert(_.isString(arg), "Type must be a string");
       // Future: Reject unknown primitive types
       //if !typeIsReference(arg) ...
     },
-    typecheck: (model, vars, arg) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => {
       if (typeIsReference(arg)) {
         ColumnId.typecheck(model, vars, arg);
       }
@@ -248,13 +248,13 @@ namespace Objsheets {
     }
   };
 
-  function getValues(model, cells) {
+  function getValues(model: fixmeAny, cells: fixmeAny) {
     // XXX: Fail on token columns
     let type = model.typecheckColumn(cells.type);
-    return new TypedSet(type, set(cells.elements().map((x) => cellIdLastStep(x))));
+    return new TypedSet(type, <fixmeAny>set(cells.elements().map((x: fixmeAny) => cellIdLastStep(x))));
   }
 
-  function typecheckUp(model, vars, startCellsType, targetColId, wantValues) {
+  function typecheckUp(model: fixmeAny, vars: fixmeAny, startCellsType: fixmeAny, targetColId: fixmeAny, wantValues: fixmeAny) {
     let [upPath, downPath] = findCommonAncestorPaths(startCellsType, targetColId);
     valAssert(downPath.length === 1, "Navigation from " + startCellsType + " to " + targetColId + " is not up");
     // Enforce the same rule as parsing.  Otherwise, if the startCellsType changes
@@ -264,7 +264,7 @@ namespace Objsheets {
     return wantValues ? readColumnTypeForFormula(model, targetColId) : targetColId;
   }
 
-  function typecheckDown(model, vars, startCellsType, targetColId, keysType, wantValues) {
+  function typecheckDown(model: fixmeAny, vars: fixmeAny, startCellsType: fixmeAny, targetColId: fixmeAny, keysType: fixmeAny, wantValues: fixmeAny) {
     let targetCol = model.getColumn(targetColId);
     valAssert(targetCol.parent === startCellsType, "Navigation from " + startCellsType + " to " + targetColId + " is not down");
     valAssert(wantValues || targetCol.isObject, "Target column has no object type to navigate to.");
@@ -275,11 +275,11 @@ namespace Objsheets {
     return wantValues ? readColumnTypeForFormula(model, targetColId) : targetColId;
   }
 
-  function goUp(model, vars, startCellsTset, targetColId, wantValues) {
+  function goUp(model: fixmeAny, vars: fixmeAny, startCellsTset: fixmeAny, targetColId: fixmeAny, wantValues: fixmeAny) {
     // XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
 
     // Go up.
-    let result;
+    let result: fixmeAny;
     if (startCellsTset.type === targetColId) {
       result = startCellsTset;
     } else {
@@ -293,13 +293,13 @@ namespace Objsheets {
         // Duplicates are thrown out.  Future: multisets?
         s.add(targetCellId);
       }
-      result = new TypedSet(targetColId, s);
+      result = new TypedSet(targetColId, <fixmeAny>s);
     }
 
     return wantValues ? getValues(model, result) : result;
   }
 
-  function goDown(model, vars, startCellsTset, targetColId, keysTset, wantValues) {
+  function goDown(model: fixmeAny, vars: fixmeAny, startCellsTset: fixmeAny, targetColId: fixmeAny, keysTset: fixmeAny, wantValues: fixmeAny) {
     // XXX: Can we get here with startCellsTset.type == TYPE_EMPTY?
 
     // Go down.
@@ -314,7 +314,7 @@ namespace Objsheets {
         }
       }
     }
-    let targetCellsTset = new TypedSet(targetColId, targetCellsSet);
+    let targetCellsTset = new TypedSet(targetColId, <fixmeAny>targetCellsSet);
 
     return wantValues ? getValues(model, targetCellsTset) : targetCellsTset;
   }
@@ -330,7 +330,7 @@ namespace Objsheets {
   // refsSeen contains qCellIds.  Since we have to use the equivalent of
   // EJSON.equals to compare them, we use an EJSONKeyedSet rather than implementing
   // our own list membership test.
-  export function valueToText(model, type, value, refsSeen : fixmeAny = new EJSONKeyedSet()) {
+  export function valueToText(model: fixmeAny, type: fixmeAny, value: fixmeAny, refsSeen: fixmeAny = new EJSONKeyedSet()) {
     if (typeIsReference(type)) {
       let qCellId = {
         columnId: type,
@@ -344,7 +344,7 @@ namespace Objsheets {
       newRefsSeen.add(qCellId);
       let col = model.getColumn(type);
       let displayColId = fallback(col.referenceDisplayColumn, defaultReferenceDisplayColumn(col));
-      let displayTset;
+      let displayTset: fixmeAny;
       if (displayColId === null) {
         // Really nothing we can use?
         return "<reference>";
@@ -363,12 +363,12 @@ namespace Objsheets {
     } else     return typeof value === "string" ? value : value instanceof Date ? value.toString("yyyy-MM-dd HH:mm") : JSON.stringify(value);  // Reasonable fallback
   }
 
-  export function genericSetToText(elements, formatOne) {
-    return elements.length === 1 ? formatOne(elements[0]) : "{" + (elements.map((e) => formatOne(e))).join(", ") + "}";
+  export function genericSetToText(elements: fixmeAny, formatOne: fixmeAny) {
+    return elements.length === 1 ? formatOne(elements[0]) : "{" + (elements.map((e: fixmeAny) => formatOne(e))).join(", ") + "}";
   }
 
-  function tsetToText(model, tset, refsSeen : fixmeAny = new EJSONKeyedSet()) {
-    return genericSetToText(tset.elements(), (e) => valueToText(model, tset.type, e, refsSeen));
+  function tsetToText(model: fixmeAny, tset: fixmeAny, refsSeen: fixmeAny = new EJSONKeyedSet()) {
+    return genericSetToText(tset.elements(), (e: fixmeAny) => valueToText(model, tset.type, e, refsSeen));
   }
 
   // The ignoreErrors versions must not be used in formula evaluation, because the
@@ -379,7 +379,7 @@ namespace Objsheets {
   // and display it.  Ignoring it is OK for niche purposes like referring to values
   // in an error message.
 
-  export function valueToTextIgnoreErrors(type, value) {
+  export function valueToTextIgnoreErrors(type: fixmeAny, value: fixmeAny) {
     try {
       return valueToText(liteModel, type, value);
     } catch (e) {
@@ -387,11 +387,11 @@ namespace Objsheets {
     }
   }
 
-  export function tsetToTextIgnoreErrors(tset) {
-    return genericSetToText(tset.elements(), (e) => valueToTextIgnoreErrors(tset.type, e));
+  export function tsetToTextIgnoreErrors(tset: fixmeAny) {
+    return genericSetToText(tset.elements(), (e: fixmeAny) => valueToTextIgnoreErrors(tset.type, e));
   }
 
-  function annotateNavigationTarget(model, vars, startCellsFmla, targetName, keysFmla, expectedFmla) {
+  function annotateNavigationTarget(model: fixmeAny, vars: fixmeAny, startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny, expectedFmla: fixmeAny) {
     if (targetName == null) {
       return "(unnamed)";
     } else {
@@ -411,7 +411,7 @@ namespace Objsheets {
     }
   }
 
-  function stringifyNavigation(direction, model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) {
+  function stringifyNavigation(direction: fixmeAny, model: fixmeAny, vars: fixmeAny, startCellsSinfo: fixmeAny, targetColumnId: fixmeAny, keysSinfo: fixmeAny, wantValues: fixmeAny) {
     let column = getColumn(targetColumnId);
     // ?. returns undefined whether the LHS is null or undefined, but we want null
     // to match the familyReference production in language.jison.
@@ -470,10 +470,10 @@ namespace Objsheets {
 
   let ASSOCIATIVITY_LEFT = "left";
   let ASSOCIATIVITY_RIGHT = "right";
-  let ASSOCIATIVITY_NONE = null;
+  let ASSOCIATIVITY_NONE: fixmeAny = null;
 
-  function binaryOperationStringify(symbol, precedence, associativity) {
-    return (model, vars, lhsSinfo, rhsSinfo) => ({
+  function binaryOperationStringify(symbol: fixmeAny, precedence: fixmeAny, associativity: fixmeAny) {
+    return (model: fixmeAny, vars: fixmeAny, lhsSinfo: fixmeAny, rhsSinfo: fixmeAny) => ({
         str: lhsSinfo.strFor(precedence + (associativity !== ASSOCIATIVITY_LEFT)) + " " + symbol + " " + rhsSinfo.strFor(precedence + (associativity !== ASSOCIATIVITY_RIGHT)),
         outerPrecedence: precedence
       });
@@ -481,36 +481,36 @@ namespace Objsheets {
 
   // Just enough of a generalization of singletonInfixOperator for '+' string
   // concatenation operator that automatically calls toText.
-  function infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames?) {
+  function infixOperator(symbol: fixmeAny, precedence: fixmeAny, associativity: fixmeAny, lhsExpectedType: fixmeAny, rhsExpectedType: fixmeAny, resultType: fixmeAny, evaluateFn: fixmeAny, paramNames?: fixmeAny) {
     return {
       paramNames: fallback(paramNames, ["left", "right"]),
       argAdapters: [EagerSubformula, EagerSubformula],
-      typecheck: (model, vars, lhsType, rhsType) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, lhsType: fixmeAny, rhsType: fixmeAny) => {
         valExpectType(`Left operand of '${symbol}'`, lhsType, lhsExpectedType);
         valExpectType(`Right operand of '${symbol}'`, rhsType, rhsExpectedType);
         return resultType;
       },
-      evaluate: (model, vars, lhsTset, rhsTset) => new TypedSet(resultType, set([evaluateFn(model, lhsTset, rhsTset)])),
+      evaluate: (model: fixmeAny, vars: fixmeAny, lhsTset: fixmeAny, rhsTset: fixmeAny) => new TypedSet(resultType, set([evaluateFn(model, lhsTset, rhsTset)])),
       stringify: binaryOperationStringify(symbol, precedence, associativity)
     };
   }
 
-  function singletonInfixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn, paramNames?) {
-    function evaluateFn2(model, lhs, rhs) {
+  function singletonInfixOperator(symbol: fixmeAny, precedence: fixmeAny, associativity: fixmeAny, lhsExpectedType: fixmeAny, rhsExpectedType: fixmeAny, resultType: fixmeAny, evaluateFn: fixmeAny, paramNames?: fixmeAny) {
+    function evaluateFn2(model: fixmeAny, lhs: fixmeAny, rhs: fixmeAny) {
       return evaluateFn(singleElement(lhs.set), singleElement(rhs.set));
     }
     return infixOperator(symbol, precedence, associativity, lhsExpectedType, rhsExpectedType, resultType, evaluateFn2, paramNames);
   }
 
-  function sameTypeSetsInfixPredicate(symbol, precedence, associativity, evaluateFn, paramNames?) {
+  function sameTypeSetsInfixPredicate(symbol: fixmeAny, precedence: fixmeAny, associativity: fixmeAny, evaluateFn: fixmeAny, paramNames?: fixmeAny) {
     return {
       paramNames: fallback(paramNames, ["left", "right"]),
       argAdapters: [EagerSubformula, EagerSubformula],
-      typecheck: (model, vars, lhsType, rhsType) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, lhsType: fixmeAny, rhsType: fixmeAny) => {
         valAssert(commonSupertype(lhsType, rhsType) !== TYPE_ERROR, `Mismatched types to '${symbol}' operator: '${stringifyType(lhsType)}' and '${stringifyType(rhsType)}'`);
         return "bool";
       },
-      evaluate: (model, vars, lhs, rhs) => new TypedSet("bool", new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)])),
+      evaluate: (model: fixmeAny, vars: fixmeAny, lhs: fixmeAny, rhs: fixmeAny) => new TypedSet("bool", new EJSONKeyedSet([evaluateFn(lhs.set, rhs.set)])),
       stringify: binaryOperationStringify(symbol, precedence, associativity)
     };
   }
@@ -519,13 +519,13 @@ namespace Objsheets {
   //   overloaded(paramNames,
   //              [[argument-types...], handler],
   //              [[argument-types...], handler], ...)
-  function overloaded(operator, paramNames, ...alternatives) {
+  function overloaded(operator: fixmeAny, paramNames: fixmeAny, ...alternatives: fixmeAny[]) {
     let arities = alternatives.map((a) => a[0].length);
     let minArity = Math.min.apply(Math, arities);
     let maxArity = Math.max.apply(Math, arities);
-    function getHandler(argtypes) {
+    function getHandler(argtypes: fixmeAny) {
       for (let [decltypes, handler] of alternatives) {
-        if (decltypes.length === argtypes.length && forall(zip(decltypes, argtypes), ([decltype, argtype]) => commonSupertype(decltype, argtype) === decltype)) {
+        if (decltypes.length === argtypes.length && forall(zip(decltypes, argtypes), ([decltype, argtype]) => commonSupertype(<fixmeAny>decltype, <fixmeAny>argtype) === decltype)) {
           return handler;
         }
       }
@@ -533,18 +533,18 @@ namespace Objsheets {
     return {
       paramNames: paramNames,
       argAdapters: (_.range(0, minArity).map((i) => EagerSubformula)).concat(_.range(minArity, maxArity).map((i) => OptionalEagerSubformula)),
-      typecheck: (model, vars, ...argtypes) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, ...argtypes: fixmeAny[]) => {
         let handler = getHandler(argtypes);
         valAssert(handler != null, `No valid alternative of '${operator}' ` + `for argument types ${(argtypes.map((t) => "'" + stringifyType(t) + "'")).join(", ")}`);
         return handler.typecheck.apply(handler, [model, vars].concat(argtypes));
       },
-      evaluate: (model, vars, ...args) => {
+      evaluate: (model: fixmeAny, vars: fixmeAny, ...args: fixmeAny[]) => {
         let argtypes = args.map((ts) => ts.type);
         let handler = getHandler(argtypes);
         valAssert(handler != null, `No valid alternative of '${operator}' ` + `for argument types ${(argtypes.map((t) => "'" + stringifyType(t) + "'")).join(", ")}`);
         return handler.evaluate.apply(handler, [model, vars].concat(args));
       },
-      stringify: (model, vars, ...sinfos) => {
+      stringify: (model: fixmeAny, vars: fixmeAny, ...sinfos: fixmeAny[]) => {
         // Does it even make sense to have different stringifies for different alternatives?
         let [_, handler] = alternatives[0];
         return handler.stringify.apply(handler, [model, vars].concat(sinfos));
@@ -552,7 +552,7 @@ namespace Objsheets {
     };
   }
 
-  function compareInfixOperator(symbol, precedence, associativity, evaluateFn) {
+  function compareInfixOperator(symbol: fixmeAny, precedence: fixmeAny, associativity: fixmeAny, evaluateFn: fixmeAny) {
     return overloaded(symbol, ["left", "right"], [["number", "number"], singletonInfixOperator(symbol, precedence, associativity, "number", "number", "bool", evaluateFn)], [["date", "date"], singletonInfixOperator(symbol, precedence, associativity, "date", "date", "bool", evaluateFn)]);
   }
 
@@ -560,7 +560,7 @@ namespace Objsheets {
   // is the least evil for now. ~ Matt 2015-11-25
   let TYPE_ERROR = "error";
 
-  let dispatch = {
+  let dispatch = <fixmeAny>{
     // ["lit", type ID (string), elements (array)]:
     // A literal set of elements of the specified type.
     // Concrete syntax: 2, {3,4}, {5,6,7,} etc.  The elements may be JSON booleans,
@@ -570,16 +570,16 @@ namespace Objsheets {
     // if/when we add data type validation?
     lit: {
       argAdapters: [Type, {}],
-      validate: (vars, type, list) => {
+      validate: (vars: fixmeAny, type: fixmeAny, list: fixmeAny) => {
         valAssert(_.isArray(list), "Set literal must be an array");
         // Future: Could go ahead and validate primitive-type literals here.
       },
-      typecheck: (model, vars, type, list) => type,
-      evaluate: (model, vars, type, list) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, type: fixmeAny, list: fixmeAny) => type,
+      evaluate: (model: fixmeAny, vars: fixmeAny, type: fixmeAny, list: fixmeAny) => {
         // XXXXXXX: Validate members of the type.
-        return new TypedSet(type, new EJSONKeyedSet(list));
+        return new TypedSet(type, <fixmeAny>new EJSONKeyedSet(list));
       },
-      stringify: (model, vars, type, list) => ({
+      stringify: (model: fixmeAny, vars: fixmeAny, type: fixmeAny, list: fixmeAny) => ({
           str: (() => {
             // Obviously, if someone manually creates a literal that requires a
             // leading minus or set notation, those constructs will be re-parsed as
@@ -591,7 +591,7 @@ namespace Objsheets {
               return JSON.stringify(list[0]);
             } else {
               // XXX: Canonicalize order?
-              return "{" + (list.map((x) => JSON.stringify(x))).join(",") + "}";
+              return "{" + (list.map((x: fixmeAny) => JSON.stringify(x))).join(",") + "}";
             }
           })(),
           outerPrecedence: (() => {
@@ -608,8 +608,8 @@ namespace Objsheets {
     date: {
       argAdapters: [StringArg],
       typecheck: () => "date",
-      evaluate: (model, vars, string) => new TypedSet("date", new EJSONKeyedSet([Date.parse(string)])),
-      stringify: (model, vars, string) => ({
+      evaluate: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => new TypedSet("date", new EJSONKeyedSet([Date.parse(string)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => ({
           str: `d${JSON.stringify(string)}`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
@@ -619,13 +619,13 @@ namespace Objsheets {
     // Concrete syntax: myVar
     "var": {
       argAdapters: [{}],
-      validate: (vars, varName) => {
+      validate: (vars: fixmeAny, varName: fixmeAny) => {
         valAssert(_.isString(varName), "Variable name must be a string");
         valAssert(vars.has(varName), `Undefined variable ${varName}`);
       },
-      typecheck: (model, vars, varName) => vars.get(varName),
-      evaluate: (model, vars, varName) => vars.get(varName),
-      stringify: (model, vars, varName) => ({
+      typecheck: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => vars.get(varName),
+      evaluate: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => vars.get(varName),
+      stringify: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => ({
           str: (() => {
             if (varName === "this") {
               // A 'this' reference can only occur implicitly in concrete syntax, as
@@ -644,12 +644,12 @@ namespace Objsheets {
     up: {
       paramNames: ["start", null, null],
       argAdapters: [EagerSubformulaCells, ColumnId, {}],
-      validate: (vars, startCellsFmla, targetColumnId, wantValues) => {
+      validate: (vars: fixmeAny, startCellsFmla: fixmeAny, targetColumnId: fixmeAny, wantValues: fixmeAny) => {
         valAssert(_.isBoolean(wantValues), "wantValues must be a boolean");
       },
       typecheck: typecheckUp,
       evaluate: goUp,
-      stringify: (model, vars, startCellsSinfo, targetColumnId, wantValues) => stringifyNavigation("up", model, vars, startCellsSinfo, targetColumnId, null, wantValues)
+      stringify: (model: fixmeAny, vars: fixmeAny, startCellsSinfo: fixmeAny, targetColumnId: fixmeAny, wantValues: fixmeAny) => stringifyNavigation("up", model, vars, startCellsSinfo, targetColumnId, null, wantValues)
     },
     // ["down", startCells, targetColumnId, wantValues (bool)]
     // Currently allows only one step, matching the concrete syntax.  This makes
@@ -662,12 +662,12 @@ namespace Objsheets {
     down: {
       paramNames: ["start", null, "keys", null],
       argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}],
-      validate: (vars, startCellsFmla, targetColumnId, keysFmla, wantValues) => {
+      validate: (vars: fixmeAny, startCellsFmla: fixmeAny, targetColumnId: fixmeAny, keysFmla: fixmeAny, wantValues: fixmeAny) => {
         valAssert(_.isBoolean(wantValues), "wantValues must be a boolean");
       },
       typecheck: typecheckDown,
       evaluate: goDown,
-      stringify: (model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues) => stringifyNavigation("down", model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues)
+      stringify: (model: fixmeAny, vars: fixmeAny, startCellsSinfo: fixmeAny, targetColumnId: fixmeAny, keysSinfo: fixmeAny, wantValues: fixmeAny) => stringifyNavigation("down", model, vars, startCellsSinfo, targetColumnId, keysSinfo, wantValues)
     },
     // ["if", condition, thenFmla, elseFmla]
     // Concrete syntax: if(condition, thenFmla, elseFmla)
@@ -675,14 +675,14 @@ namespace Objsheets {
     "if": {
       paramNames: ["condition", "thenExpr", "elseExpr"],
       argAdapters: [EagerSubformula, LazySubformula, LazySubformula],
-      typecheck: (model, vars, conditionType, thenType, elseType) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, conditionType: fixmeAny, thenType: fixmeAny, elseType: fixmeAny) => {
         valExpectType("if condition", conditionType, "bool");
         let type = commonSupertype(thenType, elseType);
         valAssert(type !== TYPE_ERROR, `Mismatched types in if branches: '${stringifyType(thenType)}' and '${stringifyType(elseType)}'`);
         return type;
       },
-      evaluate: (model, vars, conditionTset, thenFmla, elseFmla) => evaluateFormula(model, vars, singleElement(conditionTset.set) ? thenFmla : elseFmla),
-      stringify: (model, vars, conditionSinfo, thenSinfo, elseSinfo) => ({
+      evaluate: (model: fixmeAny, vars: fixmeAny, conditionTset: fixmeAny, thenFmla: fixmeAny, elseFmla: fixmeAny) => evaluateFormula(model, vars, singleElement(conditionTset.set) ? thenFmla : elseFmla),
+      stringify: (model: fixmeAny, vars: fixmeAny, conditionSinfo: fixmeAny, thenSinfo: fixmeAny, elseSinfo: fixmeAny) => ({
           str: `if(${conditionSinfo.strFor(PRECEDENCE_LOWEST)}, ${thenSinfo.strFor(PRECEDENCE_LOWEST)}, ${elseSinfo.strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
@@ -690,9 +690,9 @@ namespace Objsheets {
     count: {
       paramNames: ["set"],
       argAdapters: [EagerSubformula],
-      typecheck: (model, vars, domainType) => "number",
-      evaluate: (model, vars, domainTset) => new TypedSet("number", set([domainTset.elements().length])),
-      stringify: (model, vars, domainSinfo) => ({
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny) => "number",
+      evaluate: (model: fixmeAny, vars: fixmeAny, domainTset: fixmeAny) => new TypedSet("number", set([domainTset.elements().length])),
+      stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny) => ({
           // TODO: Factor out helper for function syntax.
           str: `count(${domainSinfo.strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
@@ -701,12 +701,12 @@ namespace Objsheets {
     oneOf: {
       paramNames: ["set"],
       argAdapters: [EagerSubformula],
-      typecheck: (model, vars, domainType) => domainType,
-      evaluate: (model, vars, domainTset) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny) => domainType,
+      evaluate: (model: fixmeAny, vars: fixmeAny, domainTset: fixmeAny) => {
         evalAssert(domainTset.elements().length > 0, "oneOf on empty set.");
         return new TypedSet(domainTset.type, set([domainTset.elements()[0]]));
       },
-      stringify: (model, vars, domainSinfo) => ({
+      stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny) => ({
           str: `oneOf(${domainSinfo.strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
@@ -719,20 +719,20 @@ namespace Objsheets {
     filter: {
       paramNames: ["set", "predicate"],
       argAdapters: [EagerSubformula, Lambda],
-      typecheck: (model, vars, domainType, predicateLambda) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny, predicateLambda: fixmeAny) => {
         let predicateType = predicateLambda(domainType);
         valExpectType("Predicate", predicateType, "bool");
         return domainType;
       },
-      evaluate: (model, vars, domainTset, predicateLambda) => {
+      evaluate: (model: fixmeAny, vars: fixmeAny, domainTset: fixmeAny, predicateLambda: fixmeAny) => {
         // XXX Use the checked type instead?
-        return new TypedSet(domainTset.type, new EJSONKeyedSet(_.filter(domainTset.set.elements(), (x) => {
+        return new TypedSet(domainTset.type, <fixmeAny>new EJSONKeyedSet(<fixmeAny>_.filter(domainTset.set.elements(), (x) => {
           // Future: Figure out where to put this code once we start duplicating it.
-          let tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]));
+          let tset = new TypedSet(domainTset.type, <fixmeAny>new EJSONKeyedSet(<fixmeAny>[x]));
           return singleElement(predicateLambda(tset).set);
         })));
       },
-      stringify: (model, vars, domainSinfo, predicateLambda) => {
+      stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny, predicateLambda: fixmeAny) => {
         // XXX Wasteful
         let predicateSinfo = predicateLambda(tryTypecheckFormula(model, vars, domainSinfo.formula));
         return {
@@ -744,12 +744,12 @@ namespace Objsheets {
     sum: {
       paramNames: ["domain", "function"],
       argAdapters: [EagerSubformula, Lambda],
-      typecheck: (model, vars, domainType, addendLambda) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny, addendLambda: fixmeAny) => {
         let addendType = addendLambda(domainType);
         valExpectType("Element of 'sum'", addendType, "number");
         return "number";
       },
-      evaluate: (model, vars, domainTset, addendLambda) => {
+      evaluate: (model: fixmeAny, vars: fixmeAny, domainTset: fixmeAny, addendLambda: fixmeAny) => {
         let res = 0;
         for (let x of domainTset.elements()) {
           let tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]));
@@ -757,7 +757,7 @@ namespace Objsheets {
         }
         return new TypedSet("number", new EJSONKeyedSet([res]));
       },
-      stringify: (model, vars, domainSinfo, addendLambda) => {
+      stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny, addendLambda: fixmeAny) => {
         let addendSinfo = addendLambda(tryTypecheckFormula(model, vars, domainSinfo.formula));
         return {
           str: `sum[${addendSinfo[0]} : ${domainSinfo.strFor(PRECEDENCE_LOWEST)}]` + `(${addendSinfo[1].strFor(PRECEDENCE_LOWEST)})`,
@@ -767,18 +767,18 @@ namespace Objsheets {
     },
     // Predicates on two sets of the same type.
     "=": sameTypeSetsInfixPredicate("=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, EJSON.equals),
-    "!=": sameTypeSetsInfixPredicate("!=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) => !EJSON.equals(x, y)),
-    "in": sameTypeSetsInfixPredicate("in", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, ((x, y) => y.hasAll(x)), ["needle", "haystack"]),
+    "!=": sameTypeSetsInfixPredicate("!=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x: fixmeAny, y: fixmeAny) => !EJSON.equals(x, y)),
+    "in": sameTypeSetsInfixPredicate("in", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, ((x: fixmeAny, y: fixmeAny) => y.hasAll(x)), ["needle", "haystack"]),
     // Unary minus.
     "neg": {
       paramNames: ["expr"],
       argAdapters: [EagerSubformula],
-      typecheck: (model, vars, argType) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, argType: fixmeAny) => {
         valExpectType("Operand of unary '-'", argType, "number");
         return "number";
       },
-      evaluate: (model, vars, arg) => new TypedSet("number", set([-singleElement(arg.set)])),
-      stringify: (model, vars, argSinfo) => ({
+      evaluate: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => new TypedSet("number", set([-singleElement(arg.set)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, argSinfo: fixmeAny) => ({
           str: `-${argSinfo.strFor(PRECEDENCE_NEG)}`,
           outerPrecedence: PRECEDENCE_NEG
         })
@@ -793,27 +793,27 @@ namespace Objsheets {
     // XXX TYPE_ERROR is a misnomer in this context: it means we accept tsets of
     // any valid type.  (There's no way to write a subexpression that actually
     // returns TYPE_ERROR; instead it will cause a FormulaValidationError.)
-    "+": overloaded("+", ["left", "right"], [["number", "number"], singletonInfixOperator("+", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, "number", "number", "number", (x, y) => x + y)], [[TYPE_ERROR, TYPE_ERROR], infixOperator("+", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, TYPE_ERROR, TYPE_ERROR, "text", (model, tsetX, tsetY) => tsetToText(model, tsetX) + tsetToText(model, tsetY))]),
-    "-": singletonInfixOperator("-", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, "number", "number", "number", (x, y) => x - y),
-    "*": singletonInfixOperator("*", PRECEDENCE_TIMES, ASSOCIATIVITY_LEFT, "number", "number", "number", (x, y) => x * y),
-    "/": singletonInfixOperator("/", PRECEDENCE_TIMES, ASSOCIATIVITY_LEFT, "number", "number", "number", (x, y) => x / y),
+    "+": overloaded("+", ["left", "right"], [["number", "number"], singletonInfixOperator("+", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, "number", "number", "number", (x: fixmeAny, y: fixmeAny) => x + y)], [[TYPE_ERROR, TYPE_ERROR], infixOperator("+", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, TYPE_ERROR, TYPE_ERROR, "text", (model: fixmeAny, tsetX: fixmeAny, tsetY: fixmeAny) => tsetToText(model, tsetX) + tsetToText(model, tsetY))]),
+    "-": singletonInfixOperator("-", PRECEDENCE_PLUS, ASSOCIATIVITY_LEFT, "number", "number", "number", (x: fixmeAny, y: fixmeAny) => x - y),
+    "*": singletonInfixOperator("*", PRECEDENCE_TIMES, ASSOCIATIVITY_LEFT, "number", "number", "number", (x: fixmeAny, y: fixmeAny) => x * y),
+    "/": singletonInfixOperator("/", PRECEDENCE_TIMES, ASSOCIATIVITY_LEFT, "number", "number", "number", (x: fixmeAny, y: fixmeAny) => x / y),
     "^": singletonInfixOperator("^", PRECEDENCE_POW, ASSOCIATIVITY_RIGHT, "number", "number", "number", Math.pow, ["base", "exponent"]),
-    "<": compareInfixOperator("<", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) => x < y),
-    "<=": compareInfixOperator("<=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) => x <= y),
-    ">": compareInfixOperator(">", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) => x > y),
-    ">=": compareInfixOperator(">=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x, y) => x >= y),
+    "<": compareInfixOperator("<", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x: fixmeAny, y: fixmeAny) => x < y),
+    "<=": compareInfixOperator("<=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x: fixmeAny, y: fixmeAny) => x <= y),
+    ">": compareInfixOperator(">", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x: fixmeAny, y: fixmeAny) => x > y),
+    ">=": compareInfixOperator(">=", PRECEDENCE_COMPARE, ASSOCIATIVITY_NONE, (x: fixmeAny, y: fixmeAny) => x >= y),
     // TODO: Short circuit?
-    "&&": singletonInfixOperator("&&", PRECEDENCE_AND, ASSOCIATIVITY_LEFT, "bool", "bool", "bool", (x, y) => x && y),
-    "||": singletonInfixOperator("||", PRECEDENCE_OR, ASSOCIATIVITY_LEFT, "bool", "bool", "bool", (x, y) => x || y),
+    "&&": singletonInfixOperator("&&", PRECEDENCE_AND, ASSOCIATIVITY_LEFT, "bool", "bool", "bool", (x: fixmeAny, y: fixmeAny) => x && y),
+    "||": singletonInfixOperator("||", PRECEDENCE_OR, ASSOCIATIVITY_LEFT, "bool", "bool", "bool", (x: fixmeAny, y: fixmeAny) => x || y),
     "!": {
       paramNames: ["condition"],
       argAdapters: [EagerSubformula],
-      typecheck: (model, vars, argType) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, argType: fixmeAny) => {
         valExpectType("Operand of '!'", argType, "bool");
         return "bool";
       },
-      evaluate: (model, vars, arg) => new TypedSet("bool", set([!singleElement(arg.set)])),
-      stringify: (model, vars, argSinfo) => ({
+      evaluate: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => new TypedSet("bool", set([!singleElement(arg.set)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, argSinfo: fixmeAny) => ({
           str: `!${argSinfo.strFor(PRECEDENCE_NEG)}`,
           outerPrecedence: PRECEDENCE_NEG
         })
@@ -823,25 +823,25 @@ namespace Objsheets {
     union: {
       paramNames: ["part"],  // Will be expanded by getSubformulaTree
       argAdapters: [HomogeneousEagerSubformulaList],
-      typecheck: (model, vars, termsType) => termsType,
-      evaluate: (model, vars, terms) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, termsType: fixmeAny) => termsType,
+      evaluate: (model: fixmeAny, vars: fixmeAny, terms: fixmeAny) => {
         let res = new TypedSet();
         for (let term of terms) {
           res.addAll(term);
         }
         return res;
       },
-      stringify: (model, vars, termSinfos) => ({
-          str: "{" + (termSinfos.map((termSinfo) => termSinfo.strFor(PRECEDENCE_LOWEST))).join(", ") + "}",
+      stringify: (model: fixmeAny, vars: fixmeAny, termSinfos: fixmeAny) => ({
+          str: "{" + (termSinfos.map((termSinfo: fixmeAny) => termSinfo.strFor(PRECEDENCE_LOWEST))).join(", ") + "}",
           outerPrecedence: PRECEDENCE_ATOMIC
         })
     },
     dummy: {
       paramNames: [],
       argAdapters: [],
-      typecheck: (model, vars) => TYPE_EMPTY,
-      evaluate: (model, vars) => new TypedSet(),
-      stringify: (model, vars) => ({
+      typecheck: (model: fixmeAny, vars: fixmeAny) => TYPE_EMPTY,
+      evaluate: (model: fixmeAny, vars: fixmeAny) => new TypedSet(),
+      stringify: (model: fixmeAny, vars: fixmeAny) => ({
           // DUMMY_FORMULA is treated specially in the formula bar.  The following is
           // in case it shows up somewhere else in the system.
           str: "dummy",
@@ -851,9 +851,9 @@ namespace Objsheets {
     toText: {
       paramNames: ["expr"],
       argAdapters: [EagerSubformula],
-      typecheck: (model, vars, argType) => "text",
-      evaluate: (model, vars, arg) => new TypedSet("text", set([tsetToText(model, arg)])),
-      stringify: (model, vars, argSinfo) => ({
+      typecheck: (model: fixmeAny, vars: fixmeAny, argType: fixmeAny) => "text",
+      evaluate: (model: fixmeAny, vars: fixmeAny, arg: fixmeAny) => new TypedSet("text", set([tsetToText(model, arg)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, argSinfo: fixmeAny) => ({
           str: `toText(${argSinfo.strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
@@ -867,15 +867,15 @@ namespace Objsheets {
   // This is just different enough from dispatchSubformula not to use it.
   // Specifically, the validate method of the operation is optional, and it
   // receives the original arguments (the adapters do not return values).
-  function validateSubformula(vars, formula) {
-    var opName;
+  function validateSubformula(vars: fixmeAny, formula: fixmeAny) {
+    var opName: fixmeAny;
     valAssert(_.isArray(formula), "Subformula must be an array.");
     valAssert(_.isString(opName = formula[0]), "Subformula must begin with an operation name (a string).");
     valAssert(dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);
     let d = dispatch[opName];
     let args = formula.slice(1);
     valAssert(args.length === d.argAdapters.length, `Wrong number of arguments to '${opName}' (required ${d.argAdapters.length}, got ${args.length})`);
-    d.argAdapters.forEach((adapter, i) => {
+    d.argAdapters.forEach((adapter: fixmeAny, i: fixmeAny) => {
       if (adapter.validate != null) {
         adapter.validate(vars, args[i]);
       }
@@ -885,7 +885,7 @@ namespace Objsheets {
     }
   }
 
-  export function validateFormula(formula) {
+  export function validateFormula(formula: fixmeAny) {
     try {
       validateSubformula(new EJSONKeyedSet(["this"]), formula);
     } catch (e) {
@@ -898,24 +898,24 @@ namespace Objsheets {
     }
   }
 
-  function dispatchFormula(action, formula, ...contextArgs) {
+  function dispatchFormula(action: fixmeAny, formula: fixmeAny, ...contextArgs: fixmeAny[]) {
     let d = dispatch[formula[0]];
     let args = formula.slice(1);
-    let adaptedArgs = d.argAdapters.map((adapter, i) => adapter[action] != null ? adapter[action].apply(adapter, contextArgs.concat([args[i]])) : args[i]);
+    let adaptedArgs = d.argAdapters.map((adapter: fixmeAny, i: fixmeAny) => adapter[action] != null ? adapter[action].apply(adapter, contextArgs.concat([args[i]])) : args[i]);
     return d[action].apply(d, contextArgs.concat(adaptedArgs));
   }
 
   // Assumes formula has passed validation.
   // vars: EJSONKeyedMap<string, type (nullable string)>
   // Returns type (nullable string).
-  export function typecheckFormula(model, vars, formula) {
+  export function typecheckFormula(model: fixmeAny, vars: fixmeAny, formula: fixmeAny): OSType {
     formula.vars = vars;
     return formula.type = dispatchFormula("typecheck", formula, model, vars);
   }
 
   // Helper for use in stringify, where we want to do our best rather than crash if
   // the formula is ill-typed.
-  function tryTypecheckFormula(model, vars, formula) {
+  function tryTypecheckFormula(model: fixmeAny, vars: fixmeAny, formula: fixmeAny) {
     try {
       return typecheckFormula(model, vars, formula);
     } catch (e) {
@@ -925,8 +925,8 @@ namespace Objsheets {
 
   // Assumes formula has passed typechecking.
   // vars: EJSONKeyedMap<string, TypedSet>
-  export function evaluateFormula(model, vars, formula) {
-    let result;
+  export function evaluateFormula(model: fixmeAny, vars: fixmeAny, formula: fixmeAny) {
+    let result: fixmeAny;
     try {
       result = dispatchFormula("evaluate", formula, model, vars);
     } catch (e) {
@@ -953,17 +953,17 @@ namespace Objsheets {
 
   // TODO: Separate out the determination of the initial variable values so we can
   // reuse the rest for formulas in procedures, etc.
-  export function traceColumnFormula(formula, columnId) {
+  export function traceColumnFormula(formula: fixmeAny, columnId: fixmeAny) {
     let tracingModel = {
-      getColumn: (columnId) => getColumn(columnId),
-      evaluateFamily: (qFamilyId) => evaluateFamilyReadOnly(qFamilyId),
-      typecheckColumn: (columnId) => getColumn(columnId).type,
+      getColumn: (columnId: fixmeAny) => getColumn(columnId),
+      evaluateFamily: (qFamilyId: fixmeAny) => evaluateFamilyReadOnly(qFamilyId),
+      typecheckColumn: (columnId: fixmeAny) => getColumn(columnId).type,
       isTracing: true
     };
     // Here we really do want to ignore erroneous families in the parent column
     // because there is nothing to trace for them.
     let parentColumnId = getColumn(columnId).parent;
-    return allCellIdsInColumnIgnoreErrors(parentColumnId).map((cellId) => {
+    return allCellIdsInColumnIgnoreErrors(parentColumnId).map((cellId: CellId1) => {
       try {
         let vars = new EJSONKeyedMap([["this", new TypedSet(parentColumnId, new EJSONKeyedSet([cellId]))]]);
         return evaluateFormula(tracingModel, vars, formula);
@@ -985,7 +985,7 @@ namespace Objsheets {
   // BELOW: Concrete syntax support.  However, this is used on the server, by
   // loadPTCData!
 
-  function validateAndTypecheckFormula(model, vars, formula) {
+  function validateAndTypecheckFormula(model: fixmeAny, vars: fixmeAny, formula: fixmeAny) {
     validateSubformula(new EJSONKeyedSet(vars.keys()), formula);
     return typecheckFormula(model, vars, formula);
   }
@@ -995,8 +995,8 @@ namespace Objsheets {
   // vars: EJSONKeyedMap<string, type (string)>
   // Returns the new formula with the call to "up" or "down" added around
   // startCellsFmla.
-  function resolveNavigation(model, vars, startCellsFmla, targetName, keysFmla) {
-    let interpretations = [];
+  function resolveNavigation(model: fixmeAny, vars: fixmeAny, startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
+    let interpretations: fixmeAny = [];
     if (startCellsFmla == null) {
       if ((vars.get("this") != null) && typeIsReference(vars.get("this"))) {
         valAssert(targetName !== "this", "Explicit \"this\" is not allowed in concrete syntax.  " + "Please use the object name for clarity.");
@@ -1030,7 +1030,7 @@ namespace Objsheets {
     }
 
     // Check logical children.
-    for (let [columnId, isValues, direction] of columnLogicalChildrenByName(startCellsType, targetName)) {
+    for (let [[columnId, isValues], direction] of columnLogicalChildrenByName(startCellsType, targetName)) {
       interpretations.push([direction, startCellsFmla, columnId, isValues]);
     }
 
@@ -1069,35 +1069,35 @@ namespace Objsheets {
   // return dummy values.  If the code is reactive, it will recover.
   export var liteModel = {
     // Eta-expand to avoid load-order dependency.
-    getColumn: (columnId) => getColumn(columnId),
+    getColumn: (columnId: fixmeAny) => getColumn(columnId),
     // FIXME: propagate errors
-    evaluateFamily: (qFamilyId) => new FamilyId(qFamilyId).typedValues(),
-    typecheckColumn: (columnId) => fallback(getColumn(columnId).type, TYPE_ERROR)
+    evaluateFamily: (qFamilyId: fixmeAny) => new FamilyId(qFamilyId).typedValues(),
+    typecheckColumn: (columnId: fixmeAny) => fallback(getColumn(columnId).type, TYPE_ERROR)
   };
 
   // Reused by parseProcedure. :/
-  export function setupParserCommon(startToken, vars) {
+  export function setupParserCommon(startToken: fixmeAny, vars: fixmeAny) {
     let parser = new Jison.Parsers.language.Parser();
     parser.yy.vars = vars.shallowClone();
     parser.yy.startToken = startToken;
-    parser.yy.bindVar = function(varName, formula) {
+    parser.yy.bindVar = function(varName: fixmeAny, formula: fixmeAny) {
       // Don't check shadowing here, because the rules for procedures are
       // complicated.  It will be done later by the validate method.
       this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula));
     };
-    parser.yy.unbindVar = function(varName) {
+    parser.yy.unbindVar = function(varName: fixmeAny) {
       this.vars["delete"](varName);
     };
-    parser.yy.navigate = function(startCellsFmla, targetName, keysFmla) {
+    parser.yy.navigate = function(startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
       return resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla);
     };
-    parser.yy.parseError = (err, hash) => {
+    parser.yy.parseError = (err: fixmeAny, hash: fixmeAny) => {
       throw new SyntaxError(err, hash);
     };
     return parser;
   }
 
-  export function parseFormula(thisType, fmlaString) {
+  export function parseFormula(thisType: fixmeAny, fmlaString: fixmeAny) {
     // XXX: If we are changing a formula so as to introduce a new cyclic type
     // checking dependency, we use the old types of the other columns to interpret
     // navigations in the new formula.  However, as soon as we save, all the
@@ -1118,7 +1118,7 @@ namespace Objsheets {
     }
   }
 
-  function stringifyIdentCommon(entryPoint, ident) {
+  function stringifyIdentCommon(entryPoint: fixmeAny, ident: fixmeAny) {
     for (let str of [ident, `\`${ident}\``]) {
       let parser = new Jison.Parsers.language.Parser();
       parser.yy.startToken = entryPoint;
@@ -1139,38 +1139,38 @@ namespace Objsheets {
   // name syntax.
   // XXX: I guess this lets people define a variable named [foo] and then refer to
   // it without backquotes in some (but not all) contexts.
-  function stringifyNavigationStep(ident) {
+  function stringifyNavigationStep(ident: fixmeAny) {
     return stringifyIdentCommon("ENTRY_NAVIGATION_STEP", ident);
   }
 
-  function stringifyIdent(ident) {
+  function stringifyIdent(ident: fixmeAny) {
     return stringifyIdentCommon("ENTRY_IDENT", ident);
   }
 
-  function stringifySubformula(model, vars, formula) {
+  function stringifySubformula(model: fixmeAny, vars: fixmeAny, formula: fixmeAny): fixmeAny {
     let res = dispatchFormula("stringify", formula, model, vars);
     return {
       // Save original: used by stringifyNavigation.  (Might not be the best design.)
       formula: formula,
-      strFor: (lowestSafePrecedence) => res.outerPrecedence >= lowestSafePrecedence ? res.str : `(${res.str})`
+      strFor: (lowestSafePrecedence: fixmeAny) => res.outerPrecedence >= lowestSafePrecedence ? res.str : `(${res.str})`
     };
   }
 
-  export function stringifyFormula(thisType, formula) {
+  export function stringifyFormula(thisType: fixmeAny, formula: fixmeAny) {
     // Stringify should only happen after type checking, so it can use liteModel on
     // either client or server.
     return stringifySubformula(liteModel, new EJSONKeyedMap([["this", thisType]]), formula).strFor(PRECEDENCE_LOWEST);
   }
 
-  export function getSubformulaTree(formula) {
+  export function getSubformulaTree(formula: fixmeAny) {
     let d = dispatch[formula[0]];
     let args = formula.slice(1);
-    let children = [];
-    d.argAdapters.forEach((adapter, i) => {
+    let children: fixmeAny = [];
+    d.argAdapters.forEach((adapter: fixmeAny, i: fixmeAny) => {
       if (adapter.getSubformulas != null) {
         let paramName = d.paramNames[i];
-        let childNodes = adapter.getSubformulas(args[i]).map((f) => getSubformulaTree(f));
-        children.push.apply(children, (childNodes.length !== 1 ? childNodes.map((n, j) => ({  // union, others?
+        let childNodes = adapter.getSubformulas(args[i]).map((f: fixmeAny) => getSubformulaTree(f));
+        children.push.apply(children, (childNodes.length !== 1 ? childNodes.map((n: fixmeAny, j: fixmeAny) => ({  // union, others?
             paramName: `paramName${j + 1}`,
             node: n
           })) : [

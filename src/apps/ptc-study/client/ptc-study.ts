@@ -41,28 +41,28 @@ namespace Objsheets {
     FamilyPage: function() {
       return RelsheetsClient.readSubtree("FamilyPage", this.familyPage);
     },
-    formatDate: (d) => valueToTextIgnoreErrors("date", d)
+    formatDate: (d: fixmeAny) => valueToTextIgnoreErrors("date", d)
   });
 
-  function blur(jbutton) {
+  function blur(jbutton: fixmeAny) {
     jbutton.width(jbutton.width());
     jbutton.text("∙ ∙ ∙");
   }
 
   Template["PTC_study_FamilyPage"].events({
-    "click .schedule": function(ev) {
+    "click .schedule": function(ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentScheduleMeeting", {
         block: this
-      }, (error, result) => {
+      }, (error: fixmeAny, result: fixmeAny) => {
         $(ev.target).text("Schedule");
       });
     },
-    "click .cancel": function(ev) {
+    "click .cancel": function(ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCancelMeeting", {
         block: this
-      }, (error, result) => {
+      }, (error: fixmeAny, result: fixmeAny) => {
         $(ev.target).text("Cancel");
       });
     }

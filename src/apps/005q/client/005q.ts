@@ -34,21 +34,21 @@ namespace Objsheets {
 
   Template["DoubleOhFiveQueue"].helpers({
     root: () => RelsheetsClient.read(),
-    sortBy: (objs, field) => _.sortBy(objs, (x) => x[field][0]),
-    people: (calls) => {
+    sortBy: (objs: fixmeAny, field: fixmeAny) => _.sortBy(objs, (x: fixmeAny) => x[field][0]),
+    people: (calls: fixmeAny) => {
       let count = (calls != null ? calls.length : null) || 0;
       return `${(count === 1 ? "is" : "are")} ` + `${(count === 0 ? "no" : count)} ` + `${(count === 1 ? "person" : "people")}`;
     }
   });
 
   Template["DoubleOhFiveQueue"].events({
-    "submit form": (event) => {
+    "submit form": (event: fixmeAny) => {
       let formData = {
         name: [event.target.name.value],
         issue: [event.target.issue.value],
         location: [event.target.location.value]
       };
-      RelsheetsClient.call("enqueue", formData, (error, result) => {
+      RelsheetsClient.call("enqueue", formData, (error: fixmeAny, result: fixmeAny) => {
         if (error == null) {
           event.target.reset();
         }

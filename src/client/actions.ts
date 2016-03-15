@@ -18,7 +18,7 @@ namespace Objsheets {
   let NESTED_UNDERLINING_MAX_DEPTH = 5;
 
   // We mainly care that this doesn't crash.
-  function origFormulaStrForData(data) {
+  function origFormulaStrForData(data: fixmeAny) {
     if (data.onObjectHeader) {
       return null;
     }
@@ -37,7 +37,7 @@ namespace Objsheets {
 
   let isFormulaDebuggerOpen = new ReactiveVar(false);
 
-  let tracingView = null;
+  let tracingView: fixmeAny = null;
 
   Template["changeColumn"].rendered = function() {
     // XXX What if there are unsaved changes when the formula changes externally?
@@ -107,8 +107,8 @@ namespace Objsheets {
       // object types.  This is a pointless thing to do but does not break our
       // tool; it's as if all of those reference types were merely empty.  So
       // don't try to prevent it for now.
-      let refItems = [];
-      function scan(colId) {
+      let refItems: fixmeAny = [];
+      function scan(colId: fixmeAny) {
         let c = getColumn(colId);
         if (c == null) {
           return;  // Not ready?  What a pain.
@@ -122,7 +122,7 @@ namespace Objsheets {
       }
       scan(rootColumnId);
 
-      let items = [];
+      let items: fixmeAny = [];
       items.push(new HtmlOptgroup("Basic types", MAIN_PRIMITIVE_TYPES.map((t) => new HtmlOption(t, t))));
       items.push(new HtmlOptgroup("Reference to:", refItems));
       typeMenuCommonItems.set(items);
@@ -145,7 +145,7 @@ namespace Objsheets {
     },
     typeMenu: function() {
       let col = getColumn(this.columnId);
-      let items = [];
+      let items: fixmeAny = [];
       if (col.formula != null) {
         // Note: Inferred type should match c.type if c.specifiedType is null and
         // there are no unsaved changes to the formula.
@@ -190,15 +190,15 @@ namespace Objsheets {
     }
   });
 
-  function changeColumnInitFormulaBar(template) {
+  function changeColumnInitFormulaBar(template: fixmeAny) {
     let formula = origFormulaStr.get();
     template.codeMirror = CodeMirror(template.find("#changeFormula-formula"), {  //changeFormula-formula'), {
       value: "",  // filled in by autorun below
       extraKeys: {
-        Enter: (cm) => {
+        Enter: (cm: fixmeAny) => {
           template.find(".saveFormula").click();
         },
-        Esc: (cm) => {
+        Esc: (cm: fixmeAny) => {
           template.find(".revertFormula").click();
         }
       }
@@ -228,19 +228,19 @@ namespace Objsheets {
         newFormulaInfo.set(generateFormulaInfo(template));
       })
     ];
-    template.codeMirror.on("beforeChange", (cm, change) => {
+    template.codeMirror.on("beforeChange", (cm: fixmeAny, change: fixmeAny) => {
       if (change.update != null) {
         let newtext = change.text.join("").replace(/\n/g, "");
         change.update(null, null, [newtext]);
       }
       // Otherwise, change is coming from undo or redo; hope it's OK.
     });
-    template.codeMirror.on("changes", (cm) => {
+    template.codeMirror.on("changes", (cm: fixmeAny) => {
       newFormulaStr.set(template.codeMirrorDoc.getValue());
     });
   }
 
-  function generateFormulaInfo(template) {
+  function generateFormulaInfo(template: fixmeAny) {
     if (tracingView != null) {
       tracingView.destroy();
     }
@@ -269,7 +269,7 @@ namespace Objsheets {
     }
     formulaInfo.root = getSubformulaTree(formulaInfo.formula);
     formulaInfo.bands = [];
-    function layoutSubtree(node) {
+    function layoutSubtree(node: fixmeAny) {
       // It looks silly to offer to debug a literal, though it's not harmful.  Open
       // to counterarguments. ~ Matt
       if (node.formula[0] === "lit") {
@@ -316,16 +316,16 @@ namespace Objsheets {
   }
 
   class TracingView {
-    public grid;
-    public hot;
+    public grid: fixmeAny;
+    public hot: fixmeAny;
 
-    constructor(domElement) {
+    constructor(domElement: fixmeAny) {
       // TODO: Add a bunch more settings?
       this.grid = [];
       this.hot = new Handsontable(domElement, {
         readOnly: true,
         readOnlyCellClassName: "",  // Not useful to dim everything.
-        cells: (row, col, prop) => {
+        cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny) => {
           let cell = this.grid[row] != null ? this.grid[row][col] : null;
           if (!cell) {
             return <any>{};  // Would like to understand why this is needed...
@@ -337,9 +337,9 @@ namespace Objsheets {
       });
     }
 
-    public show(node) {
+    public show(node: fixmeAny) {
       let formula = node.formula;
-      function formatOutcome(outcome) {
+      function formatOutcome(outcome: fixmeAny) {
         if (outcome.result != null) {
           // TODO: Display in individual cells so we can support the
           // referent-related features.  Or do we like this better?
@@ -357,13 +357,13 @@ namespace Objsheets {
       // this restriction.
       //
       // Also throw out implicit "this" again. :/
-      let childrenToShow = node.children.filter((childInfo) => (childInfo.node.formula.loc != null) && EJSON.equals(childInfo.node.formula.vars, formula.vars));
+      let childrenToShow = node.children.filter((childInfo: fixmeAny) => (childInfo.node.formula.loc != null) && EJSON.equals(childInfo.node.formula.vars, formula.vars));
       // TODO: Enforce outside-to-inside order ourselves rather than relying on it
       // as a side effect of object iteration order and the way we typecheck
       // formulas.
-      let varsAndTypesList = formula.vars.entries().filter((e) => e[1] !== rootColumnId);
+      let varsAndTypesList = formula.vars.entries().filter((e: fixmeAny) => e[1] !== rootColumnId);
       this.grid = [[], []];
-      function typeCell(type) {
+      function typeCell(type: fixmeAny) {
         return new ViewCell(stringifyTypeForSheet(type), 1, 1, ["rsHeader"].concat(markDisplayClassesForType(type)));
       }
       for (let [name, type] of varsAndTypesList) {
@@ -379,8 +379,8 @@ namespace Objsheets {
       // XXX It would be cleaner for traceColumnFormula to ensure "traces" was
       // created at least as an empty list on all subformulas, but more work to
       // implement.
-      var /*closure*/ varValues;
-      let outcome;
+      var /*closure*/ varValues: fixmeAny;
+      let outcome: fixmeAny;
       for ([varValues, outcome] of formula.traces != null ? formula.traces.entries() : null) {
         let line = varsAndTypesList.map(([name, _]) => {
           let val = varValues.get(name).elements()[0];
@@ -394,7 +394,7 @@ namespace Objsheets {
         line.push(new ViewCell(formatOutcome(outcome)));
         this.grid.push(line);
       }
-      let data = this.grid.map((row) => row.map((cell) => cell.value));
+      let data = this.grid.map((row: fixmeAny) => row.map((cell: fixmeAny) => cell.value));
       this.hot.loadData(data);
     }
 
@@ -403,7 +403,7 @@ namespace Objsheets {
     }
   }
 
-  function updateTracingView(template) {
+  function updateTracingView(template: fixmeAny) {
     let formulaInfo = newFormulaInfo.get();
     let columnId = changeColumnArgs.get()[0].columnId;
     // Tracing can be slow, so do it only on first demand.  (Longer term, we should
@@ -426,7 +426,7 @@ namespace Objsheets {
     return isFormulaDebuggerOpen.get();
   }
 
-  function stateColumnHasValues(columnId) {
+  function stateColumnHasValues(columnId: fixmeAny) {
     return Cells.find({
       column: columnId,
       values: {
@@ -438,7 +438,7 @@ namespace Objsheets {
   }
 
   Template["changeColumn"].events({
-    "change #changeColumn-backend": function(event, template) {
+    "change #changeColumn-backend": function(event: fixmeAny, template: fixmeAny) {
       let newFormula = getValueOfSelectedOption(template, "#changeColumn-backend") === "computed" ? DUMMY_FORMULA : null;  //changeColumn-backend') == 'computed'
       let col = getColumn(this.columnId);
       // With these conditions (plus the fact that DUMMY_FORMULA returns empty sets),
@@ -457,7 +457,7 @@ namespace Objsheets {
             $exists: true
           }
         }).count();
-        let msg;
+        let msg: fixmeAny;
         if (col.typecheckError != null) {
           msg = "This will delete your formula.  ";
         } else {
@@ -478,7 +478,7 @@ namespace Objsheets {
       // XXX: Disallow converting keyed objects to state?
       Meteor.call("changeColumnFormula", $$, this.columnId, newFormula, standardServerCallback);
     },
-    "change #changeColumn-type": function(event, template) {  //changeColumn-type': (event, template) ->
+    "change #changeColumn-type": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-type': (event, template) ->
       let col = getColumn(this.columnId);
       let newSpecifiedType = getValueOfSelectedOption(template, "#changeColumn-type");  //changeColumn-type')
       if (newSpecifiedType === "auto") {
@@ -493,14 +493,14 @@ namespace Objsheets {
       }
       Meteor.call("changeColumnSpecifiedType", $$, this.columnId, newSpecifiedType, standardServerCallback);
     },
-    "change #changeColumn-referenceDisplayColumn": function(event, template) {  //changeColumn-referenceDisplayColumn': (event, template) ->
+    "change #changeColumn-referenceDisplayColumn": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-referenceDisplayColumn': (event, template) ->
       let newReferenceDisplayColumn = getValueOfSelectedOption(template, "#changeColumn-referenceDisplayColumn");  //changeColumn-referenceDisplayColumn')
       if (newReferenceDisplayColumn === "auto") {
         newReferenceDisplayColumn = null;
       }
       Meteor.call("changeColumnReferenceDisplayColumn", $$, this.columnId, newReferenceDisplayColumn, standardServerCallback);
     },
-    "click .saveFormula": function(event, template) {
+    "click .saveFormula": function(event: fixmeAny, template: fixmeAny) {
       let contextColumnId = getColumn(this.columnId).parent;
       // canSave ensures that this is defined.
       let formula = newFormulaInfo.get().formula;
@@ -509,13 +509,13 @@ namespace Objsheets {
       newFormulaStr.set(stringifyFormula(contextColumnId, formula));
       Meteor.call("changeColumnFormula", $$, this.columnId, formula, standardServerCallback);
     },
-    "click .revertFormula": (event, template) => {
+    "click .revertFormula": (event: fixmeAny, template: fixmeAny) => {
       newFormulaStr.set(origFormulaStr.get());
     },
-    "click .formulaDebuggerToggle": (event, template) => {
+    "click .formulaDebuggerToggle": (event: fixmeAny, template: fixmeAny) => {
       isFormulaDebuggerOpen.set(!isFormulaDebuggerOpen.get());
     },
-    "click .formulaBand": function(event, template) {
+    "click .formulaBand": function(event: fixmeAny, template: fixmeAny) {
       // Update selection.
       let formulaInfo = newFormulaInfo.get();
       if (formulaInfo.selectedBand != null) {
@@ -533,7 +533,7 @@ namespace Objsheets {
   // Needed for the formula div to get added during the "Create formula" handler,
   // rather than sometime later when we get the update from the server.
   Meteor.methods({
-    changeColumnFormula: (cc, columnId, formula) => {
+    changeColumnFormula: (cc: fixmeAny, columnId: fixmeAny, formula: fixmeAny) => {
       Columns.update(columnId, {
         $set: {
           formula: formula

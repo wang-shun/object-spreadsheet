@@ -1,17 +1,17 @@
 namespace Objsheets {
 
   export class HtmlOption {
-    constructor(public value, public label) {}
+    constructor(public value: fixmeAny, public label: fixmeAny) {}
   }
 
   export class HtmlOptgroup {
-    constructor(public label, public members) {}
+    constructor(public label: fixmeAny, public members: fixmeAny) {}
   }
 
   export class HtmlSelect {
     // @items: array of HtmlOption and/or HtmlOptgroup
 
-    constructor(public items, public currentValue) {}
+    constructor(public items: fixmeAny, public currentValue: fixmeAny) {}
   }
 
   // Since we aren't generating the <select> element itself, the event goes to the
@@ -47,11 +47,11 @@ namespace Objsheets {
     }
   });
 
-  export function selectOptionWithValue(template, selectSelector, value) {
+  export function selectOptionWithValue(template: fixmeAny, selectSelector: fixmeAny, value: fixmeAny) {
     template.find(`${selectSelector} option[value=${value}]`).selected = true;
   }
 
-  export function getValueOfSelectedOption(template, selectSelector) {
+  export function getValueOfSelectedOption(template: fixmeAny, selectSelector: fixmeAny) {
     return template.$(selectSelector).val();
   }
 

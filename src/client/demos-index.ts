@@ -1,9 +1,9 @@
 namespace Objsheets {
 
-  function indexPathForExamplesNamePrefix(examplesNamePrefix) {
+  function indexPathForExamplesNamePrefix(examplesNamePrefix: fixmeAny) {
     // Based on the pathFor template helper, which doesn't appear to have an
     // equivalent accessible from code. :(
-    return Router.routes["index"].path(null, {
+    return (<fixmeAny>Router.routes)["index"].path(null, {
       query: {
         examplesNamePrefix: examplesNamePrefix
       }
@@ -45,7 +45,7 @@ namespace Objsheets {
     // on each server.
     //
     // XXX: Is there a library that does the following in a more robust way?
-    absUrl: (path) => location.protocol + "//" + location.host + path,
+    absUrl: (path: fixmeAny) => location.protocol + "//" + location.host + path,
     indexMultiuser: () => indexMultiuser,
     newSheetName: () => Session.get("newSheetName")
   });
@@ -62,16 +62,16 @@ namespace Objsheets {
   });
 
   Template["Index"].events({
-    "input #examplesNamePrefix": (event, template) => {
+    "input #examplesNamePrefix": (event: fixmeAny, template: fixmeAny) => {
       Router.go(indexPathForExamplesNamePrefix(event.target.value));
     },
-    "input #newSheetName": (event, template) => {  //newSheetName': (event, template) ->
+    "input #newSheetName": (event: fixmeAny, template: fixmeAny) => {  //newSheetName': (event, template) ->
       Session.set("newSheetName", event.target.value);
     },
-    "click #newSheetGo": (event, template) => {  //newSheetGo': (event, template) ->
+    "click #newSheetGo": (event: fixmeAny, template: fixmeAny) => {  //newSheetGo': (event, template) ->
       Router.go("/" + Session.get("newSheetName"));
     },
-    "keypress #newSheetName": (event, template) => {  //newSheetName': (event, template) ->
+    "keypress #newSheetName": (event: fixmeAny, template: fixmeAny) => {  //newSheetName': (event, template) ->
       if (event.which === 13) {
         Router.go("/" + Session.get("newSheetName"));
       }

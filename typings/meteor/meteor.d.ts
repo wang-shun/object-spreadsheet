@@ -9,8 +9,7 @@
 
 // Rewrite to allow primitives and arrays at the top and be consistent in our
 // treatment of top-level and nested objects (even if that means more false
-// positives!).  One can simply cast object literals that are intended to be
-// [E]JSONable. ~ Matt 2016-02-29
+// positives!). ~ Matt 2016-02-29
 /*
 interface EJSONable {
 	[key: string]: number | string | boolean | Object | number[] | string[] | Object[] | Date | Uint8Array | EJSON.CustomType;
@@ -20,9 +19,41 @@ interface JSONable {
 }
 interface EJSON extends EJSONable {}
 */
-// Using Array<EJSONable> gives a "Type alias circularly references itself" error. :()
-declare type EJSONable = number | string | boolean | {[n: number]: EJSONable} | {[key: string]: EJSONable} | Date | Uint8Array | EJSON.CustomType;
-declare type JSONable = number | string | boolean | {[n: number]: JSONable} | {[key: string]: JSONable};
+
+// Direct recursion (type EJSONable = ... | Array<EJSONable> | ...) is not
+// allowed.  But because typing is structural, the use of EJSONableArray is
+// equivalent in effect.
+//
+// We're lucky that TypeScript does exactly what we want for object literals
+// contextually typed as [E]JSONable (see
+// https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md#4.5,
+// "When an object literal is contextually typed by a type that includes a
+// string index signature...").  This typically works for toJSONValue
+// implementations of EJSON custom types.  For code that wants to traffic in
+// [E]JSONable objects of specific structures other than EJSON custom types
+// (rare), we provide the [E]JSONableBranded option.
+//
+// The [E]JSONableDict interfaces are factored out to make error messages
+// containing the expansions of the [E]JSONable aliases less horrifying.
+
+interface EJSONableArray extends Array<EJSONable> {}
+interface EJSONableDict {
+	[key: string]: EJSONable;
+}
+interface EJSONableBranded {
+	_ejsonableBrand: any;
+}
+declare type EJSONable = number | string | boolean | EJSONableArray | EJSONableDict | EJSONableBranded | Date | Uint8Array | EJSON.CustomType;
+
+interface JSONableArray extends Array<JSONable> {}
+interface JSONableDict {
+	[key: string]: JSONable;
+}
+interface JSONableBranded {
+	_jsonableBrand: any;
+}
+declare type JSONable = number | string | boolean | JSONableArray | JSONableDict | JSONableBranded;
+
 declare type EJSON = EJSONable;
 
 declare module Match {
@@ -428,7 +459,7 @@ declare module App {
 }
 
 declare module Assets {
-	function getBinary(assetPath: string, asyncCallback?: Function): EJSON;
+	function getBinary(assetPath: string, asyncCallback?: Function): EJSON.Binary;
 	function getText(assetPath: string, asyncCallback?: Function): string;
 }
 
@@ -513,19 +544,39 @@ declare module EJSON {
 		typeName(): string;
 	}
 
-	function addType(name: string, factory: (val: JSONable) => EJSON.CustomType): void;
+	type Binary = Uint8Array | number[];
+
+	// Rationale for type of "val": The factory will expect val to have properties
+	// of particular names and types.  We don't want to force it to cast.
+	// Unfortunately, it gets dinged by noImplicitAny.  We think it's fine to
+	// declare the parameter explicitly as any rather than define a type that just
+	// repeats the properties the factory accesses and their expected types.
+	//
+	// Hint for the factory: if the class is generic, it's probably more correct
+	// to set the type arguments to "any" than the default of the upper bound
+	// (https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md#4.15.2).
+	function addType(name: string, factory: (val: any) => EJSON.CustomType): void;
 	function clone<T>(val:T): T;
 	function equals(a: EJSON, b: EJSON, options?: {
 		keyOrderSensitive?: boolean;
 	}): boolean;
+	// Rationale for return type: The caller will expect the return value to be a
+	// particular EJSON type depending on the data passed.  There doesn't seem to
+	// be value in forcing the caller to explicitly downcast the return value, on
+	// top of putting it somewhere that imposes a type.  (If the caller assigns it
+	// to a variable without declaring the type, they'll get dinged for an
+	// implicit any.)  Same idea as JSON.parse.
 	function fromJSONValue(val: JSONable): any;
 	function isBinary(x: Object): boolean;
-	var newBinary: any;
-	function parse(str: string): EJSON;
+	function newBinary(size: number): Binary;
+	// See fromJSONValue re return type.
+	function parse(str: string): any;
 	function stringify(val: EJSON, options?: {
 		indent?: boolean | number | string;
 		canonical?: boolean;
 	}): string;
+	// Rationale for return type: The caller normally shouldn't know about the
+	// JSON representation.
 	function toJSONValue(val: EJSON): JSONable;
 }
 

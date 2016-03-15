@@ -56,13 +56,13 @@ declare module Router {
     export function page():void;
     export function add(route:Object):void;
     export function to(path:string, ...args:any[]):void;
-    export function filters(filtersMap:Object);
-    export function filter(filterName:string, options?:Object);
+    export function filters(filtersMap:Object):fixmeAny;
+    export function filter(filterName:string, options?:Object):fixmeAny;
 
     // These are for Iron-Router
-    export function configure(config:GlobalConfig);
+    export function configure(config:GlobalConfig):fixmeAny;
     export function map(func:Function):void;
-    export function route(name:string, handler?: any, routeParams?:MapConfig);
+    export function route(name:string, handler?: any, routeParams?:MapConfig):fixmeAny;
     export function path(route:string, params?:Object):string;
     export function url(route:string):string;
     export function go(route:string, params?:Object):void;
@@ -89,8 +89,8 @@ declare module Router {
 }
 
 interface RouteController {
-    render(route:string);
-    extend(routeParams: Router.MapConfig);
+    render(route:string):fixmeAny;
+    extend(routeParams: Router.MapConfig):fixmeAny;
 }
 
 declare var RouteController:RouteController;

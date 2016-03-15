@@ -1,21 +1,26 @@
+// check-implicit-any magic comment: noImplicitAny
+
 // Utility definitions not specific to Relational Spreadsheets.
 
 // Now that we're no longer using custom classes, we might be able to use plain
 // JSON, but we've written this already...
 
-
 namespace Objsheets {
 
-    function wrapKey(k) {
+  // In principle, what we'd like is "V can be anything, but EJSONKeyedMap is
+  // only an EJSON.CustomType if V extends EJSONable".  But we can't express
+  // this precisely, and we only use this with V extends EJSONable anyway.
+  export class EJSONKeyedMap<K extends EJSONable, V extends EJSONable> {
+    private obj: {[wrappedKey: string]: V};
+
+    private wrapKey(k: K): string {
       return "map_" + EJSON.stringify(k);
     };
-    function unwrapKey(k) {
+    private unwrapKey(k: string): K {
       return EJSON.parse(k.substr(4));
     };
-  export class EJSONKeyedMap {
-    public obj;
 
-    constructor(ents : fixmeAny = []) {
+    constructor(ents: [K, V][] = []) {
       // Future: Change to ECMAScript 6 Map when supported by all relevant JS
       // engines and CoffeeScript.
       this.obj = {};
@@ -24,281 +29,179 @@ namespace Objsheets {
       }
     }
 
-
-
-    public get(k) {
-      return this.obj[wrapKey(k)];
+    public get(k: K): V {
+      return this.obj[this.wrapKey(k)];
     }
 
-    public set(k, v) {
-      this.obj[wrapKey(k)] = v;
+    public set(k: K, v: V): void {
+      this.obj[this.wrapKey(k)] = v;
     }
 
-    public "delete"(k) {
-      delete this.obj[wrapKey(k)];
+    public "delete"(k: K): void {
+      delete this.obj[this.wrapKey(k)];
     }
 
-    public size() {
+    public size(): number {
       return _.size(this.obj);
     }
 
-    public keys() {
-      var _results;
-      _results = [];
+    public keys(): K[] {
+      let keys: K[] = [];
       for (let wk in this.obj) {
-        _results.push(unwrapKey(wk));
+        keys.push(this.unwrapKey(wk));
       }
-      return _results;
+      return keys;
     }
 
-    public entries() {
-      var _results;
-      _results = [];
+    public entries(): [K, V][] {
+      let entries: [K, V][] = [];
       for (let wk in this.obj) {
         let v = this.obj[wk];
-        _results.push([unwrapKey(wk), v]);
+        entries.push([this.unwrapKey(wk), v]);
       }
-      return _results;
+      return entries;
     }
 
-    public shallowClone() {
+    public shallowClone(): EJSONKeyedMap<K, V> {
       return new EJSONKeyedMap(this.entries());
     }
 
-    public typeName() {
+    public typeName(): string {
       return "EJSONKeyedMap";
     }
 
-    // Note, this only works if the values are EJSON-compatible.
-
-    public toJSONValue() {
+    public toJSONValue(): JSONable {
       return EJSON.toJSONValue(this.obj);
     }
 
-    public static fromJSONValue(json) {
-      let m = new EJSONKeyedMap();
+    public static fromJSONValue(json: any): EJSONKeyedMap<any, any> {
+      let m = new EJSONKeyedMap<any, any>();
       m.obj = EJSON.fromJSONValue(json);
       return m;
     }
   }
   EJSON.addType("EJSONKeyedMap", EJSONKeyedMap.fromJSONValue);
 
-  export class EJSONKeyedSet {
-    public map;
+  export class EJSONKeyedSet<E extends EJSONable> {
+    private map: EJSONKeyedMap<E, boolean>;
 
-    constructor(els : fixmeAny = []) {
-      this.map = new EJSONKeyedMap();
+    constructor(els: E[] = []) {
+      this.map = new EJSONKeyedMap<E, boolean>();
       for (let x of els) {
         this.add(x);
       }
     }
 
-    public has(x) {
+    public has(x: E): boolean {
       return !!this.map.get(x);
     }
 
-    public hasAll(s) {
+    public hasAll(s: EJSONKeyedSet<E>): boolean {
       return forall(s.elements(), (x) => this.has(x));
     }
 
-    public add(x) {
+    public add(x: E): void {
       this.map.set(x, true);
     }
 
-    public "delete"(x) {
+    public "delete"(x: E): void {
       this.map["delete"](x);
     }
 
-    public size() {
+    public size(): number {
       return this.map.size();
     }
 
-    public elements() {
+    public elements(): E[] {
       return this.map.keys();
     }
 
-    public shallowClone() {
+    public shallowClone(): EJSONKeyedSet<E> {
       return new EJSONKeyedSet(this.elements());
     }
 
-    public typeName() {
+    public typeName(): string {
       return "EJSONKeyedSet";
     }
 
-    public toJSONValue() {
+    public toJSONValue(): JSONable {
       return this.map.toJSONValue();
     }
 
-    public static fromJSONValue(json) {
-      let s = new EJSONKeyedSet();
+    public static fromJSONValue(json: any): EJSONKeyedSet<any> {
+      let s = new EJSONKeyedSet<any>();
       s.map = EJSONKeyedMap.fromJSONValue(json);
       return s;
     }
   }
   EJSON.addType("EJSONKeyedSet", EJSONKeyedSet.fromJSONValue);
 
-  export class EJSONSmallSet {
-    public els;
-
-    constructor(els : fixmeAny = [], _trustMeDistinct : fixmeAny = false) {
-      if (_trustMeDistinct) {
-        this.els = els.slice(0);
-      } else {
-        this.els = [];
-        for (let x of els) {
-          this.add(x);
-        }
-      }
-    }
-
-    public has(x) {
-      return exists(this.els, (y) => EJSON.equals(x, y));
-    }
-
-    public hasAll(s) {
-      return forall(this.els, (x) => this.has(x));
-    }
-
-    public add(x) {
-      if (!this.has(x)) {
-        this.els.push(x);
-      }
-    }
-
-    public "delete"(x) {
-      this.els = this.els.filter((y) => !EJSON.equals(x, y));
-    }
-
-    public elements() {
-      return this.els;
-    }
-
-    public shallowClone() {
-      return new EJSONSmallSet(this.els, true);
-    }
-
-    public typeName() {
-      return "EJSONSmallSet";
-    }
-
-    public toJSONValue() {
-      return this.els;
-    }
-
-    public static fromJSONValue(json) {
-      return new EJSONSmallSet(json, true);
-    }
-  }
-  EJSON.addType("EJSONSmallSet", EJSONSmallSet.fromJSONValue);
-
-  //@EJSONKeyedSet = EJSONSmallSet
-
-  export class EJSONKeyedMapToSet {
-    public map;
-
-    constructor() {
-      this.map = new EJSONKeyedMap();
-    }
-
-    public add(k, v) {
-      let s = this.map.get(k);
-      if (s == null) {
-        s = new EJSONKeyedSet();
-        this.map.set(k, s);
-      }
-      s.add(v);
-    }
-
-    public "delete"(k, v) {
-      let s = this.map.get(k);
-      if (s != null) {
-        s["delete"](v);
-        if (s.elements().length === 0) {
-          this.map["delete"](k);
-        }
-      }
-    }
-
-    public keys() {
-      return this.map.keys();
-    }
-
-    public has(k, v) {
-      var s;
-      return ((s = this.map.get(k)) != null) && s.has(v);
-    }
-
-    public elementsFor(k) {
-      return fallback(this.map.get(k) != null ? this.map.get(k).elements() : null, []);
-    }
-  }
-
-  export class Tree {
-    constructor(public root, public subtrees : fixmeAny = []) {}
+  export class Tree<T extends EJSONable> {
+    constructor(public root: T, public subtrees: Tree<T>[] = []) {}
 
     //# applies op to the root of each subtree
 
-    public map(op) {
+    public map(op: (x: T) => T): Tree<T> {
       return new Tree(op(this.root), this.subtrees.map((s) => s.map(op)));
     }
 
-    public filter(pred) {
+    public filter(pred: (x: T) => boolean): Tree<T> {
       return pred(this.root) ? new Tree(this.root, (this.subtrees.map((s) => s.filter(pred))).filter((x) => x != null)) : null;
     }
 
-    public find(value) {
+    public find(value: T): Tree<T> {
       return this.findT((n) => n.root === value);
     }
 
-    public findT(pred) {
-      var n;
+    public findT(pred: (t: Tree<T>) => boolean): Tree<T> {
       if (pred(this)) {
         return this;
       } else {
         for (let s of this.subtrees) {
-          if ((n = s.findT(pred)) != null) {
+          let n = s.findT(pred);
+          if (n != null) {
             return n;
           }
         }
       }
     }
 
-    public typeName() {
+    public typeName(): string {
       return "Tree";
     }
 
-    public toJSONValue() {
-      return <JSONable>{
-        root: this.root,
+    public toJSONValue(): JSONable {
+      return {
+        root: EJSON.toJSONValue(this.root),
         subtrees: this.subtrees.map((s) => s.toJSONValue())
       };
     }
 
-    public static fromJSONValue(json) {
-      return new Tree(json.root, json.subtrees.map((s) => Tree.fromJSONValue(s)));
+    public static fromJSONValue(json: any) {
+      return new Tree(json.root, json.subtrees.map((s: any) => Tree.fromJSONValue(s)));
     }
   }
   EJSON.addType("Tree", Tree.fromJSONValue);
 
-  export class Memo {
-    public values;
+  export class Memo<V> {
+    private values: {[k: string]: V};
 
     constructor() {
       this.values = {};
     }
 
-    public clear() {
+    public clear(): void {
       this.values = {};
     }
 
-    public get(key, recompute) {
-      var v;
-      return (v = this.values[key]) != null ? v : this.values[key] = recompute();
+    public get(key: string, recompute: () => V): V {
+      let v = this.values[key];
+      return v != null ? v : this.values[key] = recompute();
     }
   }
 
   // helper functions
-  export function forall(list, pred) {
+  export function forall<T>(list: T[], pred: (x: T) => boolean): boolean {
     for (let x of list) {
       if (!pred(x)) {
         return false;
@@ -306,7 +209,7 @@ namespace Objsheets {
     }
     return true;
   }
-  export function exists(list, pred) {
+  export function exists<T>(list: T[], pred: (x: T) => boolean): boolean {
     for (let x of list) {
       if (pred(x)) {
         return true;
@@ -314,25 +217,25 @@ namespace Objsheets {
     }
     return false;
   }
-  export function without(list, item) {
+  export function without<T>(list: T[], item: T): T[] {
     return list.filter((x) => x !== item);
   }
 
-  export function zip(...args) {
-    let lengthArray = args.map((arr) => arr.length);
-    let length = Math.min.apply(Math, lengthArray);
-    return _.range(0, length).map((i) => args.map((arr) => arr[i]));
+  // We only call this with two arguments, so let's use the simpler
+  // implementation for now. ~ Matt 2016-03-14
+  export function zip<A, B>(arr1: A[], arr2: B[]): [A, B][] {
+    let length = Math.min(arr1.length, arr2.length);
+    // TypeScript does not infer the type argument of "map" from the contextual
+    // return type.
+    // https://github.com/Microsoft/TypeScript/issues/1212
+    return _.range(0, length).map<[A, B]>((i) => [arr1[i], arr2[i]]);
   }
 
-  export function set(x?) {
+  export function set<E extends EJSONable>(x?: E[]): EJSONKeyedSet<E> {
     return new EJSONKeyedSet(x);
   }
-  export function T(...args) {
-    return (function(func, args, ctor) {
-      ctor.prototype = func.prototype;
-      var child = new ctor, result = func.apply(child, args);
-      return Object(result) === result ? result : child;
-    })(Tree, args, function(){});
+  export function T<T extends EJSONable>(root: T, subtrees?: Tree<T>[]) {
+    return new Tree(root, subtrees);
   }
 
 }
