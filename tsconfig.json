@@ -1,7 +1,8 @@
 {
     "compilerOptions": {
         "sourceMap": true,
-        "noImplicitAny": true
+        "noImplicitAny": true,
+        "target": "es5"
     },
     "exclude": [
         "tests",

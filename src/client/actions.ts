@@ -22,7 +22,7 @@ namespace Objsheets {
     if (data.onObjectHeader) {
       return null;
     }
-    let col = getColumn(data.columnId);
+    let col = getColumnWithSpares(data.columnId);
     let formula = col != null ? col.formula : null;
     return formula == null ? null : EJSON.equals(formula, DUMMY_FORMULA) ? "" : stringifyFormula(col.parent, formula);
   }
@@ -130,7 +130,7 @@ namespace Objsheets {
   });
 
   Template["changeColumn"].helpers({
-    //col: -> getColumn(@columnId)
+    //col: -> getColumnWithSpares(@columnId)
     isFormulaModified: () => newFormulaStr.get() !== origFormulaStr.get(),
     canSave: () => {
       // Looks like this can be called before the autorun that sets newFormulaInfo.  Grr.
@@ -140,11 +140,11 @@ namespace Objsheets {
       return stringifyColumnRef([this.columnId, !this.onObjectHeader]);
     },
     keyColumnName: function() {
-      let c = getColumn(this.columnId);
+      let c = getColumnWithSpares(this.columnId);
       return this.onObjectHeader && c.type !== "_token" ? c.fieldName : null;
     },
     typeMenu: function() {
-      let col = getColumn(this.columnId);
+      let col = getColumnWithSpares(this.columnId);
       let items: fixmeAny = [];
       if (col.formula != null) {
         // Note: Inferred type should match c.type if c.specifiedType is null and
@@ -159,24 +159,34 @@ namespace Objsheets {
       return new HtmlSelect(items, fallback(col.specifiedType, "auto"));
     },
     backendMenu: function() {
-      return new HtmlSelect([new HtmlOption("state", "editable"), new HtmlOption("computed", "computed by formula")], getColumn(this.columnId).formula != null ? "computed" : "state");
+      return new HtmlSelect([new HtmlOption("state", "editable"), new HtmlOption("computed", "computed by formula")], getColumnWithSpares(this.columnId).formula != null ? "computed" : "state");
     },
     isComputed: function() {
-      return getColumn(this.columnId).formula != null;
+      return getColumnWithSpares(this.columnId).formula != null;
     },
     newFormulaInfo: () => newFormulaInfo.get(),
     isFormulaDebuggerOpen: () => isFormulaDebuggerOpen.get(),
     contextText: function() {
-      let col = getColumn(this.columnId);
-      return col.isObject ? fallback(objectNameWithFallback(getColumn(col.parent)), "(unnamed)") : null;  // i.e., we are editing the formula of a key column
+      let col = getColumnWithSpares(this.columnId);
+      if (!col.isObject)
+        return null;
+      // We are editing the formula of a key column.
+      if (col.parent == rootColumnId)
+        // If a similar case shows up anywhere else, consider making a helper function.
+        return "sheet";
+      return fallback(objectNameWithFallback(getColumnWithSpares(col.parent)), "(unnamed)");
     },
     // Color-coding is much less useful with non-rainbow palettes.
     //contextColorIndex: ->
-    //  col = getColumn(@columnId)
+    //  col = getColumnWithSpares(@columnId)
     //  if col.isObject
     //    colorIndexForDepth(columnDepth(col.parent))
     //  else null
-    // Should only be called when onObjectHeader = true
+    shouldShowReferenceDisplayColumnMenu: function() {
+      // Just don't allow this for spare columns: too tricky and not useful.
+      return this.onObjectHeader && columnIdIsReal(this.columnId);
+    },
+    // Should only be called when shouldShowReferenceDisplayColumnMenu() == true
     referenceDisplayColumnMenu: function() {
       let col = getColumn(this.columnId);
       let defaultColId = defaultReferenceDisplayColumn(col);
@@ -440,46 +450,51 @@ namespace Objsheets {
   Template["changeColumn"].events({
     "change #changeColumn-backend": function(event: fixmeAny, template: fixmeAny) {
       let newFormula = getValueOfSelectedOption(template, "#changeColumn-backend") === "computed" ? DUMMY_FORMULA : null;  //changeColumn-backend') == 'computed'
-      let col = getColumn(this.columnId);
-      // With these conditions (plus the fact that DUMMY_FORMULA returns empty sets),
-      // one can toggle between an empty state column and DUMMY_FORMULA without warnings.
-      // If we add the ability to undo this operation, we can probably remove the warnings
-      // (except the numErroneousFamilies one, which Matt believes deserves more respect
-      // in general).
-      if ((newFormula != null) && stateColumnHasValues(this.columnId) && !window.confirm("This will delete all existing cells in the column.  Are you sure?")) {
-        selectOptionWithValue(template, "#changeColumn-backend", "state");  //changeColumn-backend', 'state')
-        return;
-      }
-      if ((newFormula == null) && !EJSON.equals(col.formula, DUMMY_FORMULA)) {
-        let numErroneousFamilies = Cells.find({
-          column: this.columnId,
-          error: {
-            $exists: true
-          }
-        }).count();
-        let msg: fixmeAny;
-        if (col.typecheckError != null) {
-          msg = "This will delete your formula.  ";
-        } else {
-          msg = "This will take a snapshot of the current computed data and delete your formula.";
-          if (numErroneousFamilies) {
-            msg += `\n\n${numErroneousFamilies} families are currently failing to evaluate; ` + "they will become empty, and you will not be able to distinguish them from " + "families that were originally empty.\n\n";
-          } else {
-            msg += "  ";
-          }
-        }
-        msg += "Are you sure?";
-        if (!window.confirm(msg)) {
-          selectOptionWithValue(template, "#changeColumn-backend", "computed");  //changeColumn-backend', 'computed')
+      if (columnIdIsReal(this.columnId)) {
+        let col = getColumnWithSpares(this.columnId);
+        // With these conditions (plus the fact that DUMMY_FORMULA returns empty sets),
+        // one can toggle between an empty state column and DUMMY_FORMULA without warnings.
+        // If we add the ability to undo this operation, we can probably remove the warnings
+        // (except the numErroneousFamilies one, which Matt believes deserves more respect
+        // in general).
+        if ((newFormula != null) && stateColumnHasValues(this.columnId) && !window.confirm("This will delete all existing cells in the column.  Are you sure?")) {
+          selectOptionWithValue(template, "#changeColumn-backend", "state");  //changeColumn-backend', 'state')
           return;
+        }
+        if ((newFormula == null) && !EJSON.equals(col.formula, DUMMY_FORMULA)) {
+          let numErroneousFamilies = Cells.find({
+            column: this.columnId,
+            error: {
+              $exists: true
+            }
+          }).count();
+          let msg: fixmeAny;
+          if (col.typecheckError != null) {
+            msg = "This will delete your formula.  ";
+          } else {
+            msg = "This will take a snapshot of the current computed data and delete your formula.";
+            if (numErroneousFamilies) {
+              msg += `\n\n${numErroneousFamilies} families are currently failing to evaluate; ` + "they will become empty, and you will not be able to distinguish them from " + "families that were originally empty.\n\n";
+            } else {
+              msg += "  ";
+            }
+          }
+          msg += "Are you sure?";
+          if (!window.confirm(msg)) {
+            selectOptionWithValue(template, "#changeColumn-backend", "computed");  //changeColumn-backend', 'computed')
+            return;
+          }
         }
       }
       // Server checks for "state column as child of formula column" error.
       // XXX: Disallow converting keyed objects to state?
-      Meteor.call("changeColumnFormula", $$, this.columnId, newFormula, standardServerCallback);
+      createColumnIfSpare(this.columnId, (error, realColumnId) => {
+        if (error) { standardServerCallback(error, null); return; }
+        Meteor.call("changeColumnFormula", $$, realColumnId, newFormula, standardServerCallback);
+      });
     },
     "change #changeColumn-type": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-type': (event, template) ->
-      let col = getColumn(this.columnId);
+      let col = getColumnWithSpares(this.columnId);
       let newSpecifiedType = getValueOfSelectedOption(template, "#changeColumn-type");  //changeColumn-type')
       if (newSpecifiedType === "auto") {
         newSpecifiedType = null;
@@ -491,9 +506,13 @@ namespace Objsheets {
         selectOptionWithValue(template, "#changeColumn-type", col.specifiedType);  //changeColumn-type', col.specifiedType)
         return;
       }
-      Meteor.call("changeColumnSpecifiedType", $$, this.columnId, newSpecifiedType, standardServerCallback);
+      createColumnIfSpare(this.columnId, (error, realColumnId) => {
+        if (error) { standardServerCallback(error, null); return; }
+        Meteor.call("changeColumnSpecifiedType", $$, realColumnId, newSpecifiedType, standardServerCallback);
+      });
     },
     "change #changeColumn-referenceDisplayColumn": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-referenceDisplayColumn': (event, template) ->
+      // No spare columns here.
       let newReferenceDisplayColumn = getValueOfSelectedOption(template, "#changeColumn-referenceDisplayColumn");  //changeColumn-referenceDisplayColumn')
       if (newReferenceDisplayColumn === "auto") {
         newReferenceDisplayColumn = null;
@@ -501,6 +520,7 @@ namespace Objsheets {
       Meteor.call("changeColumnReferenceDisplayColumn", $$, this.columnId, newReferenceDisplayColumn, standardServerCallback);
     },
     "click .saveFormula": function(event: fixmeAny, template: fixmeAny) {
+      // No spare columns here either, as long as spare columns are always state.
       let contextColumnId = getColumn(this.columnId).parent;
       // canSave ensures that this is defined.
       let formula = newFormulaInfo.get().formula;

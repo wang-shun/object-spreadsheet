@@ -191,7 +191,9 @@ namespace Objsheets {
     }
 
     public parent() {
-      let c = getColumn(this.columnId);
+      // getColumnWithSpares to make cellClasses work.
+      // FIXME: Decide whether this class will allow spares.
+      let c = getColumnWithSpares(this.columnId);
       return c && (c.parent != null) ? new CellId({
         columnId: c.parent,
         cellId: cellIdParent(this.cellId)
@@ -306,7 +308,7 @@ namespace Objsheets {
       };
     }
 
-    public add(value: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
+    public add(value: OSValue, callback: MeteorCallback<void>, consumePlaceholder = false) {
       let updates = <fixmeAny>{
         $addToSet: {
           values: value
@@ -321,7 +323,7 @@ namespace Objsheets {
       return this.child(value);
     }
 
-    public remove(value: fixmeAny, callback: fixmeAny = () => {}) {
+    public remove(value: OSValue, callback: MeteorCallback<void>) {
       if (getColumn(this.columnId).isObject) {
         Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
       } else {
@@ -339,7 +341,7 @@ namespace Objsheets {
       }
     }
 
-    public addPlaceholder(callback: fixmeAny = () => {}) {
+    public addPlaceholder(callback: MeteorCallback<void>) {
       // Careful... if we add a Cells entry in a state column with no "values"
       // property, evaluateAll won't automatically add the "values" property,
       // and the missing property will confuse various readers.

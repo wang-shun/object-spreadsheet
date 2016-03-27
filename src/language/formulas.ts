@@ -91,7 +91,11 @@ namespace Objsheets {
     public compiled: fixmeAny;
 
     constructor() {
-      this.goUpMemo = new Memo;
+      this.goUpMemo = new Memo<[ColumnId, ColumnId], number>(
+        ([sourceColId, targetColId]) => {
+          let [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId);
+          return upPath.length - 1;
+        });
       this.compiled = {};
     }
 
@@ -107,11 +111,8 @@ namespace Objsheets {
       }).values : null) || [];
     }
 
-    public calcLevelsUp(sourceColId: fixmeAny, targetColId: fixmeAny) {
-      return this.goUpMemo.get(`${sourceColId}-${targetColId}`, () => {
-        let [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId);
-        return upPath.length - 1;
-      });
+    public calcLevelsUp(sourceColId: ColumnId, targetColId: ColumnId) {
+      return this.goUpMemo.get([sourceColId, targetColId]);
     }
 
     public invalidateSchemaCache() {

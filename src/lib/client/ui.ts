@@ -5,7 +5,7 @@ namespace Objsheets {
   // Future: Make this better.
   export function standardServerCallback(error: fixmeAny, result: fixmeAny) {
     if (error != null) {
-      alert("The operation failed on the server: " + error.message);
+      alert("The operation failed: " + error.message);
     }
   }
 

@@ -269,7 +269,7 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
   vertical-align: middle;
 }
 
-.handsontable td.leaf:not(.vlast) {
+.handsontable td.leaf:not(.vlast):not(.dataPadding) {
   border-bottom-style: dashed;
 }
 
@@ -288,10 +288,6 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
 }
 .handsontable td.dataPadding.selected-object {
   box-shadow: inset 0px 0px 3px 2px #E8E8A0;
-}
-.handsontable td.dataPadding.parent-root {
-  border-right: 1px dashed #CCC;
-  border-bottom: 1px dashed #CCC;
 }
 
 .handsontable td.dataError {

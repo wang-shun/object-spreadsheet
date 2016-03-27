@@ -257,7 +257,7 @@ namespace Objsheets {
         });
         for (let entry of childCells) {
           let [value, childCellData] = entry;
-          fam.add(value);
+          fam.add(value, () => {} /* XXX report errors */);
           insertCells(childColumnId, cellIdChild(cellId, value), childCellData);
         }  // No point in making a map just to expand it again.
       }
