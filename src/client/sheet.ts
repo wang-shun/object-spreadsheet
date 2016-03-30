@@ -158,7 +158,7 @@ namespace Objsheets {
           error = e.message;
         }
       }
-      let vlists = this.subsections.map((subsection: fixmeAny) => subsection.prerenderVlist(cellId));
+      let vlists = this.subsections.map((subsection: ViewSection) => subsection.prerenderVlist(cellId));
       minHeight = Math.max.apply(Math, [1].concat(vlists.map((vlist: fixmeAny) => vlist.minHeight)));
       return new ViewHlist(cellId, minHeight, displayValue, error, vlists);
     }
@@ -167,9 +167,9 @@ namespace Objsheets {
       let cellId = cellIdChild(parentCellId, new SpareValue(spareIndex));
       return new ViewHlist(cellId, 1, null, null,
         this.subsections.map((subsection: fixmeAny) =>
+          new ViewVlist(cellId, 1, [])));
           // We do not need to create an hlist here.  renderVlist will call
           // makeSpareHlist again to reach the minimum height of 1.
-          new ViewVlist(cellId, 1, [])));
     }
 
     public renderVlist(vlist: ViewVlist, height: number) {
