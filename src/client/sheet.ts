@@ -1431,17 +1431,16 @@ namespace Objsheets {
     public getDeleteCommandForCell(c: ViewCell) {
       let qCellId = c.qCellId;
       let col: Column;
-      if (qCellId == null || !qCellIdIsReal(qCellId)) {
-        return null;
-      } else if (c.isPlaceholder) {  // Should only exist in state value columns.
-        let qFamilyId: QFamilyId = {columnId: qCellId.columnId, cellId: cellIdParent(qCellId.cellId)};
+      if (c.isPlaceholder) {
+        // Should only exist in real families in state value columns.
+        let qFamilyId: QFamilyId = {columnId: <ColumnId>qCellId.columnId, cellId: <CellId1>cellIdParent(qCellId.cellId)};
         return {
           name: "Delete cell",
           callback: () => {
             new FamilyId(qFamilyId).removePlaceholder(standardServerCallback);
           }
         };
-      } else if (columnIsState(col = getColumn(qCellId.columnId))) {
+      } else if (qCellId != null && qCellIdIsReal(qCellId) && columnIsState(col = getColumn(qCellId.columnId))) {
         return {
           // This currently gives 'Delete object' for the key of a keyed object
           // (deprecated).  If we wanted that case to say 'Delete cell', we
