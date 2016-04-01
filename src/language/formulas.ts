@@ -284,7 +284,7 @@ namespace Objsheets {
     if (startCellsTset.type === targetColId) {
       result = startCellsTset;
     } else {
-      let numIdStepsToDrop = $$.formulaEngine.goUpMemo.get(`${startCellsTset.type}-${targetColId}`, () => {
+      let numIdStepsToDrop = $$.formulaEngine.goUpMemo.get([startCellsTset.type, targetColId], () => {
         let [upPath, downPath] = findCommonAncestorPaths(startCellsTset.type, targetColId);
         return upPath.length - 1;
       });
