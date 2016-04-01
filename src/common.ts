@@ -100,10 +100,24 @@ namespace Objsheets {
   // cellIdIsReal(qCellId.cellId) does not narrow the type of qCellId.cellId, so
   // define this as well.
   export function qCellIdIsReal(qCellId: QCellIdWithSpares): qCellId is QCellId {
+    // Hmm, it shouldn't actually be possible to have real cells in a spare column.
     return columnIdIsReal(qCellId.columnId) && cellIdIsReal(qCellId.cellId);
   }
   export function qFamilyIdIsReal(qFamilyId: QFamilyIdWithSpares): qFamilyId is QFamilyId {
+    // But it is possible to have families in a spare column with real parent cells.
     return columnIdIsReal(qFamilyId.columnId) && cellIdIsReal(qFamilyId.cellId);
+  }
+
+  export function cellIdNearestRealAncestor(cellId: CellIdWithSpares): CellId1 {
+    let i = cellId.length;
+    while (i > 0 && cellId[i-1] instanceof SpareValue)
+      i--;
+    return <CellId1>cellId.slice(0, i);
+  }
+  export function cellIdIsAncestor(high: CellIdWithSpares, low: CellIdWithSpares): boolean {
+    // Note: if low.length < high.length, the second argument will be short and
+    // EJSON.equals will return false.
+    return EJSON.equals(high, low.slice(0, high.length));
   }
 
   // N.B. Meteor.makeErrorType is the way to make a subclass of Error so that both
@@ -274,6 +288,12 @@ namespace Objsheets {
 
   export function objectNameWithFallback(col: ColumnWithSpares): string {
     return fallback(col.objectName, (col.fieldName != null ? `[${col.fieldName}]` : null));
+  }
+
+  export function columnSiblingIndex(columnId: ColumnId): number {
+    let col = getColumn(columnId);
+    let parentCol = getColumn(col.parent);
+    return parentCol.children.indexOf(col._id);
   }
 
   export function columnDepth(columnId: ColumnId): number {

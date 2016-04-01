@@ -686,6 +686,9 @@ namespace Objsheets {
         separateTables: true,
         rootSpareRows: 10,
         rootSpareCols: 10,
+        // If true, typing in a blank cell directly below the rectangle of an
+        // existing object will add to that object in certain cases; see whereToAdd.
+        addToObjectAbove: true,
         // Developers only (print some logs with timestamps)
         profile: false
       };
@@ -830,6 +833,8 @@ namespace Objsheets {
             classes.push(`ancestor-${refc}`);
           }
         }
+        // Only column header "top" and "below" cells can be edited,
+        // for the purpose of changing the objectName and fieldName respectively.
         if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId
             // We don't have editable columns (either state or updatable views)
             // as descendants of formula columns, so if we can edit this column,
@@ -897,10 +902,6 @@ namespace Objsheets {
             // changes.  Don't use readOnly because that would dim the cells, which
             // we think is more than is appropriate.
             editor: Tracker.nonreactive(() => ActionBar.hasUnsavedData()) ? false : "text",
-            // Only column header "top" and "below" cells can be edited,
-            // for the purpose of changing the objectName and fieldName respectively.
-            //
-            // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
             readOnly: classes.indexOf("editable") == -1 
           };
         },
@@ -1037,13 +1038,9 @@ namespace Objsheets {
                   }
                 } else {
                   if (newVal || getColumnWithSpares(cell.qCellId.columnId).type === "text") {
-                    // For now, when we are filling a real value into a spare
-                    // value cell, the final SpareValue doesn't matter and we
-                    // can just add to the family.  This would change if we
-                    // supported editing of keyed objects (whether state or an
-                    // updatable view!).
-                    let qFamilyId: QFamilyIdWithSpares =
-                      {columnId: cell.qCellId.columnId, cellId: cellIdParent(cell.qCellId.cellId)};
+                    // XXX This will go horribly wrong if you paste multiple
+                    // cells and some of them trigger addToObjectAbove behavior.
+                    let qFamilyId = this.whereToAdd(row, col, cell);
                     // XXX The selection predicate of the last cell to be
                     // processed wins.  A little odd but I don't have a better
                     // idea.
@@ -1054,6 +1051,7 @@ namespace Objsheets {
               }
             }
             catch (e) {
+              standardServerCallback(e, null);
               fail = true;   // Note: this reverts all changes.
                              // The ones that have been applied will propagate back through
                              // Meteor collections.
@@ -1076,6 +1074,7 @@ namespace Objsheets {
             }
 
             let c = fallback(this.getSingleSelectedCell(), {});
+            let [r1, c1, r2, c2] = fallback(this.getSelected(), [null, null, null, null]);
 
             let items = <fixmeAny>{};
 
@@ -1144,7 +1143,7 @@ namespace Objsheets {
                   }
                 };
               }
-              if ((addCommand = this.getAddCommandForCell(c)) != null) {
+              if ((addCommand = this.getAddCommandForCell(r1, c1, c)) != null) {
                 items.add = addCommand;
               }
               if ((deleteCommand = this.getDeleteCommandForCell(c)) != null) {
@@ -1209,7 +1208,7 @@ namespace Objsheets {
       this.hot.loadData(cfg.data);
     }
 
-    public getSelected = () => {
+    public getSelected() {
       var s: fixmeAny;
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
@@ -1221,7 +1220,7 @@ namespace Objsheets {
       }
     }
 
-    public getSingleSelectedCell = () => {
+    public getSingleSelectedCell() {
       let s = this.getSelected();
       if (s == null) {
         // This can happen if no selection was made since page was loaded
@@ -1236,7 +1235,7 @@ namespace Objsheets {
       }
     }
 
-    public getMultipleSelectedCells = () => {
+    public getMultipleSelectedCells() {
       let cells: fixmeAny = [];
       for (let coord of this.hot.getSelectedRange().getAll()) {
         let cell = this.grid[coord.row][coord.col];
@@ -1306,13 +1305,80 @@ namespace Objsheets {
       ] : []);
     }
 
+    // Check a bunch of conditions to guess whether addition of data to a cell
+    // is an attempt to extend the object above, even though the cell does not
+    // actually belong to the object.
+    private whereToAdd(rowNum: number, colNum: number, c: ViewCell): QFamilyIdWithSpares {
+      // Precondition: !cellIdIsReal(c.qCellId.cellId)
+      let columnId = c.qCellId.columnId;
+
+      // In all of the current cases, the index of the final SpareValue doesn't
+      // matter and we can just add to the family.  If the beforeChange handler
+      // wanted to support composite operations where it mattered that this
+      // SpareValue is the same as another one in the operation (e.g.,
+      // explicitly creating an object and setting one of its fields), then we'd
+      // have to be more careful.
+      let origParentCellId = cellIdParent(c.qCellId.cellId);
+      let origQFamilyId: QFamilyIdWithSpares =
+        {columnId: c.qCellId.columnId, cellId: origParentCellId};
+
+      if (!this.options.addToObjectAbove ||
+          // Context menu add commands on a real (filled) cell.
+          cellIdIsReal(c.qCellId.cellId) ||
+          rowNum == 0)
+        return origQFamilyId;
+      let qCellIdAbove = gridCell(this.grid, rowNum-1, colNum).qCellId;
+      if (qCellIdAbove == null)
+        return origQFamilyId;
+
+      // Check whether we are adding a value to the first field of an object
+      // type, in which case we should apply the rest of the logic to the object
+      // type and then set the field afterwards.
+      //
+      // TODO: Make this criterion smarter.  It should apply to all columns that
+      // we are sure are singular, but if columns default to singular, we have
+      // to guess whether the user's intent is to make the column plural.
+      //
+      // FIXME: Look at the layout tree to correctly handle views and spare
+      // columns.  (Though as long as spare columns only appear in top-level
+      // object types, it makes no difference whether this code triggers on
+      // them.)
+      let addingObjectViaFirstField =
+        (columnIdIsReal(columnId) && columnSiblingIndex(columnId) == 0 &&
+         !getColumn(columnId).isObject);
+
+      let familyMemberAbove =
+        addingObjectViaFirstField
+          ? cellIdParent(qCellIdAbove.cellId)
+          : qCellIdAbove.cellId;
+      if (!cellIdIsReal(familyMemberAbove))
+        // If the user wanted to extend the object above, they could have used
+        // familyMemberAbove (or its first field as applicable).  Because they
+        // intentionally left a space, assume they don't want to extend the object.
+        return origQFamilyId;
+      let objectToExtend = cellIdParent(familyMemberAbove);
+
+      // The user definitely expects the added data to belong to the nearest
+      // real ancestor object of the target cell.  If adding it to the object
+      // above would violate this expectation, then we cannot do so.
+      let realAncestor = cellIdNearestRealAncestor(origParentCellId);
+      if (!cellIdIsAncestor(realAncestor, objectToExtend))
+        return origQFamilyId;
+
+      let newParentCellId =
+        addingObjectViaFirstField
+          ? cellIdChild(objectToExtend, new SpareValue(0))  // object created automatically
+          : objectToExtend;
+      return {columnId: columnId, cellId: newParentCellId};
+    }
+
     // get*CommandForCell return a context menu item, but onKeyDown also uses
     // just the callback, so we maintain consistency in what command is offered.
 
-    public getAddCommandForCell(c: ViewCell) {
+    public getAddCommandForCell(rowNum: number, colNum: number, c: ViewCell) {
       let col: ColumnWithSpares;
       if ((c.qCellId != null) && columnIsState(col = getColumnWithSpares(c.qCellId.columnId))) {
-        let qFamilyId: QFamilyIdWithSpares = {columnId: c.qCellId.columnId, cellId: cellIdParent(c.qCellId.cellId)};
+        let qFamilyId = this.whereToAdd(rowNum, colNum, c);
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
           // A token column has only the object UI-column, though we don't set
@@ -1415,11 +1481,12 @@ namespace Objsheets {
         return;
       }
       selectedCell = this.getSingleSelectedCell();
+      let [r1, c1, r2, c2] = fallback(this.getSelected(), [null, null, null, null]);
       if (event.altKey && event.metaKey) {
         Handsontable.Dom.stopImmediatePropagation(event);
       } else if (!event.altKey && !event.ctrlKey && !event.metaKey) {
         if (event.which === 13) {  // Enter
-          let cmd = this.getAddCommandForCell(selectedCell);
+          let cmd = this.getAddCommandForCell(r1, c1, selectedCell);
           if (cmd != null && cmd.allowEnter) {
             Handsontable.Dom.stopImmediatePropagation(event);
             cmd.callback();
@@ -1429,8 +1496,9 @@ namespace Objsheets {
           if (this.hot.getActiveEditor().state !== "STATE_EDITING") {
             Handsontable.Dom.stopImmediatePropagation(event);
             for (let cell of this.getMultipleSelectedCells()) {
-              if (this.getDeleteCommandForCell(cell) != null) {
-                this.getDeleteCommandForCell(cell).callback();
+              let cmd = this.getDeleteCommandForCell(cell);
+              if (cmd != null) {
+                cmd.callback();
               }
             }
           }
@@ -1439,8 +1507,9 @@ namespace Objsheets {
         if (event.which === 13) {  // Ctrl+Enter
           Handsontable.Dom.stopImmediatePropagation(event);
           if (selectedCell != null) {
-            if (this.getAddCommandForCell(selectedCell) != null) {
-              this.getAddCommandForCell(selectedCell).callback();
+            let cmd = this.getAddCommandForCell(r1, c1, selectedCell);
+            if (cmd != null) {
+              cmd.callback();
             }
           }
         }
@@ -1479,8 +1548,9 @@ namespace Objsheets {
               } else if (event.which === 40) {  // Down
                 // Check whether this should be possible (i.e., right children)
                 // before attempting it so we can detect real errors from the server.
-                if (this.getDemoteCommandForColumn(col) != null) {
-                  this.getDemoteCommandForColumn(col).callback();
+                let cmd = this.getDemoteCommandForColumn(col);
+                if (cmd != null) {
+                  cmd.callback();
                 }
               }
             }
