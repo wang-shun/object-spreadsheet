@@ -4,6 +4,8 @@
     "**/.git": true,
     "**/.DS_Store": true,
     ".meteor": true,
+    "**/*.ts.js": true,
+    "**/*.ls.js": true
   },
   "editor.tabSize": 2
 }

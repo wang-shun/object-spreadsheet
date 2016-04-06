@@ -141,7 +141,7 @@ namespace Objsheets {
 
     //# applies op to the root of each subtree
 
-    public map(op: (x: T) => T): Tree<T> {
+    public map<S extends EJSONable>(op: (x: T) => S): Tree<S> {
       return new Tree(op(this.root), this.subtrees.map((s) => s.map(op)));
     }
 

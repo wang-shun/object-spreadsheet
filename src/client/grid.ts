@@ -1,6 +1,5 @@
 // Grid utilities
 
-
 namespace Objsheets {
 
   export class ViewCell {
@@ -31,7 +30,8 @@ namespace Objsheets {
 
   // Mutate "orig" by adding "extension" at the bottom.
   // This would be a good place to add some assertions...
-  export function gridVertExtend(orig: fixmeAny, extension: fixmeAny) {
+  export function gridVertExtend(orig: fixmeAny, extension: fixmeAny[][]) {
+    if (orig.length > 0) assert(() => extension.every((x) => x.length == orig[0].length))
     for (let row of extension) {
       orig.push(row);
     }

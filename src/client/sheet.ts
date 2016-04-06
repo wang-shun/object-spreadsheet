@@ -46,6 +46,17 @@ namespace Objsheets {
     return type === "_unit" ? ["centered"] : [];
   }
 
+  class LayoutNode implements EJSON.CustomType {
+    public spareColumns = 0;
+    public separatorColumns = 0;
+    
+    constructor(public columnId: string) { }
+    // Not actually going to serialize this, but I want to use it in a tree,
+    // which unfortunately requires it to be EJSONable.  ~ Shachar 04-05-2016
+    public toJSONValue(): JSONable { return {columnId: this.columnId}; }
+    public typeName() {return "LayoutNode"; }
+  }
+
   class ViewVlist {
     constructor(public parentCellId: fixmeAny, public minHeight: fixmeAny, public hlists: fixmeAny, public numPlaceholders?: fixmeAny, public error?: fixmeAny) {}
   }
@@ -62,14 +73,13 @@ namespace Objsheets {
     public width: fixmeAny;
     public leftEdgeSingular: fixmeAny;
     public rightEdgeSingular: fixmeAny;
-    public extraColClassBefore: fixmeAny;
-    public subsections: fixmeAny;
-    public headerHeightBelow: fixmeAny;
-    public amRootWithSeparateTables: fixmeAny;
-    public headerMinHeight: fixmeAny;
+    public subsections: ViewSection[];
+    // headerHeightBelow and headerMinHeight refer to the expanded header.
+    public headerHeightBelow: number;
+    public headerMinHeight: number;
 
-    constructor(public layoutTree: fixmeAny, public options: fixmeAny = {}) {
-      this.columnId = this.layoutTree.root;
+    constructor(public layoutTree: Tree<LayoutNode>, public options: fixmeAny = {}) {
+      this.columnId = this.layoutTree.root.columnId;
       this.col = getColumn(this.columnId);
       // Typechecking should always fill in a type, even 'error'.
       if (!((this.col != null) && (this.col.type != null))) {
@@ -85,26 +95,17 @@ namespace Objsheets {
       this.width = (this.col.type !== "_token" ? 1 : 0) + (this.showBullets ? 1 : 0);
       this.leftEdgeSingular = true;
       this.rightEdgeSingular = true;
-      // field index -> string or null (class of extra column before this field)
-      this.extraColClassBefore = [];
       this.subsections = [];
-      // @headerHeightBelow and @headerMinHeight refer to the expanded header.
       this.headerHeightBelow = 2;  // fieldName, type
-      this.amRootWithSeparateTables = this.options.separateTables && this.columnId === rootColumnId;
       this.layoutTree.subtrees.forEach((sublayout: fixmeAny, i: fixmeAny) => {
         let subsection = new ViewSection(sublayout, this.options);
         this.subsections.push(subsection);
-        let nextLeftEdgeSingular = subsection.relationSingular && subsection.leftEdgeSingular;
-        let extraColClass = this.options.separateTables && this.col._id === rootColumnId && i > 0 ? "tableSeparator" : this.options.sepcols && !this.rightEdgeSingular && !nextLeftEdgeSingular ? "separator" : null;
-        this.extraColClassBefore.push(extraColClass);
-        if (extraColClass != null) {
-          this.width++;
-        }
         this.width += subsection.width;
         this.headerHeightBelow = Math.max(this.headerHeightBelow, subsection.headerMinHeight);
-        this.rightEdgeSingular = subsection.relationSingular && subsection.rightEdgeSingular;
+        this.rightEdgeSingular = subsection.rightEdgeSingular && subsection.relationSingular;
       });
-      this.headerMinHeight = (this.col.isObject && !this.amRootWithSeparateTables) + this.headerHeightBelow;
+      this.width += this.layoutTree.root.spareColumns + this.layoutTree.root.separatorColumns;
+      this.headerMinHeight = (this.col.isObject /*&& !this.amRootWithSeparateTables*/ ? 1 : 0) + this.headerHeightBelow;
       if (this.col.isObject) {
         // Affects empty sheet when @options.separateTables = true.
         this.headerMinHeight = Math.max(this.headerMinHeight, 3);
@@ -203,6 +204,7 @@ namespace Objsheets {
           grid[0][0].fullText = "Error: " + vlist.error;
         }
       }
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
       return grid;
     }
 
@@ -289,23 +291,13 @@ namespace Objsheets {
       }
       // Subsections
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
-        if (this.extraColClassBefore[i] != null) {
-          let extraCells = gridMergedCell(height, 1, "", [this.extraColClassBefore[i]]);
-          if (this.extraColClassBefore[i] === "separator") {
-            // Include separator cells in object region highlighting (but for now,
-            // not table separator cells for the root object).  Do not set qCellId
-            // as that would allow "Delete object", which would be a little
-            // surprising.
-            extraCells[0][0].ancestorQCellId = fallback(qCellId, ancestorQCellId);
-          }
-          gridHorizExtend(grid, extraCells);
-        }
         let subsectionGrid =
           (hlist == null)
             ? subsection.renderHlist(null, ancestorQCellId, height)
             : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding"]))
       return grid;
     }
 
@@ -314,7 +306,7 @@ namespace Objsheets {
     // If !expanded, then the requested height should always be 3.  Leaves render
     // at height 2 anyway.
 
-    public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: fixmeAny) {
+    public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: EJSONKeyedMap<string, string>) {
       // Part that is always the same.
       var fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
       let myDepthClass = "rsHeaderDepth" + this.colorIndexForDepth(this.col.isObject ? depth : depth - 1);
@@ -356,10 +348,15 @@ namespace Objsheets {
         gridHorizExtend(grid, [[fieldNameCell], [typeCell]]);
       }
 
-      if (!this.col.isObject) {
-        return grid;
+      if (this.col.isObject) {
+        grid = this.renderFieldHeaders(grid, expanded, height, depth, typeColors, myColorClass);
       }
-
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding"]))
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
+      return grid;
+    }
+  
+    private renderFieldHeaders(grid: any, expanded: boolean, height: number, depth: number, typeColors: EJSONKeyedMap<string,string>, colorClass: string) {
       // At this point, height should be at least 3.
       let currentHeight = 2;  // should always be 2 or height
       // "Corner" here is the upper left corner cell, which actually spans all the
@@ -369,7 +366,7 @@ namespace Objsheets {
         if (!isFinal) {
           classes.push("rsHeaderNonfinal");
         }
-        classes.push(myColorClass);
+        classes.push(colorClass);
         let corner = gridMergedCell(height - 2, grid[0].length, fallback(this.col.objectName, ""), classes);
         if (grid[0].length > 0) {
           corner[0][0].columnId = this.columnId;
@@ -377,32 +374,19 @@ namespace Objsheets {
           corner[0][0].kind = "top";
         }
         gridVertExtend(corner, grid);
-        grid = corner;
         currentHeight = height;
+        return corner;
       };
 
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
-        if (this.extraColClassBefore[i] != null) {
-          if (this.extraColClassBefore[i] === "tableSeparator" && currentHeight === 2) {
-            // Close off the corner for the root object so we can draw a complete
-            // table separator column.
-            makeCorner(true);
-          }
-          let cssClasses = [this.extraColClassBefore[i]];
-          if (this.extraColClassBefore[i] !== "tableSeparator") {
-            cssClasses.push(myColorClass);
-          }
-          let gridExtraCol = gridMergedCell(currentHeight, 1, "", cssClasses);
-          gridHorizExtend(grid, gridExtraCol);
-        }
         let subHeight = expanded ? this.headerHeightBelow : 3;
         let subsectionGrid = subsection.renderHeader(expanded, subHeight, depth + 1, typeColors);
         if (currentHeight === 2 && subsectionGrid.length > 2) {
-          makeCorner(false);  // may increase currentHeight so next condition holds
+          grid = makeCorner(false);  // may increase currentHeight so next condition holds
         }
         if (subsectionGrid.length < currentHeight) {
-          let cssClasses = [myColorClass];
-          if (i < this.subsections.length - 1 && !this.amRootWithSeparateTables) {
+          let cssClasses = [colorClass];
+          if (i < this.subsections.length - 1) {
             cssClasses.push("rsHeaderNonfinal");
           }
           let paddingGrid = gridMergedCell(currentHeight - subsectionGrid.length, subsection.width, "", cssClasses);
@@ -412,7 +396,7 @@ namespace Objsheets {
         gridHorizExtend(grid, subsectionGrid);
       });
       if (currentHeight === 2) {
-        makeCorner(true);
+        grid = makeCorner(true);
       }
       return grid;
     }
@@ -538,21 +522,20 @@ namespace Objsheets {
       $$.call("defineColumn", parentId, index, nextAvailableColumnName("value"), formula != null ? null : DEFAULT_STATE_FIELD_TYPE, isObject, null, formula, view != null ? view.id : null, standardServerCallback);  // specifiedType  // isObject  // objectName: when it is applicable, [fieldName] is OK  // formula
     }
   }
-
+  
   export class ClientView {
-    public options: fixmeAny;
+    //public options: fixmeAny;
     public hot: fixmeAny;
     public savedSelection: fixmeAny;
-    public layoutTree: fixmeAny;
-    public mainSection: fixmeAny;
+    public layoutTree: Tree<LayoutNode>;
+    public mainSection: ViewSection;
     public qCellIdToGridCoords: fixmeAny;
     public grid: fixmeAny;
     public colClasses: fixmeAny;
     public cellClasses: fixmeAny;
     private pending: Array<String>;
 
-    constructor(public view: fixmeAny) {
-      this.options = {
+    public options = {
         // Show type row in header
         // Currently shown, otherwise users too often forget to set the type.
         // Consider turning this off when we guess the type based on entered data.
@@ -580,6 +563,7 @@ namespace Objsheets {
         profile: false
       };
 
+    constructor(public view: fixmeAny) {
       this.headerExpanded = new ReactiveVar(this.options.headerInitiallyExpanded);
       this.hot = null;
       this.savedSelection = null;
@@ -589,8 +573,19 @@ namespace Objsheets {
     }
 
     public reload() {
-      this.layoutTree = this.view.def().layout;
+      this.layoutTree = this.buildLayoutTree(this.view.def().layout);
       this.mainSection = new ViewSection(this.layoutTree, this.options);
+    }
+    
+    private buildLayoutTree(columnIds: Tree<string>): Tree<LayoutNode> {
+      var t = columnIds.map((columnId) => new LayoutNode(columnId));
+      t.subtrees.forEach((s, i) => {
+        if (i == t.subtrees.length - 1)
+          s.root.spareColumns = 1;
+        else
+          s.root.separatorColumns = 1;
+      });
+      return t;
     }
 
     public hotConfig() {
@@ -602,7 +597,7 @@ namespace Objsheets {
       let hlist = this.mainSection.prerenderHlist([], "");
       // XXX This is in addition to any placeholders.  Desirable?
       hlist.minHeight += this.options.rootSpareRows;
-      let typeColors = new EJSONKeyedMap();
+      let typeColors = new EJSONKeyedMap<string,string>();
       if (this.options.colorReferences) {
         this.mainSection.findTypesToColor(typeColors);
         this.mainSection.assignTypeColors(0, typeColors);
@@ -676,7 +671,7 @@ namespace Objsheets {
       this.colClasses = _.range(0, grid[0].length).map((col) => {
         let colCls: fixmeAny = null;
         for (let row = 0; row < grid.length; row++) {
-          for (let cls of grid[row][col].cssClasses) {
+          for (let cls of (grid[row][col] || {}).cssClasses || []) {
             if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator") {
               // assert (!colCls? || colCls == cls)
               colCls = cls;
@@ -875,10 +870,9 @@ namespace Objsheets {
               }
             }
             catch (e) {
-              fail = true;   // Note: this reverts all changes.
+              fail = true;   // Note: this reverts all changes to Handsontable.
                              // The ones that have been applied will propagate back through
-                             // Meteor collections.
-            }
+            }                // Meteor collections.
           }
           
           if (fail) return false;
@@ -985,11 +979,11 @@ namespace Objsheets {
             }
 
             return {
-              items: items  // end of build callback  // contextMenu  // Handsontable config object
+              items: items  
             };
-          }
-        }
-      };
+          }    // end of build callback
+        }    // contextMenu
+      };   // Handsontable config object
     }
 
     public hotCreate(domElement: fixmeAny) {

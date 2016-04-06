@@ -1,4 +1,11 @@
 # If you add things, please comment the reason! ~ Matt 2016-02-26
 
+# For standalone version (I don't intend to commit this to main branch,
+# but haven't broken it out yet ~ Shachar 2016-03-04)
+*.ts.js
+*.coffee.js
+*.ls.js
+*.jison.js
+
 # Mac OS X garbage file
 .DS_Store
