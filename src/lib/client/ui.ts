@@ -3,7 +3,7 @@ namespace Objsheets {
   Template.registerHelper("not", (x: fixmeAny) => !x);
 
   // Future: Make this better.
-  export function standardServerCallback(error: fixmeAny, result: fixmeAny) {
+  export function standardServerCallback(error: Error, result: any) {
     if (error != null) {
       alert("The operation failed on the server: " + error.message);
     }

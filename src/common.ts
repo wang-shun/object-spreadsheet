@@ -22,6 +22,9 @@ namespace Objsheets {
   // subtyping is structural, this seems to be equivalent!
   export interface CellId1 extends Array<OSValue> {}
 
+  // Qualified cell id
+  export type QCellId = { columnId: ColumnId, cellId: CellId1 }; 
+
   export var rootCellId: CellId1 = [];
   export function cellIdParent(cellId: CellId1): CellId1 {
     return cellId.slice(0, -1);
@@ -67,7 +70,7 @@ namespace Objsheets {
   // the DB.  If I find a good solution, we could go back to using EJSON custom
   // classes. ~ Matt)
 
-  interface Column {
+  export interface Column {
     _id: ColumnId;
     parent: ColumnId;
     children: ColumnId[];

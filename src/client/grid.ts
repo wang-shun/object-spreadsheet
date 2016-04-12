@@ -45,6 +45,18 @@ namespace Objsheets {
       }
     }
   }
+  
+  export function gridVertStretch(orig: ViewCell[][], height: number) {
+    assert(() => 0 < orig.length && orig.length <= height);
+    if (orig.length < height) {
+      var width = orig[0].length;
+      var deltaHeight = height - orig.length;
+      gridBottomRow(orig).forEach((cell) => cell.rowspan += deltaHeight);
+      for (let i = orig.length; i < height; i++) {
+        orig.push(_.range(0, width).map(() => new ViewCell(null)));
+      }
+    }
+  }
 
   // Return a grid consisting of one "height x width" merged cell and enough dummy
   // 1x1 cells.  You can mutate the upper-left cell as desired.
@@ -58,8 +70,12 @@ namespace Objsheets {
     }
     return grid;
   }
+  
+  export function gridMatrix(height: number, width: number, value: any = "", cssClasses: string[] = []) {
+    return _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(value, 1, 1, cssClasses)));
+  }
 
-  export function gridCell(grid: fixmeAny, row: fixmeAny, col: fixmeAny) {
+  export function gridGetCell(grid: fixmeAny, row: fixmeAny, col: fixmeAny) {
     for (let i = 0; i <= row; i++) {
       for (let j = 0; j <= col; j++) {
         let cell = grid[i][j];
@@ -71,8 +87,8 @@ namespace Objsheets {
     throw new Error(`cell (${row},${col}) does not exist in grid`);
   }
 
-  export function gridBottomRow(grid: fixmeAny) {
-    var _results: fixmeAny;
+  export function gridBottomRow(grid: ViewCell[][]) {
+    var _results: ViewCell[];
     if (grid.length === 0) {
       return [];
     } else {
@@ -80,7 +96,7 @@ namespace Objsheets {
       let j = 0;
       _results = [];
       while (j < grid[i].length) {
-        let cell = gridCell(grid, i, j);
+        let cell = gridGetCell(grid, i, j);
         j += cell.colspan;
         _results.push(cell);
       }

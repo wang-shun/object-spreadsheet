@@ -139,8 +139,18 @@ namespace Objsheets {
   export class Tree<T extends EJSONable> {
     constructor(public root: T, public subtrees: Tree<T>[] = []) {}
 
-    //# applies op to the root of each subtree
-
+    public size(): number {
+      return this.subtrees.reduce((x,y) => x+y.size(), 1);
+    }
+    
+    public forEach(op: (x: T) => void) {
+      op(this.root);
+      this.subtrees.forEach((s) => s.forEach(op));
+    }
+    
+    /**
+     * applies op to the root of each subtree
+     */
     public map<S extends EJSONable>(op: (x: T) => S): Tree<S> {
       return new Tree(op(this.root), this.subtrees.map((s) => s.map(op)));
     }
@@ -166,6 +176,13 @@ namespace Objsheets {
       }
     }
 
+    public toString(): string {
+      if (this.subtrees.length > 0)
+        return `${this.root.toString()}{${this.subtrees.map((s) => s.toString()).join(", ")}}`
+      else
+       return this.root.toString()
+    }
+    
     public typeName(): string {
       return "Tree";
     }

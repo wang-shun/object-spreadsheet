@@ -238,6 +238,8 @@ namespace Objsheets {
     public ref() {
       return new TypedSet(this.columnId, set([this.cellId]));
     }
+
+    public static root = new CellId({columnId: rootColumnId, cellId: []})
   }
 
   export class FamilyId {

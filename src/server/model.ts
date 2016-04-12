@@ -68,6 +68,10 @@ namespace Objsheets {
       return (_ref = [[columnId, col]]).concat.apply(_ref, validChildren.map((c: fixmeAny) => this.getAllColumns(c)));
     }
 
+    /**
+     * Defines a new child column of parentId at given index.
+     * If index == -1, the new column is created as the last child.
+     */
     public defineColumn(parentId: fixmeAny, index: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, isObject: fixmeAny, objectName: fixmeAny, formula: fixmeAny, attrs: fixmeAny) {
       // Future: validate everything
       // Future: validate no fieldName for type _token.  For _unit, there could be borderline use cases.
@@ -78,7 +82,7 @@ namespace Objsheets {
       if (parentCol == null) {
         throw new Meteor.Error("defineColumn-no-parent", "The specified parent column does not exist.");
       }
-      if (!((0 <= index && index <= parentCol.children.length))) {
+      if (!(-1 <= index && index <= parentCol.children.length)) {
         throw new Meteor.Error("defineColumn-index-out-of-range", "Index out of range");
       }
       if (!isObject && (objectName != null)) {
@@ -122,7 +126,8 @@ namespace Objsheets {
         parentCol = this.getColumn(parentId);
         index = 1;
       }
-      parentCol.children.splice(index, 0, thisId);
+      if (index == -1) parentCol.children.push(thisId);
+      else parentCol.children.splice(index, 0, thisId);
       // Meteor is nice for so many things, but not ORM...
       Columns.update(parentCol._id, {
         $set: {
@@ -923,16 +928,23 @@ namespace Objsheets {
       }
     }
 
-    // value == null means add a placeholder.
-    public addCellRecursive(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: fixmeAny) {
-      let col = getColumn(addColumnId);
+    /**
+     * Creates a new cell.
+     * value == null means add a placeholder.
+     * newColumnType != null means create a new child column of 'columnId' and put the value there. 
+     */
+    public addCellRecursive(columnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: boolean, newColumnType?: string) {
+      if (newColumnType != null)
+        columnId = this.defineColumn(columnId, -1, "", "text", false, null, null, {});
+      let col = getColumn(columnId);
       let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
-      let fam = new FamilyId({columnId: addColumnId, cellId: parentCellId});
+      let fam = new FamilyId({columnId: columnId, cellId: parentCellId});
       if (value == null) {
         fam.addPlaceholder();
       } else {
         fam.add(value);
       }
+      if (consumePlaceholder) fam.removePlaceholder();
       // XXX Avoid if we didn't actually change the data model?
       this.invalidateDataCache();
       this.evaluateAll();
@@ -1047,9 +1059,9 @@ namespace Objsheets {
         this.model.recursiveDeleteStateCellNoInvalidate(columnId, cellId);
       });
     },
-    addCellRecursive: (cc: fixmeAny, addColumnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: fixmeAny) => {
+    addCellRecursive: (cc: Tablespace, columnId: ColumnId, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: boolean, newColumnType?: string) => {
       return cc.run(function() {
-        return this.model.addCellRecursive(addColumnId, ancestorQCellId, value, consumePlaceholder);
+        return this.model.addCellRecursive(columnId, ancestorQCellId, value, consumePlaceholder, newColumnType);
       });
     },
     notify: (cc: fixmeAny) => {

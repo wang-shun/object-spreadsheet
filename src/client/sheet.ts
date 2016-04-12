@@ -49,6 +49,8 @@ namespace Objsheets {
   class LayoutNode implements EJSON.CustomType {
     public spareColumns = 0;
     public separatorColumns = 0;
+    public topHeaderMargin = 1;
+    public stretchV = true;
     
     constructor(public columnId: string) { }
     // Not actually going to serialize this, but I want to use it in a tree,
@@ -105,7 +107,7 @@ namespace Objsheets {
         this.rightEdgeSingular = subsection.rightEdgeSingular && subsection.relationSingular;
       });
       this.width += this.layoutTree.root.spareColumns + this.layoutTree.root.separatorColumns;
-      this.headerMinHeight = (this.col.isObject /*&& !this.amRootWithSeparateTables*/ ? 1 : 0) + this.headerHeightBelow;
+      this.headerMinHeight = (this.col.isObject ? this.layoutTree.root.topHeaderMargin : 0) + this.headerHeightBelow;
       if (this.col.isObject) {
         // Affects empty sheet when @options.separateTables = true.
         this.headerMinHeight = Math.max(this.headerMinHeight, 3);
@@ -185,14 +187,8 @@ namespace Objsheets {
           gridVertExtend(grid, gridPlaceholder);
         }
         if (grid.length < height) {
-          if (grid.length === 1) {
-            // Make this row span 'height' rows
-            for (let i = 1; i < height; i++) {
-              grid.push(_.range(0, this.width).map((j) => new ViewCell()));
-            }
-            for (let cell of grid[0]) {
-              cell.rowspan = height;
-            }
+          if (grid.length === 1 && this.layoutTree.root.stretchV) {
+            gridVertStretch(grid, height);
           } else {
             while (grid.length < height)
               gridVertExtend(grid, this.renderHlist(null, ancestorQCellId, 1));
@@ -297,7 +293,7 @@ namespace Objsheets {
             : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
-      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding"]))
+      gridHorizExtend(grid, gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding", "editable"]))
       return grid;
     }
 
@@ -437,21 +433,15 @@ namespace Objsheets {
   }
 
   export class StateEdit {
-    public static parseValue(columnId: fixmeAny, text: fixmeAny) {
-      let type = getColumn(columnId).type;
-      //if typeIsReference(type)
-      //  if (m = /^@(\d+)$/.exec(text))
-      //    wantRowNum = Number.parseInt(m[1])
-      //    for [qCellId, coords] in view.qCellIdToGridCoords.entries()
-      //      if qCellId.columnId == type && coords.dataRow == wantRowNum
-      //        return qCellId.cellId
-      //    throw new Error("Column #{type} contains no cell at row #{wantRowNum}.")
-      return parseValue(type, text);
+    public static typeOf(columnId: ColumnId): OSType {
+      let col = getColumn(columnId);
+      return col.type || col.specifiedType; // corner case: if state column has just been created
+                                            // its 'type' will be set to 'null' in Model.defineColumn.
     }
 
-    public static parseValueUi(columnId: fixmeAny, text: fixmeAny) {
+    public static parseValueUi(type: OSType, text: string) {
       try {
-        return this.parseValue(columnId, text);
+        return parseValue(type, text);
       } catch (e) {
         alert("Invalid value: " + e.message);
         throw e;
@@ -460,16 +450,17 @@ namespace Objsheets {
 
     public static PLACEHOLDER = {};
 
-    public static addCell(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
+    public static addCell(addColumnId: ColumnId, ancestorQCellId: QCellId, enteredValue: string | {}, consumePlaceholder: boolean = false, newType?: OSType, callback: fixmeAny = (() => {})) {
       var newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
-      } else {
-        newValue = this.parseValueUi(addColumnId, enteredValue);
-        if (newValue == null)
-          return;
       }
-      $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder,
+      else {
+        newValue = this.parseValueUi(newType || this.typeOf(addColumnId), <string>enteredValue);
+        if (newValue == null)
+          return;  // TODO: Can this ever happen?  ~ Shachar 04-11-2016 
+      }
+      $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder, newType,
         (error: fixmeAny, result: fixmeAny) => {
           if (error == null) {
             // Try to move the selection to the added cell, once it shows up.
@@ -492,7 +483,7 @@ namespace Objsheets {
     public static modifyCell(qCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = () => {}) {
       var newValue: fixmeAny;
       let cel = new CellId(qCellId);
-      if ((newValue = this.parseValueUi(cel.columnId, enteredValue)) != null) {
+      if ((newValue = this.parseValueUi(this.typeOf(cel.columnId), enteredValue)) != null) {
         cel.value(newValue, (() => {
           $$.call("notify", callback);
         }));
@@ -579,11 +570,15 @@ namespace Objsheets {
     
     private buildLayoutTree(columnIds: Tree<string>): Tree<LayoutNode> {
       var t = columnIds.map((columnId) => new LayoutNode(columnId));
+      t.root.topHeaderMargin = 0;
       t.subtrees.forEach((s, i) => {
         if (i == t.subtrees.length - 1)
           s.root.spareColumns = 1;
         else
           s.root.separatorColumns = 1;
+      });
+      t.forEach((s) => {
+        if (getColumn(s.columnId).isObject) s.stretchV = false;
       });
       return t;
     }
@@ -863,10 +858,23 @@ namespace Objsheets {
                   }
                   //StateEdit.removeCell cell.qCellId, standardServerCallback
                 }
-              } else if ((cell.addColumnId != null) && !cell.isObjectCell) {
-                if (newVal || getColumn(cell.addColumnId).type === "text") {
-                  StateEdit.addCell(cell.addColumnId, cell.ancestorQCellId, newVal, revertingCallback, cell.isPlaceholder);
+              }
+              else {
+                // Placeholder or in spare row / column 
+                let columnId: ColumnId = cell.addColumnId;
+                let obj = this.getContainingObject(row, col);
+                let newType: string = null;
+                if (columnId != null) {        // placeholder or spare row with existing column (add to family)
+                  if (cell.ancestorQCellId.columnId == rootColumnId && //!cell.isObjectCell && !cell.isPlaceholder &&
+                      columnId == getColumn(obj.columnId).children[0]) {
+                    obj = obj.parent();
+                  }
                 }
+                else {                         // spare column (create value field)
+                  columnId = this.getContainingObjectType(row, col);
+                  newType = "text";
+                }
+                StateEdit.addCell(columnId, obj, newVal, cell.isPlaceholder, newType, revertingCallback);
               }
             }
             catch (e) {
@@ -1023,7 +1031,7 @@ namespace Objsheets {
     }
 
     public getSelected = () => {
-      var s: fixmeAny;
+      var s: number[];
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
         [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
@@ -1034,7 +1042,7 @@ namespace Objsheets {
       }
     }
 
-    public getSingleSelectedCell = () => {
+    public getSingleSelectedCell() {
       let s = this.getSelected();
       if (s == null) {
         // This can happen if no selection was made since page was loaded
@@ -1049,7 +1057,7 @@ namespace Objsheets {
       }
     }
 
-    public getMultipleSelectedCells = () => {
+    public getMultipleSelectedCells() {
       let cells: fixmeAny = [];
       for (let coord of this.hot.getSelectedRange().getAll()) {
         let cell = this.grid[coord.row][coord.col];
@@ -1058,6 +1066,56 @@ namespace Objsheets {
         }
       }
       return cells;
+    }
+    
+    public getSelectedContainingObject() {
+      var s: number[];
+      if ((s = this.hot.getSelected()) != null) {
+        let [rowIdx, colIdx, r2, c2] = s;
+        return this.getContainingObject(rowIdx, colIdx);
+      }
+      else return null;
+    }
+
+    public getContainingObject(rowIdx: number, colIdx: number): CellId {
+      var viewCell: ViewCell, columnId: ColumnId, cell: any;
+      while (colIdx > 0 && !(columnId = this.columnIdOf(viewCell = gridGetCell(this.grid, rowIdx, colIdx))))
+        colIdx--;
+      if (viewCell.qCellId) {
+        let cell = new CellId(viewCell.qCellId), col: Column;
+        while (!getColumn(cell.columnId).isObject)
+          cell = cell.parent();
+        return cell;
+      }
+      else if (cell = viewCell.ancestorQCellId) {
+        if (cell.columnId == rootColumnId && rowIdx > 0)
+          return new CellId(gridGetCell(this.grid, rowIdx - 1, colIdx).ancestorQCellId || cell)
+        else
+          return new CellId(cell);
+      }
+    }
+
+    /**
+     * Get the object type ("class") in which the given cell lives.
+     * May look spurious in the presence of getContainingObject, but there
+     * are subtle differences when certain (object) familes are empty.
+     */
+    public getContainingObjectType(rowIdx: number, colIdx: number): ColumnId {
+      var columnId: ColumnId, col: Column;
+      while (colIdx > 0 && !(columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx))))
+        colIdx--;
+      while (!(col = getColumn(columnId)).isObject)
+        columnId = col.parent;
+      return columnId;
+    }
+
+    /**
+     * Looks like this should go into ViewCell? But how to name it?
+     */
+    private columnIdOf(cell: ViewCell) {
+      var cellId: any;
+      return cell.columnId || cell.addColumnId ||
+        ((cellId = cell.qCellId) ? cellId.columnId : null);
     }
 
     public refId(qCellId: fixmeAny) {
@@ -1130,7 +1188,7 @@ namespace Objsheets {
             name: `Add '${objectName}' object here`,
             allowEnter: true,
             callback: () => {
-              StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
+              StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, false, null, standardServerCallback);
             }
           };
         } else if (col.type === "_unit") {
@@ -1147,7 +1205,7 @@ namespace Objsheets {
               name: "Add X here",
               allowEnter: true,
               callback: () => {
-                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, false, null, standardServerCallback);
               }
             };
           }
@@ -1162,7 +1220,7 @@ namespace Objsheets {
               // XXX Share code with the calculation of the "editable" class.
               allowEnter: false,
               callback: () => {
-                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, StateEdit.PLACEHOLDER, standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, StateEdit.PLACEHOLDER, false, null, standardServerCallback);
               }
             };
           }
