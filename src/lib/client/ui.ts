@@ -9,7 +9,7 @@ namespace Objsheets {
     }
   }
 
-  export function standardServerCallbackThen(callback: fixmeAny) {
+  export function standardServerCallbackThen(callback: (error: Error, result: any) => void) {
     return (error: fixmeAny, result: fixmeAny) => {
       standardServerCallback(error, result);
       if (typeof callback === "function") {

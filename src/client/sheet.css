@@ -296,6 +296,11 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
   border-right: 1px dashed #CCC;
   border-bottom: 1px dashed #CCC;
 }
+.handsontable td.spareColumn {
+  border-right: 1px dashed #CCC;
+  border-bottom: 1px dashed #CCC;
+  width: 3em;
+}
 
 .handsontable td.dataError {
   color: #F00;

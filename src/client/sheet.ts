@@ -293,7 +293,8 @@ namespace Objsheets {
             : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
-      gridHorizExtend(grid, gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding", "editable"]))
+      gridHorizExtend(grid, gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", 
+        ["spareColumn", "editable"], {ancestorQCellId: qCellId}));
       return grid;
     }
 
@@ -347,7 +348,7 @@ namespace Objsheets {
       if (this.col.isObject) {
         grid = this.renderFieldHeaders(grid, expanded, height, depth, typeColors, myColorClass);
       }
-      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["dataPadding"]))
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["spareColumn"]))
       gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
       return grid;
     }
@@ -571,11 +572,12 @@ namespace Objsheets {
     private buildLayoutTree(columnIds: Tree<string>): Tree<LayoutNode> {
       var t = columnIds.map((columnId) => new LayoutNode(columnId));
       t.root.topHeaderMargin = 0;
+      t.root.spareColumns = 10;   // magic number?
       t.subtrees.forEach((s, i) => {
         if (i == t.subtrees.length - 1)
           s.root.spareColumns = 1;
-        else
-          s.root.separatorColumns = 1;
+        s.root.separatorColumns = 1;
+        s.root.stretchV = false;
       });
       t.forEach((s) => {
         if (getColumn(s.columnId).isObject) s.stretchV = false;
@@ -632,10 +634,13 @@ namespace Objsheets {
       }
 
       // Add last column that will stretch horizontally
+      // No longer needed when we have the spare table to the right
+      /*
       let sentinel = grid.map((row: fixmeAny) => [new ViewCell("", 1, 1, ["rsSentinel"])]);
       sentinel[0][0].columnId = rootColumnId;
       sentinel[0][0].rowspan = sentinel.length;
       gridHorizExtend(grid, sentinel);
+      */
 
       // Resolve cell cross-references.
       // @ notation disabled; relevant code commented out. ~ Matt 2015-11-10
@@ -730,7 +735,7 @@ namespace Objsheets {
             return _.range(0, this.grid.length).map((i) => 24);
           }
         }).call(this)),
-        stretchH: "last",
+        // stretchH: "last",
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
           var clsRow = this.cellClasses[row]; 
           var classes = clsRow != null ? clsRow[col] : null;
@@ -863,6 +868,7 @@ namespace Objsheets {
                 // Placeholder or in spare row / column 
                 let columnId: ColumnId = cell.addColumnId;
                 let obj = this.getContainingObject(row, col);
+                /**/ assert(() => obj != null, `selection (${row}, ${col}) is not inside any object`); /**/
                 let newType: string = null;
                 if (columnId != null) {        // placeholder or spare row with existing column (add to family)
                   if (cell.ancestorQCellId.columnId == rootColumnId && //!cell.isObjectCell && !cell.isPlaceholder &&
@@ -873,6 +879,7 @@ namespace Objsheets {
                 else {                         // spare column (create value field)
                   columnId = this.getContainingObjectType(row, col);
                   newType = "text";
+                  /**/ assert(() => columnId != null, `selection (${row}, ${col}) is not in any object type`); /**/
                 }
                 StateEdit.addCell(columnId, obj, newVal, cell.isPlaceholder, newType, revertingCallback);
               }
@@ -1079,11 +1086,17 @@ namespace Objsheets {
 
     public getContainingObject(rowIdx: number, colIdx: number): CellId {
       var viewCell: ViewCell, columnId: ColumnId, cell: any;
-      while (colIdx > 0 && !(columnId = this.columnIdOf(viewCell = gridGetCell(this.grid, rowIdx, colIdx))))
-        colIdx--;
+      viewCell = gridGetCell(this.grid, rowIdx, colIdx); columnId = this.columnIdOf(viewCell);
+      if (colIdx > 0 && !columnId) { // skip to adjacent column
+        let viewCell_adj = gridGetCell(this.grid, rowIdx, colIdx - 1),
+            columnId_adj = this.columnIdOf(viewCell_adj);
+        if (columnId_adj) {
+          colIdx--; viewCell = viewCell_adj; columnId = columnId_adj;
+        }
+      }
       if (viewCell.qCellId) {
         let cell = new CellId(viewCell.qCellId), col: Column;
-        while (!getColumn(cell.columnId).isObject)
+        while (!(col = getColumn(cell.columnId)).isObject && col.parent != rootColumnId)
           cell = cell.parent();
         return cell;
       }
@@ -1102,9 +1115,13 @@ namespace Objsheets {
      */
     public getContainingObjectType(rowIdx: number, colIdx: number): ColumnId {
       var columnId: ColumnId, col: Column;
-      while (colIdx > 0 && !(columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx))))
-        colIdx--;
-      while (!(col = getColumn(columnId)).isObject)
+      columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx));
+      if (colIdx > 0 && !columnId)
+        columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx - 1));
+
+      if (!columnId) return this.getContainingObject(rowIdx, colIdx).columnId;
+
+      while (!(col = getColumn(columnId)).isObject && col.parent != rootColumnId)
         columnId = col.parent;
       return columnId;
     }

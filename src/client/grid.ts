@@ -70,9 +70,9 @@ namespace Objsheets {
     }
     return grid;
   }
-  
-  export function gridMatrix(height: number, width: number, value: any = "", cssClasses: string[] = []) {
-    return _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(value, 1, 1, cssClasses)));
+
+  export function gridMatrix(height: number, width: number, value: any = "", cssClasses: string[] = [], attrs: {} = {}): ViewCell[][] {
+    return _.range(0, height).map((i) => _.range(0, width).map((j) => _.extend(new ViewCell(value, 1, 1, cssClasses), attrs)));
   }
 
   export function gridGetCell(grid: fixmeAny, row: fixmeAny, col: fixmeAny) {

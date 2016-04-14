@@ -931,11 +931,17 @@ namespace Objsheets {
     /**
      * Creates a new cell.
      * value == null means add a placeholder.
-     * newColumnType != null means create a new child column of 'columnId' and put the value there. 
+     * newColumnType != null means create a new child column of 'columnId' and put the value there.
+     * Notice that if columnId does not already designate an object column, it will be promoted
+     * to one by defineColumn.
      */
-    public addCellRecursive(columnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: boolean, newColumnType?: string) {
-      if (newColumnType != null)
+    public addCellRecursive(columnId: ColumnId, ancestorQCellId: QCellId, value: fixmeAny, consumePlaceholder: boolean, newColumnType?: string) {
+      if (newColumnType != null) {
+        let promoting = (columnId == ancestorQCellId.columnId) && !this.getColumn(columnId).isObject;
         columnId = this.defineColumn(columnId, -1, "", "text", false, null, null, {});
+        if (promoting)
+          ancestorQCellId = this.promoteCellId(ancestorQCellId);
+      }
       let col = getColumn(columnId);
       let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
       let fam = new FamilyId({columnId: columnId, cellId: parentCellId});
@@ -949,6 +955,24 @@ namespace Objsheets {
       this.invalidateDataCache();
       this.evaluateAll();
       return parentCellId;
+    }
+
+    /**
+     * Auxiliary function to addCellRecursive.
+     * Called when the column containing the given cell was promoted to an object column,
+     * and adjusts the id to point to the object.
+     */
+    private promoteCellId(cellId: QCellId) {
+      var base = cellIdParent(cellId.cellId);
+      var value = cellIdLastStep(cellId.cellId);
+      var keyColumnId = this.getColumn(cellId.columnId).children[0];
+      assert(() => keyColumnId);
+      var familyRec = Cells.findOne({column: keyColumnId, values: [value]});
+      assert(() => familyRec);
+      return {
+        columnId: cellId.columnId,
+        cellId: familyRec.key
+      };
     }
   }
 
