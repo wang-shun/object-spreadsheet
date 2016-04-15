@@ -47,16 +47,17 @@ namespace Objsheets {
   }
 
   class LayoutNode implements EJSON.CustomType {
-    public spareColumns = 0;
-    public separatorColumns = 0;
+    public spareColumns = 0;       // Space to the right of Hlist
+    public separatorColumns = 0;   // Space to the right of Vlist
     public topHeaderMargin = 1;
     public stretchV = true;
+    public paddingCssClass = "dataPadding";
     
     constructor(public columnId: string) { }
     // Not actually going to serialize this, but I want to use it in a tree,
     // which unfortunately requires it to be EJSONable.  ~ Shachar 04-05-2016
-    public toJSONValue(): JSONable { return {columnId: this.columnId}; }
-    public typeName() {return "LayoutNode"; }
+    public toJSONValue(): JSONable { throw new Error("not implemented"); }
+    public typeName() { return "LayoutNode"; }
   }
 
   class ViewVlist {
@@ -182,7 +183,7 @@ namespace Objsheets {
         }
         for (let i = 0; i < vlist.numPlaceholders; i++) {
           // This should occur only in value columns, so gridPlaceholder should be 1x1.
-          let gridPlaceholder = this.renderHlist(null, ancestorQCellId, 1);
+          let gridPlaceholder = this.renderHlist(null, ancestorQCellId, 1, "dataPadding");
           gridPlaceholder[0][0].isPlaceholder = true;
           gridVertExtend(grid, gridPlaceholder);
         }
@@ -190,8 +191,7 @@ namespace Objsheets {
           if (grid.length === 1 && this.layoutTree.root.stretchV) {
             gridVertStretch(grid, height);
           } else {
-            while (grid.length < height)
-              gridVertExtend(grid, this.renderHlist(null, ancestorQCellId, 1));
+            gridVertExtend(grid, this.renderSpareRows(height - grid.length, grid, ancestorQCellId));
           }
         }
       } else {
@@ -236,7 +236,7 @@ namespace Objsheets {
     }
 
     // Can be called with hlist == null for an empty row.
-    public renderHlist(hlist: fixmeAny, ancestorQCellId: fixmeAny, height: fixmeAny) {
+    public renderHlist(hlist: fixmeAny, ancestorQCellId: fixmeAny, height: fixmeAny, paddingCssClass?: string) {
       let grid = _.range(0, height).map((i) => []);
       let qCellId = (hlist == null) ? null : {
         columnId: this.columnId,
@@ -246,7 +246,7 @@ namespace Objsheets {
         // Object
         let gridObject = gridMergedCell(height, 1,
           hlist == null ? "" : this.objectSymbol(),
-          [hlist == null ? "dataPadding" : "centered"]);
+          [hlist == null ? paddingCssClass : "centered"]);
         gridObject[0][0].ancestorQCellId = ancestorQCellId;
         gridObject[0][0].addColumnId = this.columnId;
         gridObject[0][0].qCellId = qCellId;
@@ -262,7 +262,7 @@ namespace Objsheets {
         // Value
         let gridValue = gridMergedCell(height, 1,
           hlist == null ? "" : fallback(hlist.value, "<?>"),
-          hlist == null ? ["dataPadding"] : []);
+          hlist == null ? [paddingCssClass] : []);
         gridValue[0][0].ancestorQCellId = ancestorQCellId;
         gridValue[0][0].addColumnId = this.columnId;
         gridValue[0][0].qCellId = qCellId;
@@ -289,15 +289,54 @@ namespace Objsheets {
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         let subsectionGrid =
           (hlist == null)
-            ? subsection.renderHlist(null, ancestorQCellId, height)
+            ? subsection.renderHlist(null, ancestorQCellId, height, paddingCssClass)
             : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
-      gridHorizExtend(grid, gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", 
-        ["spareColumn", "editable"], {ancestorQCellId: qCellId}));
+      gridHorizExtend(grid, this.renderSpareColumns(height, grid, qCellId));
       return grid;
     }
+    
+    private renderSpareColumns(height: number, grid: ViewCell[][], cellId: QCellId) {
+      var spare = gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", 
+        ["spareColumn", "editable"]);
+      var ancestorType = this.spareAncestorType() || this.columnId;
+      spare.forEach((row, i) => row.forEach((cell) => {
+        let adj = grid[i][grid[i].length - 1];
+        cell.ancestorQCellId = 
+            (adj.isObjectCell || 
+             (adj.qCellId != null && adj.qCellId.columnId == ancestorType)) ?
+                 adj.qCellId : adj.ancestorQCellId || cellId;
+        cell.ancestorType = ancestorType;
+      }));
+      return spare;
+    }
 
+    private renderSpareRows(height: number, grid: ViewCell[][], cellId: QCellId) {
+      var spare = _.range(0,height).map(() =>
+        this.renderHlist(null, cellId, 1, this.layoutTree.root.paddingCssClass)[0]);
+      // First spare row can be used to add values to the families right above it
+      if (grid.length > 0 && spare.length > 0)
+        gridBottomRow(grid).forEach((cell, j) => {
+          if (cell.qCellId != null) 
+            spare[0][j].ancestorQCellId = cell.ancestorQCellId; 
+               
+        });
+      return spare;
+    }
+
+    /**
+     * Auxiliary function for renderSpareColumns.
+     */
+    private spareAncestorType(): ColumnId {
+      if (this.col.isObject) {
+        var last = this.subsections[this.subsections.length - 1];
+        return (last && last.layoutTree.root.separatorColumns == 0 
+                  && last.spareAncestorType()) || this.columnId;
+      }
+      else return null;
+    }
+    
     // As long as siblings are always separated by a separator, we can color just
     // based on depth.
     // If !expanded, then the requested height should always be 3.  Leaves render
@@ -578,6 +617,7 @@ namespace Objsheets {
           s.root.spareColumns = 1;
         s.root.separatorColumns = 1;
         s.root.stretchV = false;
+        s.root.paddingCssClass = "spareRow";
       });
       t.forEach((s) => {
         if (getColumn(s.columnId).isObject) s.stretchV = false;
@@ -867,17 +907,17 @@ namespace Objsheets {
               else {
                 // Placeholder or in spare row / column 
                 let columnId: ColumnId = cell.addColumnId;
-                let obj = this.getContainingObject(row, col);
+                let obj = cell.ancestorQCellId;
                 /**/ assert(() => obj != null, `selection (${row}, ${col}) is not inside any object`); /**/
                 let newType: string = null;
                 if (columnId != null) {        // placeholder or spare row with existing column (add to family)
-                  if (cell.ancestorQCellId.columnId == rootColumnId && //!cell.isObjectCell && !cell.isPlaceholder &&
+                  if (cell.cssClasses.indexOf("spareRow") > -1 &&  // @@ better way to test this?
                       columnId == getColumn(obj.columnId).children[0]) {
-                    obj = obj.parent();
+                    obj = new CellId(obj).parent();
                   }
                 }
                 else {                         // spare column (create value field)
-                  columnId = this.getContainingObjectType(row, col);
+                  columnId = cell.ancestorType;
                   newType = "text";
                   /**/ assert(() => columnId != null, `selection (${row}, ${col}) is not in any object type`); /**/
                 }
@@ -885,18 +925,13 @@ namespace Objsheets {
               }
             }
             catch (e) {
+              console.error(e.stack);
               fail = true;   // Note: this reverts all changes to Handsontable.
                              // The ones that have been applied will propagate back through
             }                // Meteor collections.
           }
           
           if (fail) return false;
-          
-          
-          // Don't apply the changes directly; let them come though the Meteor
-          // stubs.  This ensures that they get reverted by Meteor if the server
-          // call fails.
-          //return false;
         },
         contextMenu: {
           build: (): fixmeAny => {
@@ -1073,57 +1108,6 @@ namespace Objsheets {
         }
       }
       return cells;
-    }
-    
-    public getSelectedContainingObject() {
-      var s: number[];
-      if ((s = this.hot.getSelected()) != null) {
-        let [rowIdx, colIdx, r2, c2] = s;
-        return this.getContainingObject(rowIdx, colIdx);
-      }
-      else return null;
-    }
-
-    public getContainingObject(rowIdx: number, colIdx: number): CellId {
-      var viewCell: ViewCell, columnId: ColumnId, cell: any;
-      viewCell = gridGetCell(this.grid, rowIdx, colIdx); columnId = this.columnIdOf(viewCell);
-      if (colIdx > 0 && !columnId) { // skip to adjacent column
-        let viewCell_adj = gridGetCell(this.grid, rowIdx, colIdx - 1),
-            columnId_adj = this.columnIdOf(viewCell_adj);
-        if (columnId_adj) {
-          colIdx--; viewCell = viewCell_adj; columnId = columnId_adj;
-        }
-      }
-      if (viewCell.qCellId) {
-        let cell = new CellId(viewCell.qCellId), col: Column;
-        while (!(col = getColumn(cell.columnId)).isObject && col.parent != rootColumnId)
-          cell = cell.parent();
-        return cell;
-      }
-      else if (cell = viewCell.ancestorQCellId) {
-        if (cell.columnId == rootColumnId && rowIdx > 0)
-          return new CellId(gridGetCell(this.grid, rowIdx - 1, colIdx).ancestorQCellId || cell)
-        else
-          return new CellId(cell);
-      }
-    }
-
-    /**
-     * Get the object type ("class") in which the given cell lives.
-     * May look spurious in the presence of getContainingObject, but there
-     * are subtle differences when certain (object) familes are empty.
-     */
-    public getContainingObjectType(rowIdx: number, colIdx: number): ColumnId {
-      var columnId: ColumnId, col: Column;
-      columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx));
-      if (colIdx > 0 && !columnId)
-        columnId = this.columnIdOf(gridGetCell(this.grid, rowIdx, colIdx - 1));
-
-      if (!columnId) return this.getContainingObject(rowIdx, colIdx).columnId;
-
-      while (!(col = getColumn(columnId)).isObject && col.parent != rootColumnId)
-        columnId = col.parent;
-      return columnId;
     }
 
     /**
@@ -1449,6 +1433,7 @@ namespace Objsheets {
           this.why = e;
           return;  // Let the autorun run again once we have the data.
         }
+        console.error(e.stack);
         throw e;
       }
       this.why = null;

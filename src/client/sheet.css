@@ -292,9 +292,10 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
 .handsontable td.dataPadding.referent-object {
   box-shadow: inset 0px 0px 3px 2px #E8CCE8;
 }
-.handsontable td.dataPadding.parent-root {
+.handsontable td.spareRow {
   border-right: 1px dashed #CCC;
   border-bottom: 1px dashed #CCC;
+  box-shadow: inset 0px 0px 3px 2px #F5F5F5;
 }
 .handsontable td.spareColumn {
   border-right: 1px dashed #CCC;

@@ -10,18 +10,21 @@ namespace Objsheets {
     public fullText: fixmeAny;
     public isObjectHeader: fixmeAny;
     public isObjectCell: fixmeAny;
-    public ancestorQCellId: fixmeAny;
+    public ancestorQCellId: QCellId;
     // If set to a state column, then data can be added to this cell, and
     // any missing ancestors will be automatically created up to
     // ancestorQCellId.
-    public addColumnId : string;
-    public isPlaceholder: fixmeAny;
+    public addColumnId : ColumnId;
+    public isPlaceholder: boolean;
+    // For spare columns: set to object column id where the new column should
+    // be added as a child. 
+    public ancestorType: ColumnId;     
 
     constructor(public value: fixmeAny = null, public rowspan: fixmeAny = 1, public colspan: fixmeAny = 1, public cssClasses: fixmeAny = []) {
       this.qCellId = null;
       this.columnId = null;
       // Use in combination with columnId or qCellId to distinguish key and object
-      // (bullet/chevron) columns in the UI.
+      // (bullet/disc) columns in the UI.
       this.isObject = false;
       this.kind = null;
       this.fullText = null;
@@ -61,6 +64,7 @@ namespace Objsheets {
   // Return a grid consisting of one "height x width" merged cell and enough dummy
   // 1x1 cells.  You can mutate the upper-left cell as desired.
   export function gridMergedCell(height: fixmeAny, width: fixmeAny, value: fixmeAny = "", cssClasses: fixmeAny = []) {
+    // assert that extension has compatible width
     let grid = _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(null)));
     if (width > 0) {
       grid[0][0].rowspan = height;
