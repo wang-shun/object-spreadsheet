@@ -183,7 +183,7 @@ namespace Objsheets {
       this.cellId = cellId;
     }
 
-    public q() {
+    public q(): QCellId {
       return {
         columnId: this.columnId,
         cellId: this.cellId
@@ -243,8 +243,8 @@ namespace Objsheets {
   }
 
   export class FamilyId {
-    public columnId: fixmeAny;
-    public cellId: fixmeAny;
+    public columnId: ColumnId;
+    public cellId: CellId1;
 
     constructor({
         columnId: columnId,

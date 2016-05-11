@@ -18,7 +18,8 @@ namespace Objsheets {
     public isPlaceholder: boolean;
     // For spare columns: set to object column id where the new column should
     // be added as a child. 
-    public ancestorType: ColumnId;     
+    // Notice that only one of addColumnId, ancestorType may be non-null on a given cell
+    public ancestorType: ColumnId;
 
     constructor(public value: fixmeAny = null, public rowspan: fixmeAny = 1, public colspan: fixmeAny = 1, public cssClasses: fixmeAny = []) {
       this.qCellId = null;

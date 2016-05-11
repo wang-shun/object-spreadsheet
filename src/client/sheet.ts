@@ -47,8 +47,8 @@ namespace Objsheets {
   }
 
   class LayoutNode implements EJSON.CustomType {
-    public spareColumns = 0;       // Space to the right of Hlist
-    public separatorColumns = 0;   // Space to the right of Vlist
+    public spareColumns = 0;       // Additional columns to the right that will be part of this layout node
+    public separatorColumns = 0;   // Space between current layout node and its right sibling
     public topHeaderMargin = 1;
     public stretchV = true;
     public paddingCssClass = "dataPadding";
@@ -172,7 +172,7 @@ namespace Objsheets {
         columnId: this.col.parent,
         cellId: vlist.parentCellId
       };
-      let grid: fixmeAny;
+      let grid: ViewCell[][];
       if (vlist.hlists != null) {
         grid = [];
         for (let hlist of vlist.hlists) {
@@ -187,19 +187,20 @@ namespace Objsheets {
           gridPlaceholder[0][0].isPlaceholder = true;
           gridVertExtend(grid, gridPlaceholder);
         }
-        if (grid.length < height) {
-          if (grid.length === 1 && this.layoutTree.root.stretchV) {
-            gridVertStretch(grid, height);
-          } else {
-            gridVertExtend(grid, this.renderSpareRows(height - grid.length, grid, ancestorQCellId));
-          }
-        }
       } else {
-        grid = gridMergedCell(height, this.width, "error", ["dataError"]);
-        if (this.width > 0) {
-          grid[0][0].fullText = "Error: " + vlist.error;
+        grid = this.renderHlist(null, ancestorQCellId, 1, "dataError");
+        grid[0][0].value = "error";
+        grid[0][0].fullText = "Error: " + vlist.error;
+      }
+      // Fill down to 'height', either by stretching or with spare rows
+      if (grid.length < height) {
+        if (grid.length === 1 && this.layoutTree.root.stretchV) {
+          gridVertStretch(grid, height);
+        } else {
+          gridVertExtend(grid, this.renderSpareRows(height - grid.length, grid, ancestorQCellId));
         }
       }
+      // Add separator columns if needed
       gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
       return grid;
     }
@@ -236,6 +237,7 @@ namespace Objsheets {
     }
 
     // Can be called with hlist == null for an empty row.
+    // In that case, supply paddingCssClass (typically either "dataPadding" or "spareRow")
     public renderHlist(hlist: fixmeAny, ancestorQCellId: fixmeAny, height: fixmeAny, paddingCssClass?: string) {
       let grid = _.range(0, height).map((i) => []);
       let qCellId = (hlist == null) ? null : {
@@ -302,11 +304,10 @@ namespace Objsheets {
         ["spareColumn", "editable"]);
       var ancestorType = this.spareAncestorType() || this.columnId;
       spare.forEach((row, i) => row.forEach((cell) => {
-        let adj = grid[i][grid[i].length - 1];
+        let adj = grid[i][grid[i].length - 1]; /* consult adjacent cell to the left: */
         cell.ancestorQCellId = 
-            (adj.isObjectCell || 
-             (adj.qCellId != null && adj.qCellId.columnId == ancestorType)) ?
-                 adj.qCellId : adj.ancestorQCellId || cellId;
+            (adj.isObjectCell) ? adj.qCellId   /* - object cell (meaning: it's an object without fields) */
+                : (adj.ancestorQCellId || cellId);
         cell.ancestorType = ancestorType;
       }));
       return spare;
@@ -320,13 +321,15 @@ namespace Objsheets {
         gridBottomRow(grid).forEach((cell, j) => {
           if (cell.qCellId != null) 
             spare[0][j].ancestorQCellId = cell.ancestorQCellId; 
-               
         });
       return spare;
     }
 
     /**
      * Auxiliary function for renderSpareColumns.
+     * Essentially finds the rightmost descendant object layout node and associates the 
+     * spare columns' cells with it.
+     * TODO make col.isObject a precondition of the function, such that it never has to return null
      */
     private spareAncestorType(): ColumnId {
       if (this.col.isObject) {
@@ -490,6 +493,11 @@ namespace Objsheets {
 
     public static PLACEHOLDER = {};
 
+    /**
+     * Parses enteredValue and forwards the call to addCellRecursive on the server to add a new
+     * cell to the model having that value.
+     * See doc of Model.addCellRecursive for a description of the parameters.
+     */
     public static addCell(addColumnId: ColumnId, ancestorQCellId: QCellId, enteredValue: string | {}, consumePlaceholder: boolean = false, newType?: OSType, callback: fixmeAny = (() => {})) {
       var newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
@@ -501,18 +509,17 @@ namespace Objsheets {
           return;  // TODO: Can this ever happen?  ~ Shachar 04-11-2016 
       }
       $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder, newType,
-        (error: fixmeAny, result: fixmeAny) => {
+        (error: fixmeAny, result: FamilyId) => {
           if (error == null) {
             // Try to move the selection to the added cell, once it shows up.
-            let predicate: fixmeAny;
+            let predicate: (cell: ViewCell) => boolean;
             if (enteredValue == StateEdit.PLACEHOLDER) {
               predicate = (c: fixmeAny) =>
-                c.addColumnId == addColumnId &&
-                EJSON.equals(c.ancestorQCellId, {columnId: getColumn(addColumnId).parent, cellId: result}) &&
-                c.isPlaceholder;
+                c.isPlaceholder && c.addColumnId == addColumnId &&
+                EJSON.equals(c.ancestorQCellId, <any>ancestorQCellId); //.cellId, result.cellId);
             } else {
-              predicate = (c: fixmeAny) =>
-                EJSON.equals(c.qCellId, {columnId: addColumnId, cellId: cellIdChild(result, newValue)});
+              let child = result.child(newValue);
+              predicate = (c: ViewCell) => EJSON.equals(c.qCellId, <any>child); 
             }
             postSelectionPredicate(predicate);
           }
@@ -620,7 +627,8 @@ namespace Objsheets {
         s.root.paddingCssClass = "spareRow";
       });
       t.forEach((s) => {
-        if (getColumn(s.columnId).isObject) s.stretchV = false;
+        var col = getColumn(s.columnId);
+        if (col && col.isObject) s.stretchV = false;
       });
       return t;
     }
@@ -728,10 +736,12 @@ namespace Objsheets {
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
           classes.push(`ref-${refc}`);
         }
-        let ancestors = cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : [];
-        for (let ancestor of ancestors) {
-          if ((refc = this.refId(ancestor.q())) != null) {
-            classes.push(`ancestor-${refc}`);
+        if (cell.cssClasses.indexOf("spareRow") == -1 && cell.cssClasses.indexOf("spareColumn") == -1) {
+          let ancestors = cell.qCellId != null ? new CellId(cell.qCellId).ancestors() : cell.ancestorQCellId != null ? new CellId(cell.ancestorQCellId).ancestors() : [];
+          for (let ancestor of ancestors) {
+            if ((refc = this.refId(ancestor.q())) != null) {
+              classes.push(`ancestor-${refc}`);
+            }
           }
         }
         if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId
@@ -869,28 +879,28 @@ namespace Objsheets {
             })(row, col, oldVal);  // enfore closure; in ES 6 we wouldn't need this anymore
             this.pending.push(`${row}-${col}`);
             
-            // One of these cases should apply...
-            if (cell.kind === "top") {
-              let name = newVal === "" ? null : newVal;
-              Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
-            }
-            if (cell.kind === "below") {
-              name = newVal === "" ? null : newVal;
-              Meteor.call("changeColumnFieldName", $$, cell.columnId, name, revertingCallback);
-            }
-            // Currently, types can only be changed via the action bar.
-            //if cell.kind == 'type'
-            //  parsed = false
-            //  try
-            //    type = if newVal == '' then null else parseTypeStr(newVal)
-            //    parsed = true
-            //  catch e
-            //    alert('Invalid type.')
-            //  if parsed
-            //    Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
-            //                standardServerCallback
             try {
-              if ((cell.qCellId != null) && !cell.isObjectCell) {
+              // One of these cases should apply...
+              if (cell.kind === "top") {
+                let name = newVal === "" ? null : newVal;
+                Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
+              }
+              else if (cell.kind === "below") {
+                name = newVal === "" ? null : newVal;
+                Meteor.call("changeColumnFieldName", $$, cell.columnId, name, revertingCallback);
+              }
+              // Currently, types can only be changed via the action bar.
+              //if cell.kind == 'type'
+              //  parsed = false
+              //  try
+              //    type = if newVal == '' then null else parseTypeStr(newVal)
+              //    parsed = true
+              //  catch e
+              //    alert('Invalid type.')
+              //  if parsed
+              //    Meteor.call 'changeColumnSpecifiedType', $$, cell.columnId, type,
+              //                standardServerCallback
+              else if ((cell.qCellId != null) && !cell.isObjectCell) {
                 // XXX Once we validate values, we should replace the hard-coded
                 // check for 'text' with an attempt to validate the input.
                 // Currently not allowing empty strings as this is the only way to catch
@@ -911,6 +921,8 @@ namespace Objsheets {
                 /**/ assert(() => obj != null, `selection (${row}, ${col}) is not inside any object`); /**/
                 let newType: string = null;
                 if (columnId != null) {        // placeholder or spare row with existing column (add to family)
+                  // Adding a value cell in the *first* field of an object in a spare row
+                  //  -> create a new object
                   if (cell.cssClasses.indexOf("spareRow") > -1 &&  // @@ better way to test this?
                       columnId == getColumn(obj.columnId).children[0]) {
                     obj = new CellId(obj).parent();

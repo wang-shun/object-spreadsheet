@@ -954,7 +954,7 @@ namespace Objsheets {
       // XXX Avoid if we didn't actually change the data model?
       this.invalidateDataCache();
       this.evaluateAll();
-      return parentCellId;
+      return fam;
     }
 
     /**
