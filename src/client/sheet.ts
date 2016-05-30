@@ -303,10 +303,14 @@ namespace Objsheets {
       var spare = gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", 
         ["spareColumn", "editable"]);
       var ancestorType = this.spareAncestorType() || this.columnId;
+      var isLoneValue = (cell: ViewCell) => 
+        cell.qCellId != null && cell.qCellId.columnId == ancestorType /* a value that will be promoted to an object when extending rightwards */ 
       spare.forEach((row, i) => row.forEach((cell) => {
         let adj = grid[i][grid[i].length - 1]; /* consult adjacent cell to the left: */
         cell.ancestorQCellId = 
-            (adj.isObjectCell) ? adj.qCellId   /* - object cell (meaning: it's an object without fields) */
+            (adj.isObjectCell ||               /* - object cell (meaning: it's an object without fields) */
+             isLoneValue(adj))                 /* - will become an object (and the new value will be a child) */
+                ? adj.qCellId
                 : (adj.ancestorQCellId || cellId);
         cell.ancestorType = ancestorType;
       }));
