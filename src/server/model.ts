@@ -1,10 +1,13 @@
 namespace Objsheets {
 
   class CannedTransaction {
-    // @params: EJSONKeyedMap of name to type
-
-    constructor(public params: fixmeAny, public body: fixmeAny) {}
+    /**
+     * params: EJSONKeyedMap of name to type
+     * body: procedural language code (see language/procedures.ts)
+     */
+    constructor(public params: EJSONKeyedMap<string, string>, public body: string) {}
   }
+  type StoredProcedure = {params: Param[], body: string}
 
   export class Model {
     public settings: fixmeAny;
@@ -764,8 +767,8 @@ namespace Objsheets {
       Procedures.remove(procId);
     }
 
-    public executeCannedTransaction(name: fixmeAny, argsObj: fixmeAny) {
-      let proc = Procedures.findOne({
+    public executeCannedTransaction(name: string, argsObj: fixmeAny) {
+      let proc: StoredProcedure = Procedures.findOne({
         name: name
       });
       if (proc == null) {
@@ -783,7 +786,8 @@ namespace Objsheets {
       }
       // Future: Validate argument types!
       // Future: Add built-in parameters (clientUser, currentTime) here.
-      let args = new EJSONKeyedMap(proc.params.map((param: fixmeAny) => [param.name, new TypedSet(param.type, <fixmeAny>set(argsObj[param.name]))]));
+      let args = makeArguments(proc.params, argsObj);
+      //new EJSONKeyedMap(proc.params.map((param: {name: string, type: string}) => [param.name, new TypedSet(param.type, <fixmeAny>set(argsObj[param.name]))]));
       try {
         $$.runTransaction(() => {
           executeProcedure(this, proc, args);
@@ -799,6 +803,7 @@ namespace Objsheets {
         }
       }
     }
+    
 
     public repair() {
       // We can add repair steps for crashes and bugs in old versions of the code here.

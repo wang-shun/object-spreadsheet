@@ -566,4 +566,27 @@ namespace Objsheets {
     };
   }
 
+  export type Param = {name: string, type: string};
+
+  export function makeArguments(params: Param[], argsObj: any) {
+    var argsMap = new EJSONKeyedMap<string, TypedSet>();
+    for (let param of params)
+      argsMap.set(param.name, makeArgumentValue(param, argsObj[param.name]));
+    return argsMap;
+  }
+
+  function makeArgumentValue(param: Param, value: any): TypedSet {
+    if (value instanceof Array)
+      value = new TypedSet(param.type, set<any>(value));   // Future: Validate type!
+    else if (value instanceof EJSONKeyedSet)
+      value = new TypedSet(param.type, value);             // Future: here too!
+    else if (value instanceof TypedSet)
+      valAssert(value.type == param.type, `argument "${param.name}": expected value of type '${param.type}', got '${value.type}'`);
+    else {
+      valAssert(value != null, `argument "${param.name}": cannot be ${value}`);
+      valAssert(false, `argument "${param.name}": should be an array, a set, or a TypedSet; got ${value.constructor.type}`);
+    }
+    return value;
+  }
+
 }
