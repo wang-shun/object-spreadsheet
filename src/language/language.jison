@@ -73,6 +73,7 @@ keeping similar operators together. ~ Matt 2015-03-11
 "remove" return 'REMOVE'
 "set" return 'SET'
 "sum" return 'SUM'
+"sort" return 'SORT'
 "to" return 'TO'
 "toText" return 'TOTEXT'
 
@@ -313,6 +314,9 @@ expression1
         { $$ = ['oneOf', $3]; }
     | TOTEXT '(' expression ')'
         { $$ = ['toText', $3]; }
+    | SORT optSign '(' binding '|' expression ')'
+        { yy.unbindVar($3.var);
+          $$ = ['sort', $4.domain, [$4.var, $6], $2]; }
     | IF '(' expression ',' expression ',' expression ')'
         { $$ = ['if', $3, $5, $7]; }
     | '!' expression
@@ -348,6 +352,12 @@ commaSeparatedExpressions
 
 optComma
     : ','
+    |
+    ;
+
+optSign
+    : '+'
+    | '-'
     |
     ;
 

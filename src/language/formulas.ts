@@ -86,6 +86,12 @@ namespace Objsheets {
     return elements[0];
   }
 
+  export function singleElementOpt(set: fixmeAny) {
+    let elements = set.elements();
+    evalAssert(elements.length <= 1, "Expected at most one element");
+    return elements[0];
+  }
+
   export class FormulaEngine {
     public goUpMemo: fixmeAny;
     public compiled: fixmeAny;
@@ -624,7 +630,13 @@ namespace Objsheets {
         valAssert(vars.has(varName), `Undefined variable ${varName}`);
       },
       typecheck: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => vars.get(varName),
-      evaluate: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => vars.get(varName),
+      evaluate: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => {
+        let v = vars.get(varName)
+        // Allows formulas to depend on reactive values (e.g., state of certain UI controls);
+        // this is useful for playing around, though eventually such values would better be
+        // placed in transient spreadsheet cells and accessed as such.
+        return (v instanceof ReactiveVar) ? v.get() : v;
+      },
       stringify: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => ({
           str: (() => {
             if (varName === "this") {
@@ -651,14 +663,14 @@ namespace Objsheets {
       evaluate: goUp,
       stringify: (model: fixmeAny, vars: fixmeAny, startCellsSinfo: fixmeAny, targetColumnId: fixmeAny, wantValues: fixmeAny) => stringifyNavigation("up", model, vars, startCellsSinfo, targetColumnId, null, wantValues)
     },
-    // ["down", startCells, targetColumnId, wantValues (bool)]
+    // ["down", startCells, targetColumnId, keysFmla, wantValues (bool)]
     // Currently allows only one step, matching the concrete syntax.  This makes
     // life easier for now.
     // XXX: Eventually the easiest way to provide the refactoring support we'll
     // want is to allow multiple steps.  We can see the issue already if startCells
     // changes type from one ancestor of the target column to another, e.g.,
     // because it is reading from another column whose formula changed.
-    // Concrete syntax: foo, FooCell, (expression).foo, ::Bar, etc.
+    // Concrete syntax: foo, FooCell, (expression).foo, $Bar (for accessing root), etc.
     down: {
       paramNames: ["start", null, "keys", null],
       argAdapters: [EagerSubformulaCells, ColumnId, OptionalEagerSubformula, {}],
@@ -761,6 +773,47 @@ namespace Objsheets {
         let addendSinfo = addendLambda(tryTypecheckFormula(model, vars, domainSinfo.formula));
         return {
           str: `sum[${addendSinfo[0]} : ${domainSinfo.strFor(PRECEDENCE_LOWEST)}]` + `(${addendSinfo[1].strFor(PRECEDENCE_LOWEST)})`,
+          outerPrecedence: PRECEDENCE_ATOMIC
+        };
+      }
+    },
+    // ["sort", domain (subformula), [varName, keyExpr (subformula)], order]:
+    // For each cell in the domain, evaluates the keyExpr with varName bound to
+    // the domain cell, which must return a singleton.  It then sorts the set according
+    // to the key values. Ascending if order == "+", descending if order == "-".
+    // Concrete syntax: sort(x : expr | predicate)
+    sort: {
+      paramNames: ["set", "function", null],
+      argAdapters: [EagerSubformula, Lambda, {}],
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny, keyLambda: fixmeAny, order: any) => {
+        if (order)
+          valAssert(order === '+' || order === '-', `sort order must be '+' or '-', got '${order}'`);
+        // TODO: force domainType to be an object?
+        return domainType;
+      },
+      evaluate: (model: fixmeAny, vars: fixmeAny, domainTset: TypedSet, keyLambda: fixmeAny, order?: string) => {
+        let elementsWithKeys = domainTset.set.elements().map((x) => {
+          // Future: Figure out where to put this code once we start duplicating it.
+          let tset = new TypedSet(domainTset.type, new EJSONKeyedSet([x]));
+          return [x, singleElementOpt(keyLambda(tset).set)];
+        });
+        // _.sortBy only does ascending for some reason. So, implementing my own.
+        let cmp = (a:any,b:any) => (a<b) ? -1 : ((a>b) ? 1 : 0);
+        let asc = (a:[any,any], b:[any,any]) => cmp(a[1], b[1]);
+        let desc = (a:[any,any], b:[any,any]) => -cmp(a[1], b[1]);
+        elementsWithKeys.sort( (order === '-') ? desc : asc );
+        // XXX Strictly speaking, EJSONKeyedSet is not ordered.
+        // but all existing JavaScript implementations preserve the order of keys in an object;
+        // this is not likely to change since many libraries depend on this behavior.
+        // If we support lists in the future, this will have to return one, but in the meantime
+        // it's not supposed to break.  ~ Shachar 2016-05-30
+        return new TypedSet(domainTset.type, new EJSONKeyedSet(elementsWithKeys.map((x) => x[0])))
+      },
+      stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny, keyLambda: fixmeAny, order: string) => {
+        // XXX Wasteful
+        let keySinfo = keyLambda(tryTypecheckFormula(model, vars, domainSinfo.formula));
+        return {
+          str: `sort${order || ''}(${keySinfo[0]} : ${domainSinfo.strFor(PRECEDENCE_LOWEST)} ` + `| ${keySinfo[1].strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
         };
       }
