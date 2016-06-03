@@ -210,8 +210,7 @@ namespace Objsheets {
 
     public value(set?: fixmeAny, callback: fixmeAny = () => {}) {
       if (set != null) {
-        this.remove();
-        this.family().add(set, callback);
+        this.family().replace(this.value(), set, callback);
       } else {
         return cellIdLastStep(this.cellId);
       }
@@ -276,7 +275,7 @@ namespace Objsheets {
     // Ignores erroneous families.
     // FIXME: Review all callers and implement error propagation where appropriate.
 
-    public values() {
+    public values(): any[] {
       return fallback(this.read() != null ? this.read().values : null, []);
     }
 
@@ -323,7 +322,7 @@ namespace Objsheets {
       return this.child(value);
     }
 
-    public remove(value: fixmeAny, callback: fixmeAny = () => {}) {
+    public remove(value: any, callback: () => void = () => {}) {
       if (getColumn(this.columnId).isObject) {
         Meteor.call("recursiveDeleteStateCellNoInvalidate", $$, this.columnId, cellIdChild(this.cellId, value), callback);
       } else {
@@ -339,6 +338,15 @@ namespace Objsheets {
           }
         }, callback);
       }
+    }
+
+    public replace(oldValue: any, newValue: any, callback: () => void = () => {}) {
+      // should only be called for value families.
+      // might be racy but at least keeps a consistent order.
+      let update = {
+        $set: {values: this.values().map((x) => EJSON.equals(x, oldValue) ? newValue : x)}
+      }
+      updateOne(Cells, this.selector(), update, callback);
     }
 
     public addPlaceholder(callback: fixmeAny = () => {}) {

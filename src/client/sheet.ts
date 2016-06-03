@@ -929,7 +929,7 @@ namespace Objsheets {
                   //  -> create a new object
                   if (cell.cssClasses.indexOf("spareRow") > -1 &&  // @@ better way to test this?
                       columnId == getColumn(obj.columnId).children[0]) {
-                    obj = new CellId(obj).parent();
+                    obj = new CellId(obj).parent() || obj;  /* yeah unless it's the root :( */
                   }
                 }
                 else {                         // spare column (create value field)
@@ -965,8 +965,9 @@ namespace Objsheets {
               let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
               let fieldName = fallback(col.fieldName, "(unnamed)");
               if (!col.isObject) {
+                let fieldDesc = desc(fieldName, 'values');
                 items.promote = {
-                  name: columnIsState(col) ? `Wrap '${fieldName}' values in objects` : `Generate objects for '${fieldName}' values`,
+                  name: columnIsState(col) ? `Wrap ${fieldDesc} in objects` : `Generate objects for ${fieldDesc}`,
                   callback: () => {
                     Meteor.call("changeColumnIsObject", $$, ci, true, standardServerCallback);
                   }
@@ -1007,7 +1008,8 @@ namespace Objsheets {
               // object column.
               if (ci !== rootColumnId && col.children.length === 0 && (!col.isObject || col.type === "_token")) {
                 items["delete"] = {
-                  name: col.isObject ? `Delete '${objectName}' object column` : `Delete '${fieldName}' value column`,
+                  name: `Delete ${col.isObject ? desc(objectName, 'object')
+                                               : desc(fieldName, 'value')} column`,
                   callback: () => {
                     this.hot.deselectCell();  // <- Otherwise changeColumn form gets hosed.
                     Meteor.call("deleteColumn", $$, ci, standardServerCallback);
@@ -1108,7 +1110,8 @@ namespace Objsheets {
       }
       let [r1, c1, r2, c2] = s;
       let cell = this.grid[r1][c1];
-      if (r2 === r1 + cell.rowspan - 1 && c2 === c1 + cell.colspan - 1) {
+      // "<" may occur intermittently when the sheet is changing
+      if (r2 < r1 + cell.rowspan && c2 < c1 + cell.colspan) {
         return cell;
       } else {
         return null;
@@ -1202,7 +1205,7 @@ namespace Objsheets {
           // A token column has only the object UI-column, though we don't set
           // isObjectCell on family padding cells.  So don't check it.
           return {
-            name: `Add '${objectName}' object here`,
+            name: `Add ${desc(objectName, 'object')} here`,
             allowEnter: true,
             callback: () => {
               StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, false, null, standardServerCallback);
@@ -1395,7 +1398,23 @@ namespace Objsheets {
 
   }
 
-  let view: fixmeAny = null;
+  /**
+   * Helper function for "profile" log entries in ClientView.
+   */
+  function stamp() {
+    var d = new Date();
+    return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
+  }
+
+  /**
+   * Auxiliary function for context menu construction in ClientView.
+   */
+  function desc(name: string, kind: string) {
+    return (name != "") ? `'${name}' ${kind}` : kind;
+  }
+
+
+  let view: ClientView = null;
 
   export function rebuildView(viewId: fixmeAny) {
     if (!view || !view.hot) {
@@ -1454,11 +1473,6 @@ namespace Objsheets {
       }
       this.why = null;
     };
-  }
-
-  function stamp() {
-    var d = new Date();
-    return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
   }
 
   Template["Spreadsheet"].rendered = function() {
