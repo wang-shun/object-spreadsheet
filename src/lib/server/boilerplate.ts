@@ -5,7 +5,7 @@ namespace Objsheets {
     procedures: function(appName: fixmeAny, defs: fixmeAny) {
       this._procedures[appName] = defs;
     },
-    compile: function(appName: fixmeAny) {
+    compile: function(appName: fixmeAny, errCallback: (msg: string, stack: any) => void = (m, s) => console.warn(m, s)) {
       // This may run multiple times; it should overwrite and not cause any problems.
       for (let name in this._procedures[appName]) {
         let preProc = this._procedures[appName][name];
@@ -35,7 +35,7 @@ namespace Objsheets {
           }
         } catch (e) {
           // Incompatible schema change?
-          console.log(`Failed to define app ${appName} sample procedure ${name} on sheet ${$$.id}:`, e.stack);
+          errCallback(`Failed to define app ${appName} sample procedure ${name} on sheet ${$$.id}:`, e.stack);
         }
       }
     }
