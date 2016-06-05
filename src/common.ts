@@ -15,8 +15,7 @@ namespace Objsheets {
 
   // Multisets unsupported for now: twindex removed.
 
-  type Token = string;
-  export type OSValue = Token | boolean | number | string | Date | CellId1;
+  export type OSValue = boolean | number | string | Date | CellId1;
   // FIXME: I wanted to name this CellId.  Resolve name clash with CellId in
   // data.ts. ~ Matt 2016-03-14
   // Direct recursion (type CellId1 = OSValue[]) is not allowed.  But because
@@ -24,100 +23,14 @@ namespace Objsheets {
   export interface CellId1 extends Array<OSValue> {}
 
   export var rootCellId: CellId1 = [];
-
-  export function cellIdParent(cellId: CellId1): CellId1;
-  export function cellIdParent(cellId: CellIdWithSpares): CellIdWithSpares;
-  export function cellIdParent<T>(cellId: T[]): T[] {
+  export function cellIdParent(cellId: CellId1): CellId1 {
     return cellId.slice(0, -1);
   }
-  export function cellIdChild(cellId: CellId1, value: OSValue): CellId1;
-  export function cellIdChild(cellId: CellIdWithSpares, value: OSValueWithSpares): CellIdWithSpares;
-  export function cellIdChild<T>(cellId: T[], value: T): T[] {
+  export function cellIdChild(cellId: CellId1, value: OSValue): CellId1 {
     return cellId.concat([value]);
   }
-  export function cellIdLastStep(cellId: CellId1): OSValue;
-  export function cellIdLastStep(cellId: CellIdWithSpares): OSValueWithSpares;
-  export function cellIdLastStep<T>(cellId: T[]): T {
+  export function cellIdLastStep(cellId: CellId1): OSValue {
     return cellId[cellId.length - 1];
-  }
-
-  // TODO: Rename one of the cellId fields once the code is typed well enough
-  // that we can do it reliably.
-  export interface QCellId extends EJSONableDict {
-    columnId: ColumnId;
-    cellId: CellId1;
-  }
-  export interface QFamilyId extends EJSONableDict {
-    columnId: ColumnId;
-    cellId: CellId1;
-  }
-
-  // Note, these can exist for keyed object types, but for now, we only support
-  // computed keyed object types (and no updatable views), so spare keyed
-  // objects will never be editable.
-  export class SpareValue {
-    constructor(public index: number) {}
-
-    public typeName(): string {
-      return "SpareValue";
-    }
-
-    public toJSONValue(): JSONable {
-      return this.index;
-    }
-
-    public static fromJSONValue(json: any): SpareValue {
-      return new SpareValue(json);
-    }
-  }
-  EJSON.addType("SpareValue", SpareValue.fromJSONValue);
-
-  // OSValueWithSpares intentionally does not include CellIdWithSpares.  Spare
-  // values may appear only in the main hierarchy of a CellIdWithSpares; any
-  // embedded object references must be real.
-  export type OSValueWithSpares = OSValue | SpareValue;
-
-  // Unenforced constraint: values (keys) are real up to a point and spare after
-  // that.
-  export interface CellIdWithSpares extends Array<OSValueWithSpares> {}
-  export interface QCellIdWithObjectSpares extends EJSONableDict {
-    columnId: ColumnId;
-    cellId: CellIdWithSpares;
-  }
-  export interface QCellIdWithSpares extends EJSONableDict {
-    columnId: ColumnIdWithSpares;
-    cellId: CellIdWithSpares;
-  }
-  export interface QFamilyIdWithSpares extends EJSONableDict {
-    columnId: ColumnIdWithSpares;
-    cellId: CellIdWithSpares;
-  }
-
-  // TypeScript is trusting us to narrow the type.
-  export function cellIdIsReal(cellId: CellIdWithSpares): cellId is CellId1 {
-    return cellId.length == 0 || !(cellIdLastStep(cellId) instanceof SpareValue);
-  }
-  // cellIdIsReal(qCellId.cellId) does not narrow the type of qCellId.cellId, so
-  // define this as well.
-  export function qCellIdIsReal(qCellId: QCellIdWithSpares): qCellId is QCellId {
-    // Hmm, it shouldn't actually be possible to have real cells in a spare column.
-    return columnIdIsReal(qCellId.columnId) && cellIdIsReal(qCellId.cellId);
-  }
-  export function qFamilyIdIsReal(qFamilyId: QFamilyIdWithSpares): qFamilyId is QFamilyId {
-    // But it is possible to have families in a spare column with real parent cells.
-    return columnIdIsReal(qFamilyId.columnId) && cellIdIsReal(qFamilyId.cellId);
-  }
-
-  export function cellIdNearestRealAncestor(cellId: CellIdWithSpares): CellId1 {
-    let i = cellId.length;
-    while (i > 0 && cellId[i-1] instanceof SpareValue)
-      i--;
-    return <CellId1>cellId.slice(0, i);
-  }
-  export function cellIdIsAncestor(high: CellIdWithSpares, low: CellIdWithSpares): boolean {
-    // Note: if low.length < high.length, the second argument will be short and
-    // EJSON.equals will return false.
-    return EJSON.equals(high, low.slice(0, high.length));
   }
 
   // N.B. Meteor.makeErrorType is the way to make a subclass of Error so that both
@@ -154,9 +67,9 @@ namespace Objsheets {
   // the DB.  If I find a good solution, we could go back to using EJSON custom
   // classes. ~ Matt)
 
-  export interface ColumnWithSpares {
-    _id: ColumnIdWithSpares;
-    parent: ColumnIdWithSpares;
+  interface Column {
+    _id: ColumnId;
+    parent: ColumnId;
     children: ColumnId[];
     fieldName: string;  // nullable
     // type specified by user (non-null for state columns)
@@ -172,128 +85,16 @@ namespace Objsheets {
     referenceDisplayColumn: ColumnId;
   }
 
-  export interface Column extends ColumnWithSpares {
-    _id: ColumnId;
-    parent: ColumnId;
-  }
-
   export function getColumn(id: ColumnId): Column {
-    // Fail fast if we get a spare column somewhere we didn't expect it.
-    // Obviously, Safe TypeScript would be much better at this if it were
-    // maintained. :( ~ Matt 2016-03-18
-    check(id, String);
     return Columns.findOne(id);
   }
 
-  // Objects we can use in place of a real column ID for spare columns (client
-  // only, but some code that is used on both sides needs to be able to check
-  // for these).  When a spare column is edited in the UI, we have to actually
-  // create it before performing the edit.
-
-  export class SpareObjectColumnId {
-    constructor() {}
-
-    // Currently hard-wired to the root, otherwise getColumnWithSpares would
-    // have to be more careful about whether to claim it's state or computed.
-    get parentColumnId(): ColumnId {
-      return rootColumnId;
-    }
-
-    public typeName(): string {
-      return "SpareObjectColumnId";
-    }
-
-    public toJSONValue(): JSONable {
-      return {};
-    }
-
-    public static fromJSONValue(json: any): SpareObjectColumnId {
-      return new SpareObjectColumnId();
-    }
-  }
-  EJSON.addType("SpareObjectColumnId", SpareObjectColumnId.fromJSONValue);
-
-  export class SpareValueColumnId {
-    constructor(
-      public parentColumnId : ColumnId | SpareObjectColumnId,
-      public index : number = 0) {}
-
-    public typeName(): string {
-      return "SpareValueColumnId";
-    }
-
-    // TODO: Cut down on this boilerplate by defining a mix-in that takes a list
-    // of property names?  But then TypeScript won't enforce that the properties
-    // are EJSONable.
-    public toJSONValue(): JSONable {
-      return {
-        parentColumnId: EJSON.toJSONValue(this.parentColumnId),
-        index: this.index
-      };
-    }
-
-    public static fromJSONValue(json: any): SpareValueColumnId {
-      return new SpareValueColumnId(EJSON.fromJSONValue(json.parentColumnId), json.index);
-    }
-  }
-  EJSON.addType("SpareValueColumnId", SpareValueColumnId.fromJSONValue);
-
-  export type ColumnIdWithSpares = ColumnId | SpareObjectColumnId | SpareValueColumnId;
-
-  export function getColumnWithSpares(columnId : ColumnIdWithSpares): ColumnWithSpares {
-    // These should be all the fields we use.  We can type this properly with
-    // TypeScript later. :(
-
-    // This data should match insertBlankColumn, except we don't assign names
-    // unless/until a spare column is actually created.
-    if (columnId instanceof SpareObjectColumnId)
-      return {
-        _id: columnId,
-        parent: columnId.parentColumnId,
-        specifiedType: "_token",  // for action bar type menu
-        type: "_token",
-        typecheckError: null,  // for "change #changeColumn-backend" handler
-        fieldName: null,
-        isObject: true,
-        objectName: '(new object column)',
-        formula: null,  // state, because the parent is always the root
-        children: [],  // for allowedReferenceDisplayColumns
-        referenceDisplayColumn: null,
-      };
-    else if (columnId instanceof SpareValueColumnId)
-      return {
-        _id: columnId,
-        parent: columnId.parentColumnId,
-        specifiedType: DEFAULT_STATE_FIELD_TYPE,  // for action bar type menu
-        type: DEFAULT_STATE_FIELD_TYPE,
-        typecheckError: null,  // for "change #changeColumn-backend" handler
-        fieldName: '(new value column)',
-        isObject: false,
-        objectName: null,
-        formula: null,
-        children: [],  // for allowedReferenceDisplayColumns
-        referenceDisplayColumn: null,
-      };
-    else
-      return getColumn(columnId);
-  }
-
-  export function columnIdIsReal(columnId : ColumnIdWithSpares): columnId is ColumnId {
-    return typeof columnId === "string";
-  }
-
-  export function columnIsState(col: ColumnWithSpares) {
+  export function columnIsState(col: Column): boolean {
     return col._id !== rootColumnId && (col.formula == null);
   }
 
-  export function objectNameWithFallback(col: ColumnWithSpares): string {
+  export function objectNameWithFallback(col: Column): string {
     return fallback(col.objectName, (col.fieldName != null ? `[${col.fieldName}]` : null));
-  }
-
-  export function columnSiblingIndex(columnId: ColumnId): number {
-    let col = getColumn(columnId);
-    let parentCol = getColumn(col.parent);
-    return parentCol.children.indexOf(col._id);
   }
 
   export function columnDepth(columnId: ColumnId): number {
@@ -384,10 +185,7 @@ namespace Objsheets {
   }
 
   // Compare to stringifyNavigation.
-  // Eek, I guess we'll allow spare columns here for the benefit of the action
-  // bar. ~ Matt 2016-03-10
-  type ColumnRefWithSpares = [ColumnIdWithSpares, /* isValues */ boolean];
-  export function stringifyColumnRef([columnId, isValues]: ColumnRefWithSpares): string {
+  export function stringifyColumnRef([columnId, isValues]: ColumnRef): string {
     if (columnId === rootColumnId) {
       // XXX Consider reenabling the error after more testing. ~ Matt 2015-11-25
       //throw new SemanticError('We currently do not support references to the root column.')
@@ -395,17 +193,14 @@ namespace Objsheets {
     }
     let names: string[] = [];
     while (columnId !== rootColumnId) {
-      let col = getColumnWithSpares(columnId);
+      let col = getColumn(columnId);
       if (col == null) {
         return "(deleted)";
       }
       let name = isValues ? col.fieldName : objectNameWithFallback(col);
       let logicalParent = isValues && col.isObject ? columnId : col.parent;
       if (name != null) {
-        if (columnIdIsReal(columnId) &&
-            /* A little reasoning that goes beyond TypeScript: if columnId is
-               real, then so is its logical parent. */
-            columnLogicalChildrenByName(<ColumnId>logicalParent, name).length !== 1) {
+        if (columnLogicalChildrenByName(logicalParent, name).length !== 1) {
           name += "(ambiguous)";
         }
       } else {

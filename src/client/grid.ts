@@ -3,31 +3,22 @@
 
 namespace Objsheets {
 
-  // Object that can be used as ViewCell.value or ViewHlist.value to defer the
-  // resolution of the target cell ID to a row number.
-  export class CellReference {
-    constructor(public qCellId: QCellId, public display: string) {}
-  }
-
   export class ViewCell {
-    public qCellId: QCellIdWithSpares;
-    // Set for header only.
-    // (TODO: Rename to headerColumnId once code is typed?)
-    public columnId: ColumnIdWithSpares;
-    public isObject: boolean;
+    public qCellId: fixmeAny;
+    public columnId: fixmeAny;
+    public isObject: fixmeAny;
     public kind: fixmeAny;
-    public fullText: string;
-    public isObjectHeader: boolean;
-    public isObjectCell: boolean;
-    // Used for object region highlighting.
-    public ancestorQCellId: QCellIdWithSpares;
-    public isPlaceholder: boolean;
+    public fullText: fixmeAny;
+    public isObjectHeader: fixmeAny;
+    public isObjectCell: fixmeAny;
+    public ancestorQCellId: fixmeAny;
+    // If set to a state column, then data can be added to this cell, and
+    // any missing ancestors will be automatically created up to
+    // ancestorQCellId.
+    public addColumnId : string;
+    public isPlaceholder: fixmeAny;
 
-    // XXX: We could probably replace these with accessors.
-    public display: string;
-    public referent: QCellId;
-
-    constructor(public value: string | CellReference = null, public rowspan = 1, public colspan = 1, public cssClasses: string[] = []) {
+    constructor(public value: fixmeAny = null, public rowspan: fixmeAny = 1, public colspan: fixmeAny = 1, public cssClasses: fixmeAny = []) {
       this.qCellId = null;
       this.columnId = null;
       // Use in combination with columnId or qCellId to distinguish key and object
@@ -38,18 +29,16 @@ namespace Objsheets {
     }
   }
 
-  export type ViewGrid = ViewCell[][];
-
   // Mutate "orig" by adding "extension" at the bottom.
   // This would be a good place to add some assertions...
-  export function gridVertExtend(orig: ViewGrid, extension: ViewGrid): void {
+  export function gridVertExtend(orig: fixmeAny, extension: fixmeAny) {
     for (let row of extension) {
       orig.push(row);
     }
   }
 
   // Mutate "orig" by adding "extension" at the right.
-  export function gridHorizExtend(orig: ViewGrid, extension: ViewGrid): void {
+  export function gridHorizExtend(orig: fixmeAny, extension: fixmeAny) {
     for (let i = 0; i < orig.length; i++) {
       for (let cell of extension[i]) {
         orig[i].push(cell);
@@ -59,10 +48,9 @@ namespace Objsheets {
 
   // Return a grid consisting of one "height x width" merged cell and enough dummy
   // 1x1 cells.  You can mutate the upper-left cell as desired.
-  export function gridMergedCell(height: number, width: number,
-      value: string | CellReference = "", cssClasses: string[] = []): ViewGrid {
+  export function gridMergedCell(height: fixmeAny, width: fixmeAny, value: fixmeAny = "", cssClasses: fixmeAny = []) {
     let grid = _.range(0, height).map((i) => _.range(0, width).map((j) => new ViewCell(null)));
-    if (width > 0 && height > 0) {
+    if (width > 0) {
       grid[0][0].rowspan = height;
       grid[0][0].colspan = width;
       grid[0][0].value = value;
@@ -71,7 +59,7 @@ namespace Objsheets {
     return grid;
   }
 
-  export function gridCell(grid: ViewGrid, row: number, col: number): ViewCell {
+  export function gridCell(grid: fixmeAny, row: fixmeAny, col: fixmeAny) {
     for (let i = 0; i <= row; i++) {
       for (let j = 0; j <= col; j++) {
         let cell = grid[i][j];
@@ -83,13 +71,14 @@ namespace Objsheets {
     throw new Error(`cell (${row},${col}) does not exist in grid`);
   }
 
-  export function gridBottomRow(grid: ViewGrid): ViewCell[] {
+  export function gridBottomRow(grid: fixmeAny) {
+    var _results: fixmeAny;
     if (grid.length === 0) {
       return [];
     } else {
       let i = grid.length - 1;
       let j = 0;
-      let _results: ViewCell[] = [];
+      _results = [];
       while (j < grid[i].length) {
         let cell = gridCell(grid, i, j);
         j += cell.colspan;

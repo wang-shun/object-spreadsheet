@@ -21,6 +21,13 @@ namespace Objsheets {
   }
   let NotReadyError = Meteor.makeErrorType("NotReadyError", NotReadyError_);
 
+  // Object that can be used as ViewCell.value or ViewHlist.value to defer the
+  // resolution of the target cell ID to a row number.  I'm a terrible person for
+  // taking advantage of heterogeneous fields in JavaScript... ~ Matt
+  export class CellReference {
+    constructor(public qCellId: fixmeAny, public display: fixmeAny) {}
+  }
+
   export function stringifyTypeForSheet(type: fixmeAny) {
     var col: fixmeAny, name: fixmeAny;
     if (type === "_unit") {
@@ -40,12 +47,11 @@ namespace Objsheets {
   }
 
   class ViewVlist {
-    constructor(public parentCellId: CellIdWithSpares, public minHeight: number, public hlists: ViewHlist[], public numPlaceholders = 0, public error?: string) {}
+    constructor(public parentCellId: fixmeAny, public minHeight: fixmeAny, public hlists: fixmeAny, public numPlaceholders?: fixmeAny, public error?: fixmeAny) {}
   }
 
   class ViewHlist {
-    // TODO: Rename value to displayValue
-    constructor(public cellId: CellIdWithSpares, public minHeight: number, public value: string | CellReference, public error: string, public vlists: ViewVlist[]) {}
+    constructor(public cellId: fixmeAny, public minHeight: fixmeAny, public value: fixmeAny, public error: fixmeAny, public vlists: fixmeAny) {}
   }
 
   class ViewSection {
@@ -62,9 +68,9 @@ namespace Objsheets {
     public amRootWithSeparateTables: fixmeAny;
     public headerMinHeight: fixmeAny;
 
-    constructor(public layoutTree: fixmeAny, public options: fixmeAny) {
+    constructor(public layoutTree: fixmeAny, public options: fixmeAny = {}) {
       this.columnId = this.layoutTree.root;
-      this.col = getColumnWithSpares(this.columnId);
+      this.col = getColumn(this.columnId);
       // Typechecking should always fill in a type, even 'error'.
       if (!((this.col != null) && (this.col.type != null))) {
         throw new NotReadyError(`column ${this.columnId}`);
@@ -89,7 +95,7 @@ namespace Objsheets {
         let subsection = new ViewSection(sublayout, this.options);
         this.subsections.push(subsection);
         let nextLeftEdgeSingular = subsection.relationSingular && subsection.leftEdgeSingular;
-        let extraColClass = this.amRootWithSeparateTables && i > 0 ? "tableSeparator" : this.options.sepcols && !this.rightEdgeSingular && !nextLeftEdgeSingular ? "separator" : null;
+        let extraColClass = this.options.separateTables && this.col._id === rootColumnId && i > 0 ? "tableSeparator" : this.options.sepcols && !this.rightEdgeSingular && !nextLeftEdgeSingular ? "separator" : null;
         this.extraColClassBefore.push(extraColClass);
         if (extraColClass != null) {
           this.width++;
@@ -111,7 +117,7 @@ namespace Objsheets {
         key: parentCellId
       });
       if ((ce != null ? ce.values : null) != null) {
-        let hlists = ce.values.map((value: fixmeAny) => this.prerenderHlist(cellIdChild(parentCellId, value)));
+        let hlists = ce.values.map((value: fixmeAny) => this.prerenderHlist(cellIdChild(parentCellId, value), value));
         let minHeight = 0;
         for (let hlist of hlists) {
           minHeight += hlist.minHeight;
@@ -133,68 +139,53 @@ namespace Objsheets {
       }
     }
 
-    public prerenderHlist(cellId: CellId1) {
-      let minHeight = 1, displayValue: string | CellReference, error: string;
-      if (this.col.type == "_token") {
-        // In this case, displayValue and error are not used by renderHlist.
-        // The root object takes this path, though it doesn't actually have a
-        // token.
-        displayValue = null;
-        error = null;
-      } else {
-        try {
-          let value = cellIdLastStep(cellId);
-          let displayString = valueToText(liteModel, this.col.type, value);
-          if (typeIsReference(this.col.type)) {
-            displayValue = new CellReference({
-              columnId: this.col.type,
-              cellId: <CellId1>value  // because typeIsReference(this.col.type)
-            }, displayString);
-          } else
-            displayValue = displayString;
-          error = null;
-        } catch (e) {
-          displayValue = null;
-          error = e.message;
+    public prerenderHlist(cellId: fixmeAny, value: fixmeAny) {
+      let minHeight = 1, displayValue: fixmeAny, error: fixmeAny;
+      try {
+        displayValue = valueToText(liteModel, this.col.type, value);
+        if (typeIsReference(this.col.type)) {
+          displayValue = new CellReference({
+            columnId: this.col.type,
+            cellId: value
+          }, displayValue);
         }
+        error = null;
+      } catch (e) {
+        displayValue = null;
+        error = e.message;
       }
       let vlists = this.subsections.map((subsection: ViewSection) => subsection.prerenderVlist(cellId));
       minHeight = Math.max.apply(Math, [1].concat(vlists.map((vlist: fixmeAny) => vlist.minHeight)));
       return new ViewHlist(cellId, minHeight, displayValue, error, vlists);
     }
 
-    private makeSpareHlist(parentCellId: CellIdWithSpares, spareIndex: number) {
-      let cellId = cellIdChild(parentCellId, new SpareValue(spareIndex));
-      return new ViewHlist(cellId, 1, null, null,
-        this.subsections.map((subsection: fixmeAny) =>
+    public renderVlist(vlist: fixmeAny, height: fixmeAny) {
           new ViewVlist(cellId, 1, [])));
-          // We do not need to create an hlist here.  renderVlist will call
-          // makeSpareHlist again to reach the minimum height of 1.
-    }
-
-    public renderVlist(vlist: ViewVlist, height: number) {
       let qFamilyId = {
         columnId: this.columnId,
         cellId: vlist.parentCellId
       };
-      let grid: ViewGrid;
+      let ancestorQCellId = {
+        columnId: this.col.parent,
+        cellId: vlist.parentCellId
+      };
+      let grid: fixmeAny;
       if (vlist.hlists != null) {
         grid = [];
         for (let hlist of vlist.hlists) {
-          gridVertExtend(grid, this.renderHlist(hlist, hlist.minHeight));
+          gridVertExtend(grid, this.renderHlist(hlist, ancestorQCellId, hlist.minHeight));
         }
         for (let cell of gridBottomRow(grid)) {
           cell.cssClasses.push("vlast");
         }
-        let spareIndex: number;
-        for (spareIndex = 0; spareIndex < vlist.numPlaceholders; spareIndex++) {
-          // This should occur only in value columns, so placeholder should be 1x1.
-          let placeholder = this.renderHlist(this.makeSpareHlist(vlist.parentCellId, spareIndex), 1);
-          placeholder[0][0].isPlaceholder = true;
-          gridVertExtend(grid, placeholder);
+        for (let i = 0; i < vlist.numPlaceholders; i++) {
+          // This should occur only in value columns, so gridPlaceholder should be 1x1.
+          let gridPlaceholder = this.renderHlist(null, ancestorQCellId, 1);
+          gridPlaceholder[0][0].isPlaceholder = true;
+          gridVertExtend(grid, gridPlaceholder);
         }
         if (grid.length < height) {
-          if (grid.length === 1 && !(this.col.parent == rootColumnId && this.options.separateTables)) {
+          if (grid.length === 1) {
             // Make this row span 'height' rows
             for (let i = 1; i < height; i++) {
               grid.push(_.range(0, this.width).map((j) => new ViewCell()));
@@ -203,9 +194,8 @@ namespace Objsheets {
               cell.rowspan = height;
             }
           } else {
-            while (grid.length < height) {
-              gridVertExtend(grid, this.renderHlist(this.makeSpareHlist(vlist.parentCellId, spareIndex++), 1));
-            }
+            while (grid.length < height)
+              gridVertExtend(grid, this.renderHlist(null, ancestorQCellId, 1));
           }
         }
       } else {
@@ -224,7 +214,7 @@ namespace Objsheets {
     // Only applicable if @col.isObject.
 
     public objectSymbol() {
-      return this.columnId === rootColumnId ? "" : this.col.type === "_token" ? "•" : "◦";
+      return this.col._id === rootColumnId ? "" : this.col.type === "_token" ? "•" : "◦";
     }
 
     // typeColors: EJSONKeyedMap<string, int>
@@ -248,17 +238,20 @@ namespace Objsheets {
       return nextColor;
     }
 
-    public renderHlist(hlist: ViewHlist, height: number) {
+    // Can be called with hlist == null for an empty row.
+    public renderHlist(hlist: fixmeAny, ancestorQCellId: fixmeAny, height: fixmeAny) {
       let grid = _.range(0, height).map((i) => []);
-      let qCellId: QCellIdWithSpares = {
+      let qCellId = (hlist == null) ? null : {
         columnId: this.columnId,
         cellId: hlist.cellId
       };
       if (this.showBullets) {
         // Object
         let gridObject = gridMergedCell(height, 1,
-          cellIdIsReal(hlist.cellId) ? this.objectSymbol() : "",
-          [cellIdIsReal(hlist.cellId) ? "centered" : "dataPadding"]);
+          hlist == null ? "" : this.objectSymbol(),
+          [hlist == null ? "dataPadding" : "centered"]);
+        gridObject[0][0].ancestorQCellId = ancestorQCellId;
+        gridObject[0][0].addColumnId = this.columnId;
         gridObject[0][0].qCellId = qCellId;
         gridObject[0][0].isObjectCell = true;
         // For debugging and calling canned transactions from the console.
@@ -271,8 +264,10 @@ namespace Objsheets {
       if (this.col.type !== "_token") {
         // Value
         let gridValue = gridMergedCell(height, 1,
-          cellIdIsReal(hlist.cellId) ? fallback(hlist.value, "<?>") : "",
-          cellIdIsReal(hlist.cellId) ? [] : ["dataPadding"]);
+          hlist == null ? "" : fallback(hlist.value, "<?>"),
+          hlist == null ? ["dataPadding"] : []);
+        gridValue[0][0].ancestorQCellId = ancestorQCellId;
+        gridValue[0][0].addColumnId = this.columnId;
         gridValue[0][0].qCellId = qCellId;
         if (hlist != null) {
           if (this.subsections.length === 0) {
@@ -294,7 +289,7 @@ namespace Objsheets {
         gridHorizExtend(grid, gridValue);
       }
       // Subsections
-      this.subsections.forEach((subsection: ViewSection, i: number) => {
+      this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         if (this.extraColClassBefore[i] != null) {
           let extraCells = gridMergedCell(height, 1, "", [this.extraColClassBefore[i]]);
           if (this.extraColClassBefore[i] === "separator") {
@@ -302,11 +297,14 @@ namespace Objsheets {
             // not table separator cells for the root object).  Do not set qCellId
             // as that would allow "Delete object", which would be a little
             // surprising.
-            extraCells[0][0].ancestorQCellId = qCellId;
+            extraCells[0][0].ancestorQCellId = fallback(qCellId, ancestorQCellId);
           }
           gridHorizExtend(grid, extraCells);
         }
-        let subsectionGrid = subsection.renderVlist(hlist.vlists[i], height);
+        let subsectionGrid =
+          (hlist == null)
+            ? subsection.renderHlist(null, ancestorQCellId, height)
+            : subsection.renderVlist(hlist.vlists[i], height);
         gridHorizExtend(grid, subsectionGrid);
       });
       return grid;
@@ -318,10 +316,7 @@ namespace Objsheets {
     // at height 2 anyway.
 
     public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: fixmeAny) {
-      // Spare columns have a hypothetical name and type for use elsewhere in
-      // the UI, but we don't display that information in the header because it
-      // would make the spare columns look too real.
-      let isSpareColumn = !columnIdIsReal(this.columnId);
+      // Part that is always the same.
       var fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
       let myDepthClass = "rsHeaderDepth" + this.colorIndexForDepth(this.col.isObject ? depth : depth - 1);
       // Currently matching-colored header cells don't depend on depth.  You could
@@ -332,7 +327,7 @@ namespace Objsheets {
         let fieldNameCell = new ViewCell("", 1, 1, ["rsHeaderFieldNameObject"].concat((this.col.type !== "_token" ? ["rsHeaderFieldNameKeyedObject"] : []), [myColorClass]));
         fieldNameCell.columnId = this.columnId;
         fieldNameCell.isObjectHeader = true;
-        let typeCell = new ViewCell("", 1, 1, ["rsHeaderTypeObject"].concat((this.col.type !== "_token" ? ["rsHeaderTypeKeyedObject"] : []), ["centered"], [myColorClass]));
+        let typeCell = new ViewCell(this.objectSymbol(), 1, 1, ["rsHeaderTypeObject"].concat((this.col.type !== "_token" ? ["rsHeaderTypeKeyedObject"] : []), ["centered"], [myColorClass]));
         typeCell.columnId = this.columnId;
         typeCell.isObjectHeader = true;
         if (this.col.type === "_token") {
@@ -349,18 +344,16 @@ namespace Objsheets {
       }
       if (this.col.type !== "_token") {
         let myFieldColorClass = (fieldMatchIdx = typeColors.get(this.col.type)) != null ? "rsHeaderMatch" + this.colorIndexForMatch(fieldMatchIdx) : myDepthClass;
-        let fieldNameCell = new ViewCell(isSpareColumn ? "" : fallback(this.col.fieldName, ""), 1, 1, [(this.col.isObject ? "rsHeaderFieldNameKey" : "rsHeaderFieldNameLeaf"), myFieldColorClass]);
+        let fieldNameCell = new ViewCell(fallback(this.col.fieldName, ""), 1, 1, [(this.col.isObject ? "rsHeaderFieldNameKey" : "rsHeaderFieldNameLeaf"), myFieldColorClass]);
         fieldNameCell.columnId = this.columnId;
         fieldNameCell.kind = "below";
-        let typeName = isSpareColumn ? "" : stringifyTypeForSheet(this.col.type);
+        let typeName = stringifyTypeForSheet(this.col.type);
         // The type is essential to interpret values in the column.  The rest of
         // the attributes are no more important than the formula itself, which we
         // currently show only in the action bar, so don't show them here.
         let typeCell = new ViewCell(typeName, 1, 1, [(this.col.isObject ? "rsHeaderTypeKey" : "rsHeaderTypeLeaf"), myFieldColorClass].concat(this.markDisplayClasses()));
         typeCell.columnId = this.columnId;
         typeCell.kind = "type";
-        if (isSpareColumn)
-          typeCell.cssClasses.push("spareValueColumn");
         gridHorizExtend(grid, [[fieldNameCell], [typeCell]]);
       }
 
@@ -378,7 +371,7 @@ namespace Objsheets {
           classes.push("rsHeaderNonfinal");
         }
         classes.push(myColorClass);
-        let corner = gridMergedCell(height - 2, grid[0].length, isSpareColumn ? "" : fallback(this.col.objectName, ""), classes);
+        let corner = gridMergedCell(height - 2, grid[0].length, fallback(this.col.objectName, ""), classes);
         if (grid[0].length > 0) {
           corner[0][0].columnId = this.columnId;
           corner[0][0].isObjectHeader = true;
@@ -451,27 +444,18 @@ namespace Objsheets {
 
   // This may hold a reference to a ViewCell object from an old View.  Weird but
   // shouldn't cause any problem and not worth doing differently.
-  let selectedCell: ViewCell = null;
-  type SelectionPredicate = (c: ViewCell) => boolean;
-  let pendingSelectionPredicate: SelectionPredicate = null;
-  function postSelectionPredicate(predicate: SelectionPredicate) {
-    if (clientView != null && clientView.selectMatchingCell(predicate))
+  let selectedCell: fixmeAny = null;
+  let pendingSelectionPredicate: fixmeAny = null;
+  function postSelectionPredicate(predicate: fixmeAny) {
+    if (view != null && view.selectMatchingCell(predicate))
       pendingSelectionPredicate = null;
     else
       pendingSelectionPredicate = predicate;
   }
 
-  class Placeholder {
-    // Appears to be needed for TypeScript to interpret instanceof properly.
-    private dummy : any;
-  }
-
   export class StateEdit {
-    public static parseValue(columnId: ColumnIdWithSpares, text: string): OSValue {
-      // XXX This is wrong if you manage to edit the type of a spare column and
-      // enter data into it in a single operation.  I'm willing to say we don't
-      // care. ~ Matt 2016-03-26
-      let type = getColumnWithSpares(columnId).type;
+    public static parseValue(columnId: fixmeAny, text: fixmeAny) {
+      let type = getColumn(columnId).type;
       //if typeIsReference(type)
       //  if (m = /^@(\d+)$/.exec(text))
       //    wantRowNum = Number.parseInt(m[1])
@@ -482,68 +466,48 @@ namespace Objsheets {
       return parseValue(type, text);
     }
 
-    public static parseValueUi(columnId: ColumnIdWithSpares, text: string): OSValue {
+    public static parseValueUi(columnId: fixmeAny, text: fixmeAny) {
       try {
         return this.parseValue(columnId, text);
       } catch (e) {
-        e.message = "Invalid value: " + e.message;  // Hack
+        alert("Invalid value: " + e.message);
         throw e;
       }
     }
 
-    public static PLACEHOLDER = new Placeholder();
+    public static PLACEHOLDER = {};
 
-    public static addCell(qFamilyId: QFamilyIdWithSpares, enteredValue: string | Placeholder, callback: MeteorCallback<void>,
-        consumePlaceholder = false, spareColumnCreator = createColumnIfSpare, spareObjectCreator = createObjectIfSpare) {
-      let newValue: OSValue;
-      if (enteredValue instanceof Placeholder) {
+    public static addCell(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
+      var newValue: fixmeAny;
+      if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
       } else {
-        newValue = this.parseValueUi(qFamilyId.columnId, enteredValue);
+        newValue = this.parseValueUi(addColumnId, enteredValue);
+        if (newValue == null)
+          return;
       }
-
-      let qFamilyId3: QFamilyId;
-      let after: MeteorCallback<void> = (error, result) => {
-        if (error == null) {
-          // Try to move the selection to the added cell, once it shows up.
-          let predicate: SelectionPredicate;
-          if (enteredValue instanceof Placeholder) {
-            predicate = (c) =>
-              c.qCellId &&
-              EJSON.equals(c.qCellId.columnId, qFamilyId3.columnId) &&
-              EJSON.equals(cellIdParent(c.qCellId.cellId), qFamilyId3.cellId) &&
-              c.isPlaceholder;
-          } else {
-            predicate = (c) =>
-              EJSON.equals(c.qCellId, {columnId: qFamilyId3.columnId, cellId: cellIdChild(qFamilyId3.cellId, newValue)});
+      $$.call("addCellRecursive", addColumnId, ancestorQCellId, newValue, consumePlaceholder,
+        (error: fixmeAny, result: fixmeAny) => {
+          if (error == null) {
+            // Try to move the selection to the added cell, once it shows up.
+            let predicate: fixmeAny;
+            if (enteredValue == StateEdit.PLACEHOLDER) {
+              predicate = (c: fixmeAny) =>
+                c.addColumnId == addColumnId &&
+                EJSON.equals(c.ancestorQCellId, {columnId: getColumn(addColumnId).parent, cellId: result}) &&
+                c.isPlaceholder;
+            } else {
+              predicate = (c: fixmeAny) =>
+                EJSON.equals(c.qCellId, {columnId: addColumnId, cellId: cellIdChild(result, newValue)});
+            }
+            postSelectionPredicate(predicate);
           }
-          postSelectionPredicate(predicate);
-        }
-        callback(error, null);
-      };
-
-      spareColumnCreator(qFamilyId.columnId, (error, realColumnId) => {
-        if (error) { callback(error, null); return; }
-        let parentQCellId2: QCellIdWithObjectSpares =
-          {columnId: getColumn(realColumnId).parent, cellId: qFamilyId.cellId};
-        spareObjectCreator(parentQCellId2, (error, realParentQCellId) => {
-          if (error) { callback(error, null); return; }
-          qFamilyId3 = {columnId: realColumnId, cellId: realParentQCellId.cellId};
-
-          if (newValue == null) {
-            new FamilyId(qFamilyId3).addPlaceholder(after);
-          } else {
-            new FamilyId(qFamilyId3).add(newValue, (error, result) => {
-              if (error) { callback(error, null); return; }
-              $$.call("notify", after);
-            }, consumePlaceholder);
-          }
+          callback(error, result);
         });
-      });
     }
 
-    public static modifyCell(qCellId: QCellId, enteredValue: string, callback: MeteorCallback<void>) {
-      let newValue: OSValue;
+    public static modifyCell(qCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = () => {}) {
+      var newValue: fixmeAny;
       let cel = new CellId(qCellId);
       if ((newValue = this.parseValueUi(cel.columnId, enteredValue)) != null) {
         cel.value(newValue, (() => {
@@ -552,89 +516,17 @@ namespace Objsheets {
       }
     }
 
-    public static removeCell(qCellId: QCellId, callback: MeteorCallback<void>) {
+    public static removeCell(qCellId: fixmeAny, callback: fixmeAny = () => {}) {
       new CellId(qCellId).remove((() => {
         $$.call("notify", callback);
       }));
     }
 
-    public static canEdit(columnId: ColumnIdWithSpares) {
-      let col = getColumnWithSpares(columnId);
+    public static canEdit(columnId: fixmeAny) {
+      let col = getColumn(columnId);
       // May as well not let the user try to edit _unit.
       return (col != null) && columnIsState(col) && (col.type !== "_token" && col.type !== "_unit");
     }
-  }
-
-  type SpareColumnCreator = (columnId: ColumnIdWithSpares, callback: MeteorCallback<ColumnId>) => void;
-  type SpareObjectCreator = (qCellId: QCellIdWithObjectSpares, callback: MeteorCallback<QCellId>) => void;
-
-  function createColumnIfSpareWithHook(columnId: ColumnIdWithSpares, recurse: SpareColumnCreator,
-    callback: MeteorCallback<ColumnId>): void {
-    if (columnIdIsReal(columnId))
-      callback(null, columnId);
-    else {
-      let origSelectedCell = selectedCell;  // save it now
-      let viewId = clientView.view != null ? clientView.view.id : null;
-      let col = getColumnWithSpares(columnId);
-      recurse(col.parent, (error, realParentColumnId) => {
-        if (error) { callback(error, null); return; }
-        let parentCol = getColumn(realParentColumnId);
-        $$.call("defineColumn", parentCol._id, parentCol.children.length,
-          col.isObject ? null : nextAvailableColumnName("value"),
-          col.specifiedType, col.isObject,
-          col.isObject ? nextAvailableColumnName("Object") : null,
-          null, viewId, (error: Error, realColumnId: ColumnId) => {
-          if (error == null) {
-            // If a header cell of the spare column was selected, then try to move
-            // the selection to the real column.  Most cases where a data cell in
-            // the column was selected should be handled by StateEdit.addCell.
-            // XXX Is there a more robust way to express the idea that the real
-            // column is the successor to the spare column we saw in the UI
-            // without cluttering the permanent data model?
-            if (origSelectedCell != null && EJSON.equals(origSelectedCell.columnId, columnId)) {
-              postSelectionPredicate((c) =>
-                c.kind == origSelectedCell.kind && EJSON.equals(c.columnId, realColumnId));
-            }
-          }
-          callback(error, realColumnId);
-        });
-      });
-    }
-
-  }
-  // Used by actions.ts.
-  export function createColumnIfSpare(columnId: ColumnIdWithSpares, callback: MeteorCallback<ColumnId>): void {
-    createColumnIfSpareWithHook(columnId, createColumnIfSpare, callback);
-  }
-
-  function createObjectIfSpareWithHook(qCellId: QCellIdWithObjectSpares, recurse: SpareObjectCreator,
-    callback: MeteorCallback<QCellId>): void {
-    if (qCellIdIsReal(qCellId))
-      callback(null, qCellId);
-    else {
-      // XXX: Have not decided yet whether CellId allows spares.
-      recurse(<fixmeAny>new CellId(qCellId).parent().q(),
-        (error, realParentQCellId) => {
-        let fam = new CellId(realParentQCellId).family(qCellId.columnId);
-        let token = Random.id();
-        // Not relying on return value of fam.add because that would bake in the
-        // assumption that it returns before the callback is called, which is ugly.
-        // XXX: Change FamilyID.add to pass the value to the callback instead.
-        fam.add(token, (error: Error) => {
-          if (error != null) { callback(error, null); return; }
-          // XXX: This is extremely inefficient, but for now, the best way to
-          // make sure the sheet isn't left out of date.  We can consider adding
-          // some "transaction" abstraction and recomputing only at the end.
-          $$.call("notify", (error: Error) => {
-            if (error != null) { callback(error, null); return; }
-            callback(null, <fixmeAny>fam.child(token).q());
-          });
-        });
-      });
-    }
-  }
-  function createObjectIfSpare(qCellId: QCellIdWithObjectSpares, callback: MeteorCallback<QCellId>): void {
-    createObjectIfSpareWithHook(qCellId, createObjectIfSpare, callback);
   }
 
   function insertBlankColumn(parentId: fixmeAny, index: fixmeAny, isObject: fixmeAny, view: fixmeAny) {
@@ -685,10 +577,6 @@ namespace Objsheets {
         // Show children of the root as separate tables.
         separateTables: true,
         rootSpareRows: 10,
-        rootSpareCols: 10,
-        // If true, typing in a blank cell directly below the rectangle of an
-        // existing object will add to that object in certain cases; see whereToAdd.
-        addToObjectAbove: true,
         // Developers only (print some logs with timestamps)
         profile: false
       };
@@ -702,29 +590,8 @@ namespace Objsheets {
     }
 
     public reload() {
-      // OK to mutate.  XXX: Track this better.
-      let layoutTree = this.view.def().layout;
-      if (this.options.separateTables) {
-        // Spare column on the last child of the root, if it's an object type.
-        let len = layoutTree.subtrees.length;
-        if (len > 0) {
-          let last = layoutTree.subtrees[len - 1];
-          let lastCol = getColumn(last.root);
-          if (lastCol == null) throw new NotReadyError("lastCol");  // annoying...
-          // It takes more work to get spare columns on top-level computed
-          // object types to work (I haven't tried it to see exactly how much)
-          // and it's an unimportant case, so I won't do it now.
-          // ~ Matt 2016-03-26
-          if (lastCol.isObject && lastCol.formula == null)
-            last.subtrees.push(new Tree(new SpareValueColumnId(last.root)));
-        }
-        // Spare object type.
-        let spareObjColId = new SpareObjectColumnId();
-        layoutTree.subtrees.push(new Tree<ColumnIdWithSpares>(spareObjColId,
-          _.range(0, this.options.rootSpareCols).map(
-            (i) => new Tree(new SpareValueColumnId(spareObjColId, i)))));
-      }
-      this.mainSection = new ViewSection(layoutTree, this.options);
+      this.layoutTree = this.view.def().layout;
+      this.mainSection = new ViewSection(this.layoutTree, this.options);
     }
 
     public hotConfig() {
@@ -733,7 +600,7 @@ namespace Objsheets {
       if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid started  --- `);
       // Display the root column for completeness.  However, it doesn't have a real
       // value.
-      let hlist = this.mainSection.prerenderHlist([]);
+      let hlist = this.mainSection.prerenderHlist([], "");
       // XXX This is in addition to any placeholders.  Desirable?
       hlist.minHeight += this.options.rootSpareRows;
       let typeColors = new EJSONKeyedMap();
@@ -758,7 +625,7 @@ namespace Objsheets {
           }
         });
       }
-      let gridData = this.mainSection.renderHlist(hlist, hlist.minHeight);
+      let gridData = this.mainSection.renderHlist(hlist, null, hlist.minHeight);
       gridVertExtend(grid, gridData);
 
       //gridCaption = []
@@ -811,7 +678,7 @@ namespace Objsheets {
         let colCls: fixmeAny = null;
         for (let row = 0; row < grid.length; row++) {
           for (let cls of grid[row][col].cssClasses) {
-            if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator" || cls === "spareValueColumn") {
+            if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator") {
               // assert (!colCls? || colCls == cls)
               colCls = cls;
             }
@@ -833,13 +700,12 @@ namespace Objsheets {
             classes.push(`ancestor-${refc}`);
           }
         }
-        // Only column header "top" and "below" cells can be edited,
-        // for the purpose of changing the objectName and fieldName respectively.
         if ((cell.kind === "top" || cell.kind === "below") && cell.columnId !== rootColumnId
-            // We don't have editable columns (either state or updatable views)
-            // as descendants of formula columns, so if we can edit this column,
-            // we'll also be able to create any spare ancestor objects.
-            || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId))
+            || (cell.qCellId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.qCellId.columnId)
+            // We don't have state columns as descendants of formula columns, so
+            // if we can edit addColumnId, we'll also be able to insert the
+            // ancestors.
+            || (cell.addColumnId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.addColumnId))
           classes.push("editable");
         return cell.cssClasses.concat(classes);
       }))
@@ -859,9 +725,6 @@ namespace Objsheets {
               return 10;
             case "rsRoot":
               return 18;
-            case "spareValueColumn":
-              // Handsontable default.  XXX: Reference from there?
-              return 50;
             default:
               // NOTE!  Auto column size only works if this is undefined, not null.
               return undefined;
@@ -902,6 +765,10 @@ namespace Objsheets {
             // changes.  Don't use readOnly because that would dim the cells, which
             // we think is more than is appropriate.
             editor: Tracker.nonreactive(() => ActionBar.hasUnsavedData()) ? false : "text",
+            // Only column header "top" and "below" cells can be edited,
+            // for the purpose of changing the objectName and fieldName respectively.
+            //
+            // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
             readOnly: classes.indexOf("editable") == -1 
           };
         },
@@ -954,39 +821,10 @@ namespace Objsheets {
           if (!source) return;   // Run this handler only for interactive edits
 
           var fail = false;
-
-          // If we edit multiple cells in the same spare object or column in a
-          // single operation (e.g., via copy and paste), we only want to create
-          // the object or column once.  It's unclear how long this
-          // functionality is going to live before we do something more
-          // sophisticated, but it makes for a cool demo. ~ Matt 2016-03-19
-          let columnMemo = new Memo<ColumnIdWithSpares, Promise<ColumnId>>(
-            (columnId) => Meteor.wrapPromise(createColumnIfSpareWithHook)(columnId, cachedCreateColumnIfSpare));
-          let cachedCreateColumnIfSpare =
-            (columnId: ColumnIdWithSpares, callback: MeteorCallback<ColumnId>) => {
-              promiseThenCallback(columnMemo.get(columnId), callback);
-            };
-          // Otherwise we get multiple columns named "value1".  After we migrate
-          // to async/await, we can consider performing the changes completely
-          // sequentially from an async function; without async/await, that
-          // would be extremely messy.
-          let createColumnQueue = new OneAtATime();
-          let sequentialCreateColumnIfSpare =
-            (columnId: ColumnIdWithSpares, callback: MeteorCallback<ColumnId>) => {
-              promiseThenCallback(createColumnQueue.run(() => Meteor.wrapPromise(cachedCreateColumnIfSpare)(columnId)), callback);
-            };
-
-          let objectMemo = new Memo<QCellIdWithObjectSpares, Promise<QCellId>>(
-            (qCellId) => Meteor.wrapPromise(createObjectIfSpareWithHook)(qCellId, cachedCreateObjectIfSpare));
-          let cachedCreateObjectIfSpare =
-            (qCellId: QCellIdWithObjectSpares, callback: MeteorCallback<QCellId>) => {
-              promiseThenCallback(objectMemo.get(qCellId), callback);
-            };
-
           for (let [row, col, oldVal, newVal] of changes) {
             if (oldVal === newVal) continue;
             
-            let cell: ViewCell = this.grid[row][col];
+            let cell = this.grid[row][col];
             let revertingCallback = ((row: fixmeAny, col: fixmeAny, oldVal: fixmeAny) => (error: fixmeAny, result: fixmeAny) => {
               if (error) {
                 fail = true;  // prevent race condition in case we're still in this function
@@ -1000,17 +838,11 @@ namespace Objsheets {
             // One of these cases should apply...
             if (cell.kind === "top") {
               let name = newVal === "" ? null : newVal;
-              sequentialCreateColumnIfSpare(cell.columnId, (error, realColumnId) => {
-                if (error) { revertingCallback(error, null); return; }
-                Meteor.call("changeColumnObjectName", $$, realColumnId, name, revertingCallback);
-              });
+              Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
             }
             if (cell.kind === "below") {
               name = newVal === "" ? null : newVal;
-              sequentialCreateColumnIfSpare(cell.columnId, (error, realColumnId) => {
-                if (error) { revertingCallback(error, null); return; }
-                Meteor.call("changeColumnFieldName", $$, realColumnId, name, revertingCallback);
-              });
+              Meteor.call("changeColumnFieldName", $$, cell.columnId, name, revertingCallback);
             }
             // Currently, types can only be changed via the action bar.
             //if cell.kind == 'type'
@@ -1025,33 +857,25 @@ namespace Objsheets {
             //                standardServerCallback
             try {
               if ((cell.qCellId != null) && !cell.isObjectCell) {
-                let qCellId = cell.qCellId;
-                if (qCellIdIsReal(qCellId)) {
-                  // XXX Once we validate values, we should replace the hard-coded
-                  // check for 'text' with an attempt to validate the input.
-                  if (newVal || getColumn(qCellId.columnId).type == 'text') {
-                    StateEdit.modifyCell(qCellId, newVal, revertingCallback);
-                  } else {
-                    if (this.getDeleteCommandForCell(cell) != null) {
-                      this.getDeleteCommandForCell(cell).callback();
-                    }
-                  }
+                // XXX Once we validate values, we should replace the hard-coded
+                // check for 'text' with an attempt to validate the input.
+                // Currently not allowing empty strings as this is the only way to catch
+                // cell deletion keystroke (see comment in onKeyDown).
+                if (newVal) {  // || getColumn(cell.qCellId.columnId).type == 'text'
+                  StateEdit.modifyCell(cell.qCellId, newVal, revertingCallback);
                 } else {
-                  if (newVal || getColumnWithSpares(cell.qCellId.columnId).type === "text") {
-                    // XXX This will go horribly wrong if you paste multiple
-                    // cells and some of them trigger addToObjectAbove behavior.
-                    let qFamilyId = this.whereToAdd(row, col, cell);
-                    // XXX The selection predicate of the last cell to be
-                    // processed wins.  A little odd but I don't have a better
-                    // idea.
-                    StateEdit.addCell(qFamilyId, newVal, revertingCallback, cell.isPlaceholder,
-                      sequentialCreateColumnIfSpare, cachedCreateObjectIfSpare);
+                  if (this.getDeleteCommandForCell(cell) != null) {
+                    this.getDeleteCommandForCell(cell).callback();
                   }
+                  //StateEdit.removeCell cell.qCellId, standardServerCallback
+                }
+              } else if ((cell.addColumnId != null) && !cell.isObjectCell) {
+                if (newVal || getColumn(cell.addColumnId).type === "text") {
+                  StateEdit.addCell(cell.addColumnId, cell.ancestorQCellId, newVal, revertingCallback, cell.isPlaceholder);
                 }
               }
             }
             catch (e) {
-              standardServerCallback(e, null);
               fail = true;   // Note: this reverts all changes.
                              // The ones that have been applied will propagate back through
                              // Meteor collections.
@@ -1074,13 +898,10 @@ namespace Objsheets {
             }
 
             let c = fallback(this.getSingleSelectedCell(), {});
-            let [r1, c1, r2, c2] = fallback(this.getSelected(), [null, null, null, null]);
 
             let items = <fixmeAny>{};
 
-            // It doesn't look like any of the column context menu commands here
-            // are relevant for spare columns.
-            if ((ci = c.columnId) != null && columnIdIsReal(ci)) {
+            if ((ci = c.columnId) != null) {
               let col = getColumn(ci);
               let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
               let fieldName = fallback(col.fieldName, "(unnamed)");
@@ -1143,7 +964,7 @@ namespace Objsheets {
                   }
                 };
               }
-              if ((addCommand = this.getAddCommandForCell(r1, c1, c)) != null) {
+              if ((addCommand = this.getAddCommandForCell(c)) != null) {
                 items.add = addCommand;
               }
               if ((deleteCommand = this.getDeleteCommandForCell(c)) != null) {
@@ -1208,7 +1029,7 @@ namespace Objsheets {
       this.hot.loadData(cfg.data);
     }
 
-    public getSelected() {
+    public getSelected = () => {
       var s: fixmeAny;
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
@@ -1220,7 +1041,7 @@ namespace Objsheets {
       }
     }
 
-    public getSingleSelectedCell() {
+    public getSingleSelectedCell = () => {
       let s = this.getSelected();
       if (s == null) {
         // This can happen if no selection was made since page was loaded
@@ -1235,7 +1056,7 @@ namespace Objsheets {
       }
     }
 
-    public getMultipleSelectedCells() {
+    public getMultipleSelectedCells = () => {
       let cells: fixmeAny = [];
       for (let coord of this.hot.getSelectedRange().getAll()) {
         let cell = this.grid[coord.row][coord.col];
@@ -1293,92 +1114,21 @@ namespace Objsheets {
       this.highlightReferent(selectedCell != null ? selectedCell.referent : null);
       this.highlightObject((selectedCell != null ? selectedCell.isObjectCell : null) ? selectedCell.qCellId : null);
       // _id: Hacks to get the #each to clear the forms when the cell changes.
-      //
-      // Do we still need this?  It looks like it's mainly used to close the
-      // formula debugger. ~ Matt 2016-03-10
       ActionBar.changeColumnArgs.set((selectedCell != null) && ((ci = selectedCell.columnId) != null) && ci !== rootColumnId ? [
         {
-          _id: EJSON.stringify(ci, /* canonical */ true),
+          _id: ci,
           columnId: ci,
           onObjectHeader: selectedCell.isObjectHeader
         }
       ] : []);
     }
 
-    // Check a bunch of conditions to guess whether addition of data to a cell
-    // is an attempt to extend the object above, even though the cell does not
-    // actually belong to the object.
-    private whereToAdd(rowNum: number, colNum: number, c: ViewCell): QFamilyIdWithSpares {
-      // Precondition: !cellIdIsReal(c.qCellId.cellId)
-      let columnId = c.qCellId.columnId;
-
-      // In all of the current cases, the index of the final SpareValue doesn't
-      // matter and we can just add to the family.  If the beforeChange handler
-      // wanted to support composite operations where it mattered that this
-      // SpareValue is the same as another one in the operation (e.g.,
-      // explicitly creating an object and setting one of its fields), then we'd
-      // have to be more careful.
-      let origParentCellId = cellIdParent(c.qCellId.cellId);
-      let origQFamilyId: QFamilyIdWithSpares =
-        {columnId: c.qCellId.columnId, cellId: origParentCellId};
-
-      if (!this.options.addToObjectAbove ||
-          // Context menu add commands on a real (filled) cell.
-          cellIdIsReal(c.qCellId.cellId) ||
-          rowNum == 0)
-        return origQFamilyId;
-      let qCellIdAbove = gridCell(this.grid, rowNum-1, colNum).qCellId;
-      if (qCellIdAbove == null)
-        return origQFamilyId;
-
-      // Check whether we are adding a value to the first field of an object
-      // type, in which case we should apply the rest of the logic to the object
-      // type and then set the field afterwards.
-      //
-      // TODO: Make this criterion smarter.  It should apply to all columns that
-      // we are sure are singular, but if columns default to singular, we have
-      // to guess whether the user's intent is to make the column plural.
-      //
-      // FIXME: Look at the layout tree to correctly handle views and spare
-      // columns.  (Though as long as spare columns only appear in top-level
-      // object types, it makes no difference whether this code triggers on
-      // them.)
-      let addingObjectViaFirstField =
-        (columnIdIsReal(columnId) && columnSiblingIndex(columnId) == 0 &&
-         !getColumn(columnId).isObject);
-
-      let familyMemberAbove =
-        addingObjectViaFirstField
-          ? cellIdParent(qCellIdAbove.cellId)
-          : qCellIdAbove.cellId;
-      if (!cellIdIsReal(familyMemberAbove))
-        // If the user wanted to extend the object above, they could have used
-        // familyMemberAbove (or its first field as applicable).  Because they
-        // intentionally left a space, assume they don't want to extend the object.
-        return origQFamilyId;
-      let objectToExtend = cellIdParent(familyMemberAbove);
-
-      // The user definitely expects the added data to belong to the nearest
-      // real ancestor object of the target cell.  If adding it to the object
-      // above would violate this expectation, then we cannot do so.
-      let realAncestor = cellIdNearestRealAncestor(origParentCellId);
-      if (!cellIdIsAncestor(realAncestor, objectToExtend))
-        return origQFamilyId;
-
-      let newParentCellId =
-        addingObjectViaFirstField
-          ? cellIdChild(objectToExtend, new SpareValue(0))  // object created automatically
-          : objectToExtend;
-      return {columnId: columnId, cellId: newParentCellId};
-    }
-
     // get*CommandForCell return a context menu item, but onKeyDown also uses
     // just the callback, so we maintain consistency in what command is offered.
 
-    public getAddCommandForCell(rowNum: number, colNum: number, c: ViewCell) {
-      let col: ColumnWithSpares;
-      if ((c.qCellId != null) && columnIsState(col = getColumnWithSpares(c.qCellId.columnId))) {
-        let qFamilyId = this.whereToAdd(rowNum, colNum, c);
+    public getAddCommandForCell(c: fixmeAny) {
+      var col: fixmeAny;
+      if ((c.addColumnId != null) && columnIsState(col = getColumn(c.addColumnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
           // A token column has only the object UI-column, though we don't set
@@ -1387,7 +1137,7 @@ namespace Objsheets {
             name: `Add '${objectName}' object here`,
             allowEnter: true,
             callback: () => {
-              StateEdit.addCell(qFamilyId, null, standardServerCallback);
+              StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
             }
           };
         } else if (col.type === "_unit") {
@@ -1397,14 +1147,14 @@ namespace Objsheets {
           // to select an object cell is to already have a unit value present.
           let fam: fixmeAny;
           if (!c.isObjectCell && !(
-                qFamilyIdIsReal(qFamilyId) &&
-                (fam = Cells.findOne({column: qFamilyId.columnId, key: qFamilyId.cellId})) != null &&
+                col.parent == c.ancestorQCellId.columnId &&
+                (fam = Cells.findOne({column: col._id, key: c.ancestorQCellId.cellId})) != null &&
                 fam.values != null && fam.values.length > 0)) {
             return {
               name: "Add X here",
               allowEnter: true,
               callback: () => {
-                StateEdit.addCell(qFamilyId, null, standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, standardServerCallback);
               }
             };
           }
@@ -1419,7 +1169,7 @@ namespace Objsheets {
               // XXX Share code with the calculation of the "editable" class.
               allowEnter: false,
               callback: () => {
-                StateEdit.addCell(qFamilyId, StateEdit.PLACEHOLDER, standardServerCallback);
+                StateEdit.addCell(c.addColumnId, c.ancestorQCellId, StateEdit.PLACEHOLDER, standardServerCallback);
               }
             };
           }
@@ -1428,26 +1178,25 @@ namespace Objsheets {
       return null;
     }
 
-    public getDeleteCommandForCell(c: ViewCell) {
-      let qCellId = c.qCellId;
-      let col: Column;
-      if (c.isPlaceholder) {
-        // Should only exist in real families in state value columns.
-        let qFamilyId: QFamilyId = {columnId: <ColumnId>qCellId.columnId, cellId: <CellId1>cellIdParent(qCellId.cellId)};
+    public getDeleteCommandForCell(c: fixmeAny) {
+      var col: fixmeAny;
+      if (c.isPlaceholder) {  // Should only exist in state value columns.
         return {
           name: "Delete cell",
           callback: () => {
-            new FamilyId(qFamilyId).removePlaceholder(standardServerCallback);
+            new FamilyId({columnId: c.addColumnId,
+                          cellId: c.ancestorQCellId.cellId})
+              .removePlaceholder(standardServerCallback);
           }
         };
-      } else if (qCellId != null && qCellIdIsReal(qCellId) && columnIsState(col = getColumn(qCellId.columnId))) {
+      } else if ((c.qCellId != null) && columnIsState(col = getColumn(c.qCellId.columnId))) {
         return {
           // This currently gives 'Delete object' for the key of a keyed object
           // (deprecated).  If we wanted that case to say 'Delete cell', we
           // would test c.isObjectCell instead.
           name: col.isObject ? "Delete object" : "Delete cell",
           callback: () => {
-            StateEdit.removeCell(qCellId, standardServerCallback);
+            StateEdit.removeCell(c.qCellId, standardServerCallback);
           }
         };
       } else {
@@ -1480,12 +1229,11 @@ namespace Objsheets {
         return;
       }
       selectedCell = this.getSingleSelectedCell();
-      let [r1, c1, r2, c2] = fallback(this.getSelected(), [null, null, null, null]);
       if (event.altKey && event.metaKey) {
         Handsontable.Dom.stopImmediatePropagation(event);
       } else if (!event.altKey && !event.ctrlKey && !event.metaKey) {
         if (event.which === 13) {  // Enter
-          let cmd = this.getAddCommandForCell(r1, c1, selectedCell);
+          let cmd = this.getAddCommandForCell(selectedCell);
           if (cmd != null && cmd.allowEnter) {
             Handsontable.Dom.stopImmediatePropagation(event);
             cmd.callback();
@@ -1495,9 +1243,8 @@ namespace Objsheets {
           if (this.hot.getActiveEditor().state !== "STATE_EDITING") {
             Handsontable.Dom.stopImmediatePropagation(event);
             for (let cell of this.getMultipleSelectedCells()) {
-              let cmd = this.getDeleteCommandForCell(cell);
-              if (cmd != null) {
-                cmd.callback();
+              if (this.getDeleteCommandForCell(cell) != null) {
+                this.getDeleteCommandForCell(cell).callback();
               }
             }
           }
@@ -1506,9 +1253,8 @@ namespace Objsheets {
         if (event.which === 13) {  // Ctrl+Enter
           Handsontable.Dom.stopImmediatePropagation(event);
           if (selectedCell != null) {
-            let cmd = this.getAddCommandForCell(r1, c1, selectedCell);
-            if (cmd != null) {
-              cmd.callback();
+            if (this.getAddCommandForCell(selectedCell) != null) {
+              this.getAddCommandForCell(selectedCell).callback();
             }
           }
         }
@@ -1547,9 +1293,8 @@ namespace Objsheets {
               } else if (event.which === 40) {  // Down
                 // Check whether this should be possible (i.e., right children)
                 // before attempting it so we can detect real errors from the server.
-                let cmd = this.getDemoteCommandForColumn(col);
-                if (cmd != null) {
-                  cmd.callback();
+                if (this.getDemoteCommandForColumn(col) != null) {
+                  this.getDemoteCommandForColumn(col).callback();
                 }
               }
             }
@@ -1563,7 +1308,7 @@ namespace Objsheets {
       this.hot.selectCell(r1, c1, r1 + cell.rowspan - 1, c1 + cell.colspan - 1);
     }
 
-    public selectMatchingCell(predicate: SelectionPredicate) {
+    public selectMatchingCell(predicate: fixmeAny) {
       for (let i = 0; i < this.grid.length; i++) {
         for (let j = 0; j < this.grid[i].length; j++) {
           if (predicate(this.grid[i][j])) {
@@ -1582,48 +1327,46 @@ namespace Objsheets {
 
   }
 
-  let clientView: ClientView = null;
+  let view: fixmeAny = null;
 
   export function rebuildView(viewId: fixmeAny) {
-    if (!clientView || !clientView.hot) {
-      if ((clientView != null ? clientView.hot : null) != null) {
-        clientView.hot.destroy();
+    if (!view || !view.hot) {
+      if ((view != null ? view.hot : null) != null) {
+        view.hot.destroy();
       }
-      clientView = new ClientView(new View(viewId));
-      clientView.hotCreate($("#View")[0]);  //View')[0]
+      view = new ClientView(new View(viewId));
+      view.hotCreate($("#View")[0]);  //View')[0]
     } else {
-      clientView.reload();  //viewDef
-      clientView.hotReconfig();
+      view.reload();  //viewDef
+      view.hotReconfig();
     }
+    this.view = view;  // for debugging
 
     Tracker.nonreactive(() => {
       // Nothing below should trigger rebuilding of the view if it reads reactive
       // data sources.  (Ouch!)
 
       if (pendingSelectionPredicate != null &&
-          clientView.selectMatchingCell(pendingSelectionPredicate)) {
+          view.selectMatchingCell(pendingSelectionPredicate)) {
         pendingSelectionPredicate = null;
       } else if (selectedCell != null) {
         // Try to select a cell similar to the one previously selected.
-        ((selectedCell.qCellId != null) && clientView.selectMatchingCell((c) =>
+        ((selectedCell.qCellId != null) && view.selectMatchingCell((c: fixmeAny) =>
             EJSON.equals(selectedCell.qCellId, c.qCellId) &&
             selectedCell.isObjectCell === c.isObjectCell)) ||
-        // Same family.
-        ((selectedCell.qCellId != null) && clientView.selectMatchingCell((c) =>
-            c.qCellId != null &&
-            EJSON.equals(selectedCell.qCellId.columnId, c.qCellId.columnId) /* could be spare */ &&
-            EJSON.equals(cellIdParent(selectedCell.qCellId.cellId), cellIdParent(c.qCellId.cellId)))) ||
-        ((selectedCell.qCellId != null) && clientView.selectMatchingCell((c) =>
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
+            selectedCell.addColumnId == c.addColumnId &&
+            EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
+        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
             (c.kind === "below" || c.kind === "tokenObject-below") &&
-            EJSON.equals(selectedCell.qCellId.columnId, c.columnId))) ||
-        ((selectedCell.kind != null) && clientView.selectMatchingCell((c) =>
+            EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
+        ((selectedCell.kind != null) && view.selectMatchingCell((c: fixmeAny) =>
             selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
-        console.log('Warning: Failed to carry over selected cell based on data model.  ' +
-          'Allowing Handsontable to fall back to grid coordinates.');
+        false;
       }
       // Make sure various things are consistent with change in table data or
       // selection (view.selectMatchingCell doesn't always seem to trigger this).
-      clientView.onSelection();
+      view.onSelection();
       ActionBar.isLoading.set(false);
     });
   }
@@ -1664,7 +1407,7 @@ namespace Objsheets {
 
   Template["Spreadsheet"].events = {
     "click .toggleHeaderExpanded": () => {
-      clientView.toggleHeaderExpanded();
+      view.toggleHeaderExpanded();
     }
   };
 

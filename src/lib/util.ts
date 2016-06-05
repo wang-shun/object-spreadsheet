@@ -7,16 +7,14 @@
 
 namespace Objsheets {
 
-  // In principle, what we'd like is "V can be anything, but toJSONValue is only
-  // defined if V extends EJSONable".
-  // https://github.com/Microsoft/TypeScript/issues/1290 would give us that, and
-  // then structural subtyping would give us "EJSONKeyedMap<K, V> is an
-  // EJSON.CustomType if V extends EJSONable".  For now, two classes. :/
-  export class EJSONKeyedMapBase<K extends EJSONable, V> {
-    protected obj: {[wrappedKey: string]: V};
+  // In principle, what we'd like is "V can be anything, but EJSONKeyedMap is
+  // only an EJSON.CustomType if V extends EJSONable".  But we can't express
+  // this precisely, and we only use this with V extends EJSONable anyway.
+  export class EJSONKeyedMap<K extends EJSONable, V extends EJSONable> {
+    private obj: {[wrappedKey: string]: V};
 
     private wrapKey(k: K): string {
-      return "map_" + EJSON.stringify(k, /* canonical */ true);
+      return "map_" + EJSON.stringify(k);
     };
     private unwrapKey(k: string): K {
       return EJSON.parse(k.substr(4));
@@ -63,14 +61,6 @@ namespace Objsheets {
       }
       return entries;
     }
-
-    public shallowClone(): EJSONKeyedMapBase<K, V> {
-      return new EJSONKeyedMapBase(this.entries());
-    }
-  }
-
-  export class EJSONKeyedMap<K extends EJSONable, V extends EJSONable>
-    extends EJSONKeyedMapBase<K, V> {
 
     public shallowClone(): EJSONKeyedMap<K, V> {
       return new EJSONKeyedMap(this.entries());
@@ -193,24 +183,20 @@ namespace Objsheets {
   }
   EJSON.addType("Tree", Tree.fromJSONValue);
 
-  export class Memo<K extends EJSONable, V> {
-    private values: EJSONKeyedMapBase<K, V>;
+  export class Memo<V> {
+    private values: {[k: string]: V};
 
-    constructor(private recompute: (k: K) => V) {
-      this.clear();
+    constructor() {
+      this.values = {};
     }
 
     public clear(): void {
-      this.values = new EJSONKeyedMapBase<K, V>();
+      this.values = {};
     }
 
-    public get(k: K): V {
-      let v = this.values.get(k);
-      if (v == null) {
-        v = this.recompute(k);
-        this.values.set(k, v);
-      }
-      return v;
+    public get(key: string, recompute: () => V): V {
+      let v = this.values[key];
+      return v != null ? v : this.values[key] = recompute();
     }
   }
 
@@ -251,4 +237,5 @@ namespace Objsheets {
   export function T<T extends EJSONable>(root: T, subtrees?: Tree<T>[]) {
     return new Tree(root, subtrees);
   }
+
 }

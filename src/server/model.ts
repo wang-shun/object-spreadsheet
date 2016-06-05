@@ -911,6 +911,33 @@ namespace Objsheets {
       });
     }
 
+    private newObjectRecursive(columnId: fixmeAny, ancestorQCellId: fixmeAny): CellId1 {
+      if (columnId == ancestorQCellId.columnId) {
+        return ancestorQCellId.cellId;
+      } else {
+        let col = this.getColumn(columnId);
+        let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
+        let token = Random.id();
+        new FamilyId({columnId: columnId, cellId: parentCellId}).add(token);
+        return cellIdChild(parentCellId, token);
+      }
+    }
+
+    // value == null means add a placeholder.
+    public addCellRecursive(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: fixmeAny) {
+      let col = getColumn(addColumnId);
+      let parentCellId = this.newObjectRecursive(col.parent, ancestorQCellId);
+      let fam = new FamilyId({columnId: addColumnId, cellId: parentCellId});
+      if (value == null) {
+        fam.addPlaceholder();
+      } else {
+        fam.add(value);
+      }
+      // XXX Avoid if we didn't actually change the data model?
+      this.invalidateDataCache();
+      this.evaluateAll();
+      return parentCellId;
+    }
   }
 
   Meteor.startup(() => {
@@ -948,14 +975,13 @@ namespace Objsheets {
       cc.run();
     },
     defineColumn: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, isObject: fixmeAny, objectName: fixmeAny, formula: fixmeAny, viewId: fixmeAny) => {
-      return cc.run(function() {
+      cc.run(function() {
         //attrs = if viewId? then {view: viewId} else {}
         let id = this.model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula);
         if (viewId != null) {
           new View(viewId).addColumn(id, true);  // FIXME: honor index
         }
         this.model.evaluateAll();
-        return id;
       });
     },
     insertUnkeyedStateObjectTypeWithField: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, objectName: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, viewId: fixmeAny) => {
@@ -1019,6 +1045,11 @@ namespace Objsheets {
     recursiveDeleteStateCellNoInvalidate: (cc: fixmeAny, columnId: fixmeAny, cellId: fixmeAny) => {
       cc.run(function() {
         this.model.recursiveDeleteStateCellNoInvalidate(columnId, cellId);
+      });
+    },
+    addCellRecursive: (cc: fixmeAny, addColumnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: fixmeAny) => {
+      return cc.run(function() {
+        return this.model.addCellRecursive(addColumnId, ancestorQCellId, value, consumePlaceholder);
       });
     },
     notify: (cc: fixmeAny) => {

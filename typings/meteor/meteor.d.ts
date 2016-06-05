@@ -24,35 +24,35 @@ interface EJSON extends EJSONable {}
 // allowed.  But because typing is structural, the use of EJSONableArray is
 // equivalent in effect.
 //
-// The [E]JSONableDict interfaces are factored out to make error messages
-// containing the expansions of the [E]JSONable aliases less horrifying.
-//
 // We're lucky that TypeScript does exactly what we want for object literals
 // contextually typed as [E]JSONable (see
 // https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md#4.5,
 // "When an object literal is contextually typed by a type that includes a
 // string index signature...").  This typically works for toJSONValue
-// implementations of EJSON custom types.  If you want to define an object type
-// that is [E]JSONable by processing each of its properties, the recommended
-// approach for now is to define an interface that extends EJSONableDict.
-// ("{...} & EJSONableDict" does not work with type narrowing, and "{...} &
-// EJSONable" does not work for contextual typing of object literals due to
-// compiler bugs I have not fully investigated.  The behavior is about to
-// change in TypeScript 2.0
-// (https://github.com/Microsoft/TypeScript/issues/6041), so it's not worth
-// researching issues further before that.)
+// implementations of EJSON custom types.  For code that wants to traffic in
+// [E]JSONable objects of specific structures other than EJSON custom types
+// (rare), we provide the [E]JSONableBranded option.
+//
+// The [E]JSONableDict interfaces are factored out to make error messages
+// containing the expansions of the [E]JSONable aliases less horrifying.
 
 interface EJSONableArray extends Array<EJSONable> {}
 interface EJSONableDict {
 	[key: string]: EJSONable;
 }
-declare type EJSONable = number | string | boolean | EJSONableArray | EJSONableDict | Date | Uint8Array | EJSON.CustomType;
+interface EJSONableBranded {
+	_ejsonableBrand: any;
+}
+declare type EJSONable = number | string | boolean | EJSONableArray | EJSONableDict | EJSONableBranded | Date | Uint8Array | EJSON.CustomType;
 
 interface JSONableArray extends Array<JSONable> {}
 interface JSONableDict {
 	[key: string]: JSONable;
 }
-declare type JSONable = number | string | boolean | JSONableArray | JSONableDict;
+interface JSONableBranded {
+	_jsonableBrand: any;
+}
+declare type JSONable = number | string | boolean | JSONableArray | JSONableDict | JSONableBranded;
 
 declare type EJSON = EJSONable;
 

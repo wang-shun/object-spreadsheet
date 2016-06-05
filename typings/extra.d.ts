@@ -9,24 +9,10 @@ declare var Handsontable: fixmeAny;
 // ~ Matt 2016-02-28
 declare var Jison: fixmeAny;
 
-// https://github.com/Microsoft/TypeScript/issues/983
-type GlobalError = Error;
-
 declare module Meteor {
   // Unsound but probably the most reasonable way to write this.
   function makeErrorType<typeofClass>(name: string, constructor: typeofClass): typeofClass;
-
-  // Pretty close?
-  function bindEnvironment<F extends Function>(func: F, onException: string | ((e: GlobalError) => void), _this: any): F;
-  function _debug(...args: any[]): void;
 }
-
-// So we can start typing bits of our own code more precisely.
-// TODO: Better name.  Meteor is not the only system using this style of
-// callback.
-// TODO: Integrate this properly into meteor.d.ts (at least for our own use,
-// maybe later for upstreaming.) ~ Matt 2016-03-17
-type MeteorCallback<R> = (error: Error, result: R) => void;
 
 declare module Blaze {
   function _reportException(e: Error, msg: string): void;

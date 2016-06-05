@@ -91,11 +91,7 @@ namespace Objsheets {
     public compiled: fixmeAny;
 
     constructor() {
-      this.goUpMemo = new Memo<[ColumnId, ColumnId], number>(
-        ([sourceColId, targetColId]) => {
-          let [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId);
-          return upPath.length - 1;
-        });
+      this.goUpMemo = new Memo;
       this.compiled = {};
     }
 
@@ -111,8 +107,11 @@ namespace Objsheets {
       }).values : null) || [];
     }
 
-    public calcLevelsUp(sourceColId: ColumnId, targetColId: ColumnId) {
-      return this.goUpMemo.get([sourceColId, targetColId]);
+    public calcLevelsUp(sourceColId: fixmeAny, targetColId: fixmeAny) {
+      return this.goUpMemo.get(`${sourceColId}-${targetColId}`, () => {
+        let [upPath, downPath] = findCommonAncestorPaths(sourceColId, targetColId);
+        return upPath.length - 1;
+      });
     }
 
     public invalidateSchemaCache() {
@@ -284,7 +283,7 @@ namespace Objsheets {
     if (startCellsTset.type === targetColId) {
       result = startCellsTset;
     } else {
-      let numIdStepsToDrop = $$.formulaEngine.goUpMemo.get([startCellsTset.type, targetColId], () => {
+      let numIdStepsToDrop = $$.formulaEngine.goUpMemo.get(`${startCellsTset.type}-${targetColId}`, () => {
         let [upPath, downPath] = findCommonAncestorPaths(startCellsTset.type, targetColId);
         return upPath.length - 1;
       });
