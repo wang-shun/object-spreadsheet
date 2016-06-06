@@ -1,9 +1,13 @@
 // Place your settings in this file to overwrite default and user settings.
+//
+// So I guess VS Code allows comments, although the JSON standard doesn't?
+// ~ Matt 2016-06-05
 {
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
     ".meteor": true,
+    // For standalone version (see .gitignore).
     "**/*.ts.js": true,
     "**/*.ls.js": true
   },
