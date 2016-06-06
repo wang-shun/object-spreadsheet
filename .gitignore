@@ -1,7 +1,9 @@
 # If you add things, please comment the reason! ~ Matt 2016-02-26
 
-# For standalone version (I don't intend to commit this to main branch,
-# but haven't broken it out yet ~ Shachar 2016-03-04)
+# For standalone version.  Ideally this wouldn't be on the main branch (and the
+# standalone version would use a better approach such as a separate output
+# directory), but it doesn't seem worth worrying about for now.
+# ~ Matt 2016-06-05
 *.ts.js
 *.coffee.js
 *.ls.js
