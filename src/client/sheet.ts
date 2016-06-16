@@ -160,7 +160,6 @@ namespace Objsheets {
     }
 
     public renderVlist(vlist: fixmeAny, height: fixmeAny) {
-          new ViewVlist(cellId, 1, [])));
       let qFamilyId = {
         columnId: this.columnId,
         cellId: vlist.parentCellId
