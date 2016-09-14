@@ -26,7 +26,7 @@ namespace Objsheets {
 
   declare class CallingContext {
     static get: () => any;
-    static set: (cc: any, func: () => {}) => {};
+    static setAndRun: (cc: any, func: () => {}) => {};
   }
 
   export class Tablespace {
@@ -48,7 +48,7 @@ namespace Objsheets {
 
     public run(func: fixmeAny = () => {}) {
       //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
-      return CallingContext.set(this, () => {
+      return CallingContext.setAndRun(this, () => {
         if (this.lock) {
           this.scheduled.push(func);  // HACK
         } else {
