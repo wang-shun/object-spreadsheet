@@ -54,7 +54,7 @@ namespace Objsheets {
     };
     let ce = Cells.findOne(keyFields);
     if (ce == null) {
-      let col = this.getColumn(qFamilyId.columnId);
+      let col = getColumn(qFamilyId.columnId);
       if (col.formula != null) {
         throw new Error(`Computed family ${qFamilyId} missing from database`);
       } else {
@@ -62,7 +62,7 @@ namespace Objsheets {
       }
     }
     if (ce.values != null) {
-      return new TypedSet(this.getColumn(qFamilyId.columnId).type, <fixmeAny>new EJSONKeyedSet(<fixmeAny>ce.values));
+      return new TypedSet(getColumn(qFamilyId.columnId).type, <fixmeAny>new EJSONKeyedSet(<fixmeAny>ce.values));
     } else {
       return null;
     }

@@ -4,7 +4,7 @@ CallingContext = {
     var d = process.domain;
     if (d) return d.cc
   },
-  set: function(cc, func) {
+  setAndRun: function(cc, func) {
     var domain = Npm.require('domain')
     var d = domain.create();
     d.cc = cc;

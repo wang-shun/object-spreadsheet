@@ -158,7 +158,7 @@ namespace Objsheets {
         displayValue = null;
         error = e.message;
       }
-      let vlists = this.subsections.map((subsection: fixmeAny) => subsection.prerenderVlist(cellId));
+      let vlists = this.subsections.map((subsection: ViewSection) => subsection.prerenderVlist(cellId));
       minHeight = Math.max.apply(Math, [1].concat(vlists.map((vlist: fixmeAny) => vlist.minHeight)));
       return new ViewHlist(cellId, minHeight, displayValue, error, vlists);
     }
