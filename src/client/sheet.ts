@@ -62,10 +62,9 @@ namespace Objsheets {
     public width: fixmeAny;
     public leftEdgeSingular: fixmeAny;
     public rightEdgeSingular: fixmeAny;
-    public extraColClassBefore: fixmeAny;
+    public haveTableSeparatorBefore: boolean[];
     public subsections: fixmeAny;
     public headerHeightBelow: fixmeAny;
-    public amRootWithSeparateTables: fixmeAny;
     public headerMinHeight: fixmeAny;
 
     constructor(public layoutTree: fixmeAny, public options: fixmeAny = {}) {
@@ -86,27 +85,26 @@ namespace Objsheets {
       this.leftEdgeSingular = true;
       this.rightEdgeSingular = true;
       // field index -> string or null (class of extra column before this field)
-      this.extraColClassBefore = [];
+      this.haveTableSeparatorBefore = [];
       this.subsections = [];
       // @headerHeightBelow and @headerMinHeight refer to the expanded header.
       this.headerHeightBelow = 2;  // fieldName, type
-      this.amRootWithSeparateTables = this.options.separateTables && this.columnId === rootColumnId;
       this.layoutTree.subtrees.forEach((sublayout: fixmeAny, i: fixmeAny) => {
         let subsection = new ViewSection(sublayout, this.options);
         this.subsections.push(subsection);
         let nextLeftEdgeSingular = subsection.relationSingular && subsection.leftEdgeSingular;
-        let extraColClass = this.options.separateTables && this.col._id === rootColumnId && i > 0 ? "tableSeparator" : this.options.sepcols && !this.rightEdgeSingular && !nextLeftEdgeSingular ? "separator" : null;
-        this.extraColClassBefore.push(extraColClass);
-        if (extraColClass != null) {
+        let htsb = this.col._id === rootColumnId && i > 0;
+        this.haveTableSeparatorBefore.push(htsb);
+        if (htsb) {
           this.width++;
         }
         this.width += subsection.width;
         this.headerHeightBelow = Math.max(this.headerHeightBelow, subsection.headerMinHeight);
         this.rightEdgeSingular = subsection.relationSingular && subsection.rightEdgeSingular;
       });
-      this.headerMinHeight = (this.col.isObject && !this.amRootWithSeparateTables) + this.headerHeightBelow;
+      this.headerMinHeight = (this.col.isObject && this.columnId !== rootColumnId) + this.headerHeightBelow;
       if (this.col.isObject) {
-        // Affects empty sheet when @options.separateTables = true.
+        // Affects empty sheet.
         this.headerMinHeight = Math.max(this.headerMinHeight, 3);
       }
     }
@@ -289,15 +287,8 @@ namespace Objsheets {
       }
       // Subsections
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
-        if (this.extraColClassBefore[i] != null) {
-          let extraCells = gridMergedCell(height, 1, "", [this.extraColClassBefore[i]]);
-          if (this.extraColClassBefore[i] === "separator") {
-            // Include separator cells in object region highlighting (but for now,
-            // not table separator cells for the root object).  Do not set qCellId
-            // as that would allow "Delete object", which would be a little
-            // surprising.
-            extraCells[0][0].ancestorQCellId = fallback(qCellId, ancestorQCellId);
-          }
+        if (this.haveTableSeparatorBefore[i]) {
+          let extraCells = gridMergedCell(height, 1, "", ["tableSeparator"]);
           gridHorizExtend(grid, extraCells);
         }
         let subsectionGrid =
@@ -309,8 +300,6 @@ namespace Objsheets {
       return grid;
     }
 
-    // As long as siblings are always separated by a separator, we can color just
-    // based on depth.
     // If !expanded, then the requested height should always be 3.  Leaves render
     // at height 2 anyway.
 
@@ -382,17 +371,13 @@ namespace Objsheets {
       };
 
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
-        if (this.extraColClassBefore[i] != null) {
-          if (this.extraColClassBefore[i] === "tableSeparator" && currentHeight === 2) {
+        if (this.haveTableSeparatorBefore[i]) {
+          if (currentHeight === 2) {
             // Close off the corner for the root object so we can draw a complete
             // table separator column.
             makeCorner(true);
           }
-          let cssClasses = [this.extraColClassBefore[i]];
-          if (this.extraColClassBefore[i] !== "tableSeparator") {
-            cssClasses.push(myColorClass);
-          }
-          let gridExtraCol = gridMergedCell(currentHeight, 1, "", cssClasses);
+          let gridExtraCol = gridMergedCell(currentHeight, 1, "", ["tableSeparator"]);
           gridHorizExtend(grid, gridExtraCol);
         }
         let subHeight = expanded ? this.headerHeightBelow : 3;
@@ -402,7 +387,9 @@ namespace Objsheets {
         }
         if (subsectionGrid.length < currentHeight) {
           let cssClasses = [myColorClass];
-          if (i < this.subsections.length - 1 && !this.amRootWithSeparateTables) {
+          // If this.columnId === rootColumnId, then the padding cell should
+          // have a right border because there will be a table separator column.
+          if (i < this.subsections.length - 1 && this.columnId !== rootColumnId) {
             cssClasses.push("rsHeaderNonfinal");
           }
           let paddingGrid = gridMergedCell(currentHeight - subsectionGrid.length, subsection.width, "", cssClasses);
@@ -570,15 +557,24 @@ namespace Objsheets {
         // for object types with no children (for UI prototyping; not all functionality
         // works in this mode).
         showBullets: true,
+        rootSpareRows: 10,
+        // Developers only (print some logs with timestamps)
+        profile: false,
+
+        // We've stopped maintaining these options because they weren't worth
+        // the complexity they added to the already very complex rendering code.
+        // They are now fixed at the values shown below.
+
         // Separator column between every pair of adjacent incomparable columns
         // (except ones that are in separate tables when separateTables is on).
-        // Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
+        //
+        // Will be more workable once we have column plurality data.  I still
+        // feel that separator columns have merit and we should consider turning
+        // them back on the future if we don't come up with something better.
+        // ~ Matt 2016-09-15
         sepcols: false,
         // Show children of the root as separate tables.
         separateTables: true,
-        rootSpareRows: 10,
-        // Developers only (print some logs with timestamps)
-        profile: false
       };
 
       this.headerExpanded = new ReactiveVar(this.options.headerInitiallyExpanded);
@@ -678,7 +674,7 @@ namespace Objsheets {
         let colCls: fixmeAny = null;
         for (let row = 0; row < grid.length; row++) {
           for (let cls of grid[row][col].cssClasses) {
-            if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator") {
+            if (cls === "rsCaption" || cls === "rsRoot" || cls === "tableSeparator") {
               // assert (!colCls? || colCls == cls)
               colCls = cls;
             }
@@ -690,7 +686,7 @@ namespace Objsheets {
       this.cellClasses = grid.map((dataRow: fixmeAny, row: fixmeAny) => dataRow.map((cell: fixmeAny, col: fixmeAny) => {
         let refc: fixmeAny;
         let adjcol = col + cell.colspan;
-        let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
+        let classes: string[] = [];
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
           classes.push(`ref-${refc}`);
         }
@@ -716,13 +712,10 @@ namespace Objsheets {
         // clever, though with carefully designed individual views, we may never
         // need it.  We may also want to fix the header for large data sets.
         //fixedColumnsLeft: 1  # Caption removed
-        // Separator columns are 8 pixels wide.  Others use default width.
         colWidths: _.range(0, this.grid[0].length).map((i) => {  // no way grid can be empty
           switch (this.colClasses[i]) {
             case "tableSeparator":
               return 20;
-            case "separator":
-              return 10;
             case "rsRoot":
               return 18;
             default:
