@@ -728,11 +728,13 @@ namespace Objsheets {
           // otherwise the fixed clone of the left column sometimes reduced the
           // objectName row to zero height because it wasn't constrained by the
           // content of the real table.  We can look out for any similar glitches.
-          if (this.headerExpanded.get()) {
-            return _.range(0, this.grid.length).map((i) => i < headerHeight - (2 + this.options.showTypes) ? 11 : 24);
-          } else {
-            return _.range(0, this.grid.length).map((i) => 24);
-          }
+          let fieldNameRow = headerHeight - (1 + this.options.showTypes);
+          let objectNameRow = fieldNameRow - 1;
+          return _.range(0, this.grid.length).map((i) =>
+            i < objectNameRow ? 11 :
+            i == objectNameRow ? 23 :  // Remove a pixel for the missing bottom border.
+            i == fieldNameRow ? 25 :  // Add a pixel for the top border.
+            24);
         })(),
         stretchH: "last",
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
