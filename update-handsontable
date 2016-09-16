@@ -1,0 +1,37 @@
+#!/bin/bash
+# update-handsontable: Updates the Handsontable compiled files used by Object
+# Spreadsheets.  Follow the "Installation" steps at the top of
+# tests/handsontable/Gruntfile.js before running.
+#
+# Object Spreadsheets uses a modified version of Handsontable in the
+# tests/handsontable submodule.  We use the Handsontable build system, which
+# compiles the sources in tests/handsontable/src to the files in
+# tests/handsontable/dist (which are checked in), and then copy the relevant
+# files to public/handsontable (which we also check in).
+#
+# It's unfortunate to check in two copies of the generated files and require a
+# manual step.  At least we rarely change Handsontable.  Alternatives
+# considered:
+# - Use a Meteor package with Npm.depends on a Handsontable package built from a
+#   custom git repository.  This feature is designed to be used with URLs to
+#   remote repositories and doesn't look like it supports local repositories, so
+#   the development cycle to test changes to Handsontable would be terrible.
+#   Also, we'd add the Handsontable build (about 20 seconds in Matt's testing,
+#   possibly plus additional overhead) to the build time from a "meteor reset".
+# - Write a Meteor build plugin to call the Handsontable build system.  This
+#   would be very difficult to get right (the Meteor build plugin API certainly
+#   isn't designed for it) and would have the same build-time cost.
+# - Load the source files directly instead of compiling them.  This might be
+#   workable.
+# - Make symlinks from public/handsontable to the submodule.  Then Object
+#   Spreadsheets won't run on Windows.  (Granted, this script needs a
+#   bash-compatible shell to run on Windows, but it isn't needed to run Object
+#   Spreadsheets.)
+# - Put the submodule in a Meteor package and specify the desired files from
+#   dist/ in package.js instead of checking in another copy.  Then Meteor builds
+#   copy the entire submodule directory, which takes several minutes in Matt's
+#   tests.
+
+set -e
+(cd tests/handsontable && grunt)
+cp tests/handsontable/dist/handsontable.full.{css,js} public/handsontable/

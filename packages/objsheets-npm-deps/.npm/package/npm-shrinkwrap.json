@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "codemirror": {
+      "version": "5.18.2",
+      "resolved": "https://registry.npmjs.org/codemirror/-/codemirror-5.18.2.tgz",
+      "from": "codemirror@5.18.2"
+    },
+    "datejs": {
+      "version": "1.0.0-rc3",
+      "resolved": "https://registry.npmjs.org/datejs/-/datejs-1.0.0-rc3.tgz",
+      "from": "datejs@1.0.0-rc3"
+    },
+    "jquery": {
+      "version": "3.1.0",
+      "resolved": "https://registry.npmjs.org/jquery/-/jquery-3.1.0.tgz",
+      "from": "jquery@*"
+    },
+    "semantic-ui-css": {
+      "version": "2.2.4",
+      "resolved": "https://registry.npmjs.org/semantic-ui-css/-/semantic-ui-css-2.2.4.tgz",
+      "from": "semantic-ui-css@2.2.4"
+    }
+  }
+}

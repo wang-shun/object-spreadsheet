@@ -8,7 +8,6 @@ reactive-var@1.0.10
 underscore@1.0.9
 iron:router
 fds:jison-build
-datejs
 meteor-base@1.0.4
 mobile-experience@1.0.4
 mongo@1.1.12
@@ -26,3 +25,4 @@ hansoft:typescript@=1.1.1-objsheets
 standard-minifier-css
 standard-minifier-js
 shell-server
+objsheets-npm-deps
