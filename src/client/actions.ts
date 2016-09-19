@@ -382,7 +382,7 @@ namespace Objsheets {
       var /*closure*/ varValues: fixmeAny;
       let outcome: fixmeAny;
       for ([varValues, outcome] of formula.traces != null ? formula.traces.entries() : null) {
-        let line = varsAndTypesList.map(([name, _]) => {
+        let line = varsAndTypesList.map(([name, _]: fixmeAny) => {
           let val = varValues.get(name).elements()[0];
           return new ViewCell(valueToTextIgnoreErrors(varValues.get(name).type, val));
         });

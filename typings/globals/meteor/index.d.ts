@@ -1111,6 +1111,8 @@ declare module "meteor/http" {
   }
 }
 
+declare type _GlobalError = Error;
+
 declare module Meteor {
   /** Global props **/
   var isClient: boolean;
@@ -1156,7 +1158,7 @@ declare module Meteor {
   interface ErrorStatic {
     new(error: string | number, reason?: string, details?: string): Error;
   }
-  interface Error {
+  interface Error extends _GlobalError {
     error: string | number;
     reason?: string;
     details?: string;
@@ -1257,7 +1259,7 @@ declare module "meteor/meteor" {
     interface ErrorStatic {
       new(error: string | number, reason?: string, details?: string): Error;
     }
-    interface Error {
+    interface Error extends _GlobalError {
       error: string | number;
       reason?: string;
       details?: string;

@@ -176,7 +176,7 @@ namespace Objsheets {
     constructor({
         columnId: columnId,
         cellId: cellId
-      }) {
+      }: fixmeAny) {
       this.columnId = _toColumnId(columnId);
       this.cellId = cellId;
     }
@@ -245,7 +245,7 @@ namespace Objsheets {
     constructor({
         columnId: columnId,
         cellId: cellId
-      }) {
+      }: fixmeAny) {
       this.columnId = _toColumnId(columnId);
       this.cellId = cellId;
     }

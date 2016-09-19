@@ -198,12 +198,12 @@ namespace Objsheets {
       newVars.add(varName);
       validateSubformula(newVars, body);
     },
-    typecheck: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return typecheckFormula(model, newVars, body);
       },
-    evaluate: (model: fixmeAny, vars: fixmeAny, [varName, body]) => {
+    evaluate: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => {
       // he he he!
       return (arg: fixmeAny) => {
         let newVars = vars.shallowClone();
@@ -211,12 +211,12 @@ namespace Objsheets {
         return evaluateFormula(model, newVars, body);
       };
     },
-    stringify: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
+    stringify: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return [stringifyIdent(varName), stringifySubformula(model, newVars, body)];
       },
-    getSubformulas: ([varName, body]) => [body]
+    getSubformulas: ([varName, body]: fixmeAny) => [body]
   };
   let ColumnId = {
     validate: (vars: fixmeAny, arg: fixmeAny) => {

@@ -835,8 +835,9 @@ namespace Objsheets {
             this.pending.push(`${row}-${col}`);
             
             // One of these cases should apply...
+            let name: string;
             if (cell.kind === "top") {
-              let name = newVal === "" ? null : newVal;
+              name = newVal === "" ? null : newVal;
               Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
             }
             if (cell.kind === "below") {

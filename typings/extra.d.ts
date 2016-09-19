@@ -22,10 +22,6 @@ declare module Blaze {
   function _reportException(e: Error, msg: string): void;
 }
 
-declare interface Error {
-  stack: string;
-}
-
 // datejs library modifies the global Date object.
 declare interface Date {
   toString(format: string): string;
