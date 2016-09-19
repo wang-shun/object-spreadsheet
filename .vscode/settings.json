@@ -3,7 +3,10 @@
   "files.exclude": {
     "**/.git": true,
     "**/.DS_Store": true,
-    ".meteor": true,
+    ".meteor": true
   },
-  "editor.tabSize": 2
+  "editor.tabSize": 2,
+  // Use the same version of TypeScript as the Meteor build.  You must run
+  // "meteor" once and restart Visual Studio Code before this will work.
+  "typescript.tsdk": "packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/typescript/lib"
 }
