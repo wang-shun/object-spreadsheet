@@ -385,3 +385,7 @@ namespace Objsheets {
   }
 
 }
+
+// Attach to the global object for debugging.
+declare var global: any;
+(global || window).Objsheets = Objsheets;

@@ -446,7 +446,7 @@ namespace Objsheets {
   let selectedCell: fixmeAny = null;
   let pendingSelectionPredicate: fixmeAny = null;
   function postSelectionPredicate(predicate: fixmeAny) {
-    if (view != null && view.selectMatchingCell(predicate))
+    if (sheetView != null && sheetView.selectMatchingCell(predicate))
       pendingSelectionPredicate = null;
     else
       pendingSelectionPredicate = predicate;
@@ -1326,49 +1326,52 @@ namespace Objsheets {
 
   }
 
-  let view: fixmeAny = null;
+  export let sheetView: fixmeAny = null;
 
   export function rebuildView(viewId: fixmeAny) {
-    if (!view || !view.hot) {
-      if ((view != null ? view.hot : null) != null) {
-        view.hot.destroy();
+    if (!sheetView || !sheetView.hot) {
+      if ((sheetView != null ? sheetView.hot : null) != null) {
+        sheetView.hot.destroy();
       }
-      view = new ClientView(new View(viewId));
-      view.hotCreate($("#View")[0]);  //View')[0]
+      sheetView = new ClientView(new View(viewId));
+      sheetView.hotCreate($("#View")[0]);  //View')[0]
     } else {
-      view.reload();  //viewDef
-      view.hotReconfig();
+      sheetView.reload();  //viewDef
+      sheetView.hotReconfig();
     }
-    this.view = view;  // for debugging
 
     Tracker.nonreactive(() => {
       // Nothing below should trigger rebuilding of the view if it reads reactive
       // data sources.  (Ouch!)
 
       if (pendingSelectionPredicate != null &&
-          view.selectMatchingCell(pendingSelectionPredicate)) {
+          sheetView.selectMatchingCell(pendingSelectionPredicate)) {
         pendingSelectionPredicate = null;
       } else if (selectedCell != null) {
         // Try to select a cell similar to the one previously selected.
-        ((selectedCell.qCellId != null) && view.selectMatchingCell((c: fixmeAny) =>
+        ((selectedCell.qCellId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
             EJSON.equals(selectedCell.qCellId, c.qCellId) &&
             selectedCell.isObjectCell === c.isObjectCell)) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
+        ((selectedCell.addColumnId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
             selectedCell.addColumnId == c.addColumnId &&
             EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
+        ((selectedCell.addColumnId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
             (c.kind === "below" || c.kind === "tokenObject-below") &&
             EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
-        ((selectedCell.kind != null) && view.selectMatchingCell((c: fixmeAny) =>
+        ((selectedCell.kind != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
             selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
         false;
       }
       // Make sure various things are consistent with change in table data or
       // selection (view.selectMatchingCell doesn't always seem to trigger this).
-      view.onSelection();
+      sheetView.onSelection();
       ActionBar.isLoading.set(false);
     });
   }
+
+  // Hm, using the pre-makeErrorType class as the TypeScript type is a little
+  // awkward but the best way I can think of. ~ Matt 2016-09-19
+  export let whyNotReady: NotReadyError_ = null;
 
   // Helper decorator for use with Tracker.autorun
   export function guarded(op: fixmeAny) {
@@ -1377,12 +1380,12 @@ namespace Objsheets {
         op.apply(null, args);
       } catch (e) {
         if (e instanceof NotReadyError) {
-          this.why = e;
+          whyNotReady = e;
           return;  // Let the autorun run again once we have the data.
         }
         throw e;
       }
-      this.why = null;
+      whyNotReady = null;
     };
   }
 
@@ -1406,7 +1409,7 @@ namespace Objsheets {
 
   Template["Spreadsheet"].events = {
     "click .toggleHeaderExpanded": () => {
-      view.toggleHeaderExpanded();
+      sheetView.toggleHeaderExpanded();
     }
   };
 
