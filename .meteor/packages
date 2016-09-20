@@ -4,24 +4,25 @@
 # 'meteor add' and 'meteor remove' will edit this file for you,
 # but you can also edit it by hand.
 
-reactive-var
-underscore
+reactive-var@1.0.10
+underscore@1.0.9
 iron:router
 fds:jison-build
-callingcontext
 datejs
-standard-minifiers
-meteor-base
-mobile-experience
-mongo
-blaze-html-templates
-session
-jquery
-tracker
-logging
-reload
-random
-ejson
-spacebars
-check
+meteor-base@1.0.4
+mobile-experience@1.0.4
+mongo@1.1.12
+blaze-html-templates@1.0.4
+session@1.1.6
+jquery@1.11.9
+tracker@1.1.0
+logging@1.1.15
+reload@1.1.10
+random@1.0.10
+ejson@1.0.12
+spacebars@1.0.12
+check@1.2.3
 hansoft:typescript@=1.1.1-objsheets
+standard-minifier-css
+standard-minifier-js
+shell-server

@@ -24,10 +24,8 @@ namespace Objsheets {
     })(coll);  // Work around JavaScript variable capture semantics
   }
 
-  declare class CallingContext {
-    static get: () => any;
-    static setAndRun: (cc: any, func: () => {}) => {};
-  }
+  // http://stackoverflow.com/a/25282455
+  let tablespaceEnvVar = new Meteor.EnvironmentVariable();
 
   export class Tablespace {
     public lock: fixmeAny;
@@ -43,12 +41,12 @@ namespace Objsheets {
 
     public static get(id?: fixmeAny) {
       var v: fixmeAny;
-      return id == null ? (Meteor.isServer && CallingContext.get()) || Tablespace.defaultTablespace : (v = Tablespace.instances[id]) != null ? v : Tablespace.instances[id] = new Tablespace(id);
+      return id == null ? (Meteor.isServer && tablespaceEnvVar.get()) || Tablespace.defaultTablespace : (v = Tablespace.instances[id]) != null ? v : Tablespace.instances[id] = new Tablespace(id);
     }
 
     public run(func: fixmeAny = () => {}) {
       //Fiber = Npm.require('fibers')     # <-- tried to use Fiber.yield() but got "Fiber is a zombie" error ~~~~
-      return CallingContext.setAndRun(this, () => {
+      return tablespaceEnvVar.withValue(this, () => {
         if (this.lock) {
           this.scheduled.push(func);  // HACK
         } else {

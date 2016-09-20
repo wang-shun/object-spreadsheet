@@ -10,6 +10,15 @@ declare var Handsontable: fixmeAny;
 declare var Jison: fixmeAny;
 
 declare module Meteor {
+  var EnvironmentVariable: EnvironmentVariableStatic;
+  interface EnvironmentVariableStatic {
+    new<T>(): EnvironmentVariable<T>;
+  }
+  interface EnvironmentVariable<T> {
+    get(): T;
+    withValue<R>(value: T, func: () => R): R;
+  }
+
   // Unsound but probably the most reasonable way to write this.
   function makeErrorType<typeofClass>(name: string, constructor: typeofClass): typeofClass;
 }
