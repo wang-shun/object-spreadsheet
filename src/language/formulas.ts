@@ -1080,15 +1080,15 @@ namespace Objsheets {
     let parser = new Jison.Parsers.language.Parser();
     parser.yy.vars = vars.shallowClone();
     parser.yy.startToken = startToken;
-    parser.yy.bindVar = function(varName: fixmeAny, formula: fixmeAny) {
+    parser.yy.bindVar = function(this: fixmeAny, varName: fixmeAny, formula: fixmeAny) {
       // Don't check shadowing here, because the rules for procedures are
       // complicated.  It will be done later by the validate method.
       this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula));
     };
-    parser.yy.unbindVar = function(varName: fixmeAny) {
+    parser.yy.unbindVar = function(this: fixmeAny, varName: fixmeAny) {
       this.vars["delete"](varName);
     };
-    parser.yy.navigate = function(startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
+    parser.yy.navigate = function(this: fixmeAny, startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
       return resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla);
     };
     parser.yy.parseError = (err: fixmeAny, hash: fixmeAny) => {

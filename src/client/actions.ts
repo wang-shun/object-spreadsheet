@@ -39,7 +39,7 @@ namespace Objsheets {
 
   let tracingView: fixmeAny = null;
 
-  Template["changeColumn"].rendered = function() {
+  Template["changeColumn"].rendered = function(this: fixmeAny) {
     // XXX What if there are unsaved changes when the formula changes externally?
     this.autorun(() => {
       newFormulaStr.set(origFormulaStr.get());
@@ -136,14 +136,14 @@ namespace Objsheets {
       // Looks like this can be called before the autorun that sets newFormulaInfo.  Grr.
       return newFormulaStr.get() !== origFormulaStr.get() && ((newFormulaInfo.get() != null ? newFormulaInfo.get().formula : null) != null);
     },
-    columnName: function() {
+    columnName: function(this: fixmeAny) {
       return stringifyColumnRef([this.columnId, !this.onObjectHeader]);
     },
-    keyColumnName: function() {
+    keyColumnName: function(this: fixmeAny) {
       let c = getColumn(this.columnId);
       return this.onObjectHeader && c.type !== "_token" ? c.fieldName : null;
     },
-    typeMenu: function() {
+    typeMenu: function(this: fixmeAny) {
       let col = getColumn(this.columnId);
       let items: fixmeAny = [];
       if (col.formula != null) {
@@ -158,15 +158,15 @@ namespace Objsheets {
       }
       return new HtmlSelect(items, fallback(col.specifiedType, "auto"));
     },
-    backendMenu: function() {
+    backendMenu: function(this: fixmeAny) {
       return new HtmlSelect([new HtmlOption("state", "editable"), new HtmlOption("computed", "computed by formula")], getColumn(this.columnId).formula != null ? "computed" : "state");
     },
-    isComputed: function() {
+    isComputed: function(this: fixmeAny) {
       return getColumn(this.columnId).formula != null;
     },
     newFormulaInfo: () => newFormulaInfo.get(),
     isFormulaDebuggerOpen: () => isFormulaDebuggerOpen.get(),
-    contextText: function() {
+    contextText: function(this: fixmeAny) {
       let col = getColumn(this.columnId);
       return col.isObject ? fallback(objectNameWithFallback(getColumn(col.parent)), "(unnamed)") : null;  // i.e., we are editing the formula of a key column
     },
@@ -177,7 +177,7 @@ namespace Objsheets {
     //    colorIndexForDepth(columnDepth(col.parent))
     //  else null
     // Should only be called when onObjectHeader = true
-    referenceDisplayColumnMenu: function() {
+    referenceDisplayColumnMenu: function(this: fixmeAny) {
       let col = getColumn(this.columnId);
       let defaultColId = defaultReferenceDisplayColumn(col);
       let defaultColDesc = defaultColId != null ? fallback(getColumn(defaultColId).fieldName, "unnamed") : "none";
@@ -438,7 +438,7 @@ namespace Objsheets {
   }
 
   Template["changeColumn"].events({
-    "change #changeColumn-backend": function(event: fixmeAny, template: fixmeAny) {
+    "change #changeColumn-backend": function(this: fixmeAny, event: fixmeAny, template: fixmeAny) {
       let newFormula = getValueOfSelectedOption(template, "#changeColumn-backend") === "computed" ? DUMMY_FORMULA : null;  //changeColumn-backend') == 'computed'
       let col = getColumn(this.columnId);
       // With these conditions (plus the fact that DUMMY_FORMULA returns empty sets),
@@ -478,7 +478,7 @@ namespace Objsheets {
       // XXX: Disallow converting keyed objects to state?
       Meteor.call("changeColumnFormula", $$, this.columnId, newFormula, standardServerCallback);
     },
-    "change #changeColumn-type": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-type': (event, template) ->
+    "change #changeColumn-type": function(this: fixmeAny, event: fixmeAny, template: fixmeAny) {  //changeColumn-type': (event, template) ->
       let col = getColumn(this.columnId);
       let newSpecifiedType = getValueOfSelectedOption(template, "#changeColumn-type");  //changeColumn-type')
       if (newSpecifiedType === "auto") {
@@ -493,14 +493,14 @@ namespace Objsheets {
       }
       Meteor.call("changeColumnSpecifiedType", $$, this.columnId, newSpecifiedType, standardServerCallback);
     },
-    "change #changeColumn-referenceDisplayColumn": function(event: fixmeAny, template: fixmeAny) {  //changeColumn-referenceDisplayColumn': (event, template) ->
+    "change #changeColumn-referenceDisplayColumn": function(this: fixmeAny, event: fixmeAny, template: fixmeAny) {  //changeColumn-referenceDisplayColumn': (event, template) ->
       let newReferenceDisplayColumn = getValueOfSelectedOption(template, "#changeColumn-referenceDisplayColumn");  //changeColumn-referenceDisplayColumn')
       if (newReferenceDisplayColumn === "auto") {
         newReferenceDisplayColumn = null;
       }
       Meteor.call("changeColumnReferenceDisplayColumn", $$, this.columnId, newReferenceDisplayColumn, standardServerCallback);
     },
-    "click .saveFormula": function(event: fixmeAny, template: fixmeAny) {
+    "click .saveFormula": function(this: fixmeAny, event: fixmeAny, template: fixmeAny) {
       let contextColumnId = getColumn(this.columnId).parent;
       // canSave ensures that this is defined.
       let formula = newFormulaInfo.get().formula;
@@ -515,7 +515,7 @@ namespace Objsheets {
     "click .formulaDebuggerToggle": (event: fixmeAny, template: fixmeAny) => {
       isFormulaDebuggerOpen.set(!isFormulaDebuggerOpen.get());
     },
-    "click .formulaBand": function(event: fixmeAny, template: fixmeAny) {
+    "click .formulaBand": function(this: fixmeAny, event: fixmeAny, template: fixmeAny) {
       // Update selection.
       let formulaInfo = newFormulaInfo.get();
       if (formulaInfo.selectedBand != null) {

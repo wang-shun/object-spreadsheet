@@ -10,7 +10,8 @@
         "noEmit": true,
 
         "target": "es5",
-        "noImplicitAny": true
+        "noImplicitAny": true,
+        "noImplicitThis": true
     },
     "exclude": [
         "tests",

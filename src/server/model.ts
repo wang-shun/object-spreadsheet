@@ -975,7 +975,7 @@ namespace Objsheets {
       cc.run();
     },
     defineColumn: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, isObject: fixmeAny, objectName: fixmeAny, formula: fixmeAny, viewId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         //attrs = if viewId? then {view: viewId} else {}
         let id = this.model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula);
         if (viewId != null) {
@@ -985,7 +985,7 @@ namespace Objsheets {
       });
     },
     insertUnkeyedStateObjectTypeWithField: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, objectName: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, viewId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         //attrs = if viewId? then {view: viewId} else {}
         let [objectColId, fieldColId] = this.model.insertUnkeyedStateObjectTypeWithField(parentId, index, objectName, fieldName, specifiedType);
         if (viewId != null) {
@@ -997,69 +997,69 @@ namespace Objsheets {
       });
     },
     changeColumnFieldName: (cc: fixmeAny, columnId: fixmeAny, fieldName: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnFieldName(columnId, fieldName);
       });
     },
     changeColumnIsObject: (cc: fixmeAny, columnId: fixmeAny, isObject: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnIsObject(columnId, isObject);
         // For the case where a token object is converted to or from a field.
         this.model.evaluateAll();
       });
     },
     changeColumnObjectName: (cc: fixmeAny, columnId: fixmeAny, objectName: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnObjectName(columnId, objectName);
       });
     },
     changeColumnSpecifiedType: (cc: fixmeAny, columnId: fixmeAny, specifiedType: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnSpecifiedType(columnId, specifiedType);
         this.model.evaluateAll();
       });
     },
     changeColumnFormula: (cc: fixmeAny, columnId: fixmeAny, formula: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnFormula(columnId, formula);
         this.model.evaluateAll();
       });
     },
     changeColumnReferenceDisplayColumn: (cc: fixmeAny, columnId: fixmeAny, referenceDisplayColumn: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnReferenceDisplayColumn(columnId, referenceDisplayColumn);
       });
     },
     reorderColumn: (cc: fixmeAny, columnId: fixmeAny, newIndex: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.reorderColumn(columnId, newIndex);
       });
     },
     deleteColumn: (cc: fixmeAny, columnId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.deleteColumn(columnId);
         View.removeColumnFromAll(columnId);
         this.model.evaluateAll();
       });
     },
     recursiveDeleteStateCellNoInvalidate: (cc: fixmeAny, columnId: fixmeAny, cellId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.recursiveDeleteStateCellNoInvalidate(columnId, cellId);
       });
     },
     addCellRecursive: (cc: fixmeAny, addColumnId: fixmeAny, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: fixmeAny) => {
-      return cc.run(function() {
+      return cc.run(function(this: fixmeAny) {
         return this.model.addCellRecursive(addColumnId, ancestorQCellId, value, consumePlaceholder);
       });
     },
     notify: (cc: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.invalidateDataCache();
         this.model.evaluateAll();
       });
     },
     executeCannedTransaction: (cc: fixmeAny, name: fixmeAny, argsObj: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.executeCannedTransaction(name, argsObj);
       });
     }

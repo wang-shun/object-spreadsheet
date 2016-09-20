@@ -20,7 +20,7 @@ namespace Objsheets {
     onOpen: (callback: fixmeAny) => {
       openCallbacks.push(callback);
     },
-    readObj: function(t: fixmeAny, rootCellId: fixmeAny = [], expandRefs: fixmeAny = false, keyField?: fixmeAny, visited?: fixmeAny) {
+    readObj: function(this: fixmeAny, t: fixmeAny, rootCellId: fixmeAny = [], expandRefs: fixmeAny = false, keyField?: fixmeAny, visited?: fixmeAny) {
       var v: fixmeAny;
       let obj = <fixmeAny>{
         qCellId: {
@@ -72,11 +72,11 @@ namespace Objsheets {
       return obj;
     },
     // Future: Deprecate this in favor of something like readSubtree?
-    read: function(viewId?: fixmeAny) {
+    read: function(this: fixmeAny, viewId?: fixmeAny) {
       let layout = viewId != null ? ((new View(viewId).def()) != null ? (new View(viewId).def()).layout : null) || new Tree(rootColumnId) : View.rootLayout();
       return this.readObj(layout, [], true);
     },
-    readSubtree: function(columnStr: fixmeAny, rootCellId: fixmeAny) {
+    readSubtree: function(this: fixmeAny, columnStr: fixmeAny, rootCellId: fixmeAny) {
       let columnTree: fixmeAny;
       try {
         columnTree = View.drillDown(parseObjectTypeRef(columnStr));

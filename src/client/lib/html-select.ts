@@ -19,7 +19,7 @@ namespace Objsheets {
   // reference between the templates.  Yay!
 
   Template["html_select_content"].helpers({
-    currentValueFound: function() {
+    currentValueFound: function(this: fixmeAny) {
       for (let item of this.items) {
         if (item instanceof HtmlOptgroup) {
           for (let subitem of item.members) {
@@ -35,10 +35,10 @@ namespace Objsheets {
       }
       return false;
     },
-    isOptgroup: function() {
+    isOptgroup: function(this: fixmeAny) {
       return this instanceof HtmlOptgroup;
     },
-    isSelected: function() {
+    isSelected: function(this: fixmeAny) {
       let parent = <fixmeAny>Template.parentData(1);
       if (parent instanceof HtmlOptgroup) {
         parent = Template.parentData(2);

@@ -2,10 +2,10 @@ namespace Objsheets {
 
   export var RelsheetsServer = {
     _procedures: {},
-    procedures: function(appName: fixmeAny, defs: fixmeAny) {
+    procedures: function(this: fixmeAny, appName: fixmeAny, defs: fixmeAny) {
       this._procedures[appName] = defs;
     },
-    compile: function(appName: fixmeAny) {
+    compile: function(this: fixmeAny, appName: fixmeAny) {
       // This may run multiple times; it should overwrite and not cause any problems.
       for (let name in this._procedures[appName]) {
         let preProc = this._procedures[appName][name];

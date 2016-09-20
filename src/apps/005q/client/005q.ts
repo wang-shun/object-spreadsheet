@@ -1,6 +1,6 @@
 namespace Objsheets {
 
-  Router.route("/:sheet/apps/005q", function() {
+  Router.route("/:sheet/apps/005q", function(this: fixmeAny) {
     this.render("DoubleOhFiveQueue", {
       data: {
         sheet: this.params.sheet
@@ -8,7 +8,7 @@ namespace Objsheets {
     });
   });
 
-  Router.route("/:sheet/apps/005q/staff", function() {
+  Router.route("/:sheet/apps/005q/staff", function(this: fixmeAny) {
     this.render("DoubleOhFiveQueueStaff", {
       data: {
         sheet: this.params.sheet
@@ -16,7 +16,7 @@ namespace Objsheets {
     });
   });
 
-  Router.route("/:sheet/apps/split-view/005q", function() {
+  Router.route("/:sheet/apps/split-view/005q", function(this: fixmeAny) {
     this.render("DoubleOhFiveQueue_Demo", {
       data: {
         sheet: this.params.sheet
@@ -24,11 +24,11 @@ namespace Objsheets {
     });
   });
 
-  Template["DoubleOhFiveQueue"].created = function() {
+  Template["DoubleOhFiveQueue"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null, "005q");
   };
 
-  Template["DoubleOhFiveQueueStaff"].created = function() {
+  Template["DoubleOhFiveQueueStaff"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null, "005q");
   };
 
@@ -71,19 +71,19 @@ namespace Objsheets {
   });
 
   Template["DoubleOhFiveQueueStaff"].events({
-    "click .pick": function() {
+    "click .pick": function(this: fixmeAny) {
       RelsheetsClient.call("pick", {
         call: this.call,
         user: this.user
       });
     },
-    "click .forfeit": function() {
+    "click .forfeit": function(this: fixmeAny) {
       RelsheetsClient.call("forfeit", {
         call: this.call,
         user: this.user
       });
     },
-    "click .done": function() {
+    "click .done": function(this: fixmeAny) {
       RelsheetsClient.call("done", {
         call: this.call
       });

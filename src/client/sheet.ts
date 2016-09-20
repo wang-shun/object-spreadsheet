@@ -1,13 +1,13 @@
 namespace Objsheets {
 
-  Router.route("/:sheet", function() {
+  Router.route("/:sheet", function(this: fixmeAny) {
     this.render("Spreadsheet", {
       data: {
         sheet: this.params.sheet
       }
     });
   });
-  Router.route("/:sheet/views/:_id", function() {
+  Router.route("/:sheet/views/:_id", function(this: fixmeAny) {
     this.render("Spreadsheet", {
       data: {
         sheet: this.params.sheet,
@@ -729,7 +729,7 @@ namespace Objsheets {
               return undefined;
           }
         }),
-        rowHeights: ((function() {
+        rowHeights: (() => {
           // Specify all the row heights (24 pixels is the Handsontable default),
           // otherwise the fixed clone of the left column sometimes reduced the
           // objectName row to zero height because it wasn't constrained by the
@@ -739,7 +739,7 @@ namespace Objsheets {
           } else {
             return _.range(0, this.grid.length).map((i) => 24);
           }
-        }).call(this)),
+        })(),
         stretchH: "last",
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
           var clsRow = this.cellClasses[row]; 
@@ -1395,7 +1395,7 @@ namespace Objsheets {
     return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
   }
 
-  Template["Spreadsheet"].rendered = function() {
+  Template["Spreadsheet"].rendered = function(this: fixmeAny) {
     let sheet = (this.data != null ? this.data.sheet : null) || "";
     let viewId = this.data != null ? this.data.viewId : null;
     // $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
