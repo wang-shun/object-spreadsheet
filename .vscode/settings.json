@@ -8,5 +8,11 @@
   "editor.tabSize": 2,
   // Use the same version of TypeScript as the Meteor build.  You must run
   // "meteor" once and restart Visual Studio Code before this will work.
-  "typescript.tsdk": "packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/typescript/lib"
+  "typescript.tsdk": "packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/typescript/lib",
+
+  // I confirmed that tslint is using the bundled TypeScript: it correctly lints
+  // code using the TypeScript 2.0 "readonly" keyword, while it doesn't if I set
+  // tslint.nodePath to a directory containing TypeScript 1.8. ~ Matt 2016-09-20
+  "tslint.nodePath": "packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules",
+  "tslint.configFile": "tslint.json"
 }

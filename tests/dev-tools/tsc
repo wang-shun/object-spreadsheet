@@ -4,7 +4,7 @@
 # We call this the "embedded" compiler.  This wrapper script allows other tools
 # to use the same compiler so we can standardize the version.
 
-tsc="$(dirname -- "$0")/../packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/.bin/tsc"
+tsc="$(dirname -- "$0")/../../packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/.bin/tsc"
 if [ -x "$tsc" ]; then
   exec "$tsc" "$@"
 else

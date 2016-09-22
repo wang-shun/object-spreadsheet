@@ -1,3 +1,6 @@
+// Node.js global object
+declare var global: any;
+
 // Stubs for now.
 
 // I didn't find a type definition for Jison at all.  We could start one.

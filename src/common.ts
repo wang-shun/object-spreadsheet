@@ -182,7 +182,7 @@ namespace Objsheets {
       // override this behavior. :/
       throw new SemanticError("We currently do not support references to the root column.");
     }
-    let colId2 : ColumnRef = [rootColumnId, false];
+    let colId2: ColumnRef = [rootColumnId, false];
     for (let n of s.split(":")) {
       if (colId2[1]) {
         throw new SemanticError(`Looking up child '${n}' of a value column.`);
@@ -319,7 +319,7 @@ namespace Objsheets {
       };
     }
 
-    public static fromJSONValue(json: any): TypedSet {
+    public static fromJSONValue(json: EJSON.any_fp): TypedSet {
       return new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set));
     }
   }
@@ -391,13 +391,14 @@ namespace Objsheets {
       // unprivileged users, we probably want the server to generate it, but we
       // may not reuse this code for unprivileged users anyway.
       return Random.id();
-    } else     return type === "text" ? text : type === "date" ? Date.parse(text) || (() => {
-      throw new Error(`Invalid date: '${text}'`);
-    })() : JSON.parse(text);
+    } else {
+      return type === "text" ? text : type === "date" ? Date.parse(text) || (() => {
+        throw new Error(`Invalid date: '${text}'`);
+      })() : JSON.parse(text);
+    }
   }
 
 }
 
 // Attach to the global object for debugging.
-declare var global: any;
 (global || window).Objsheets = Objsheets;

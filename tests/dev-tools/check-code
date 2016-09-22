@@ -1,0 +1,15 @@
+#!/bin/bash
+# check-code: Run all tools that report errors or warnings on our codebase,
+# currently the TypeScript compiler and tslint.  (Called from the VS Code task.)
+
+set -e
+
+cd "$(dirname -- "$0")/../.."
+
+outcome=0
+
+tests/dev-tools/tsc -p . || outcome=1
+# We currently don't use any rules that require --type-check.
+tests/dev-tools/tslint --project tsconfig.json --config tslint.json || outcome=1
+
+exit "$outcome"

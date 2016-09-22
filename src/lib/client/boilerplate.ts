@@ -21,7 +21,7 @@ namespace Objsheets {
       openCallbacks.push(callback);
     },
     readObj: function(this: fixmeAny, t: fixmeAny, rootCellId: fixmeAny = [], expandRefs: fixmeAny = false, keyField?: fixmeAny, visited?: fixmeAny) {
-      var v: fixmeAny;
+      let v: fixmeAny;
       let obj = <fixmeAny>{
         qCellId: {
           columnId: t.root,
@@ -29,7 +29,7 @@ namespace Objsheets {
         }
       };
       if (visited == null) {
-        visited = new EJSONKeyedMap;
+        visited = new EJSONKeyedMap();
       }
       if ((v = visited.get(obj.qCellId))) {
         return v;
@@ -39,16 +39,16 @@ namespace Objsheets {
       if (keyField != null) {
         obj[keyField] = cellIdLastStep(rootCellId);
       }
-      var /*closure*/ x: fixmeAny;
+      let x: fixmeAny;
       for (x of t.subtrees) {
-        var /*closure*/ c = Columns.findOne(x.root);
+        let c = Columns.findOne(x.root);
         if (c != null) {
           let vals = new FamilyId({
             cellId: rootCellId,
             columnId: x.root
           }).values();
           if (c.isObject) {
-            let fam = vals.map((v: fixmeAny) => this.readObj(x, cellIdChild(rootCellId, v), expandRefs, c.fieldName, visited));
+            let fam = vals.map((v2: fixmeAny) => this.readObj(x, cellIdChild(rootCellId, v2), expandRefs, c.fieldName, visited));
             fam.qFamilyId = {
               columnId: x.root,
               cellId: rootCellId
@@ -61,8 +61,8 @@ namespace Objsheets {
             // is a security problem.  Remove this feature and update all affected
             // applications.  (Doesn't really matter until we have authentication.)
             if (expandRefs && (c.type != null) && typeIsReference(c.type)) {
-              var /*closure*/ ot = View.drillDown(c.type);
-              vals = vals.map((v: fixmeAny) => this.readObj(ot, v, expandRefs, Columns.findOne(ot.root) != null ? Columns.findOne(ot.root).fieldName : null, visited));
+              let ot = View.drillDown(c.type);
+              vals = vals.map((v2: fixmeAny) => this.readObj(ot, v2, expandRefs, Columns.findOne(ot.root) != null ? Columns.findOne(ot.root).fieldName : null, visited));
             }
             obj[c.fieldName] = vals;
           }

@@ -40,7 +40,7 @@ namespace Objsheets {
     public static instances: {[id: string]: Tablespace} = {};
 
     public static get(id?: fixmeAny) {
-      var v: fixmeAny;
+      let v: fixmeAny;
       return id == null ? (Meteor.isServer && tablespaceEnvVar.get()) || Tablespace.defaultTablespace : (v = Tablespace.instances[id]) != null ? v : Tablespace.instances[id] = new Tablespace(id);
     }
 
@@ -135,7 +135,7 @@ namespace Objsheets {
 
     public runTransaction(op: fixmeAny) {
       return this.run(() => {
-        let t = new Transaction;
+        let t = new Transaction();
         t.begin();
         try {
           let ret = op();
@@ -197,7 +197,7 @@ namespace Objsheets {
     }
 
     public ancestors() {
-      let c : CellId = this;
+      let c: CellId = this;
       let ancestors: fixmeAny = [];
       while (c != null) {
         ancestors.push(c);
@@ -210,6 +210,9 @@ namespace Objsheets {
       if (set != null) {
         this.remove();
         this.family().add(set, callback);
+        // TypeScript --noImplicitReturns is flagging this.
+        // TODO: Just get rid of MATLAB-style overloading...
+        return undefined;
       } else {
         return cellIdLastStep(this.cellId);
       }
@@ -391,7 +394,7 @@ namespace Objsheets {
   // documents by ID.
 
   function updateOne(collection: fixmeAny, selector: fixmeAny, modifier: fixmeAny, callback: fixmeAny) {
-    var doc: fixmeAny;
+    let doc: fixmeAny;
     if ((doc = collection.findOne(selector)) != null) {
       collection.update(doc._id, modifier, callback);
     }
@@ -422,18 +425,18 @@ let _cnt = 0;
     constructor() {
       this.byColumn = {};
       this.byId = {};
-      this.recycle = new EJSONKeyedMap;
+      this.recycle = new EJSONKeyedMap();
     }
 
     public insert(doc: fixmeAny) {
       //console.log "[insert(#{JSON.stringify doc})]"
-      var byKey: fixmeAny;
+      let byKey: fixmeAny;
       if (doc._id == null) {
         doc._id = this.mkId(doc);
       }
       let column = doc.column;
       let key = doc.key;
-      this.byColumn[column] = byKey = fallback(this.byColumn[column], new EJSONKeyedMap);
+      this.byColumn[column] = byKey = fallback(this.byColumn[column], new EJSONKeyedMap());
       //**  assume !byKey.get(key)?  **#
       byKey.set(key, doc);
       this.byId[doc._id] = doc;
@@ -441,19 +444,19 @@ let _cnt = 0;
     }
 
     public mkId(doc: fixmeAny) {
-      var fid: fixmeAny, rec: fixmeAny;
+      let fid: fixmeAny, rec: fixmeAny;
       if ((rec = this.recycle.get([doc.column, doc.key])) != null) {
         return rec;
       } else {
-        while (this.byId[fid = _freshId()] != null) {
-          0;
-        }
+        do {
+          fid = _freshId();
+        } while (this.byId[fid] != null);
         return fid;
       }
     }
 
     public findOne(query: fixmeAny) {
-      var column: fixmeAny, key: fixmeAny;
+      let column: fixmeAny, key: fixmeAny;
       if (_.isString(query)) {
         return this.byId[query];
       } else if ((column = query.column) != null) {
@@ -508,12 +511,12 @@ let _cnt = 0;
           }
         } else if (k === "$pull") {
           for (let k in v0) {
-            var /*closure*/ v = v0[k];
+            let v = v0[k];
             doc[k] = doc[k].filter((x: fixmeAny) => !EJSON.equals(x, v));
           }
         } else if (k === "$addToSet") {
           for (let k in v0) {
-            var /*closure*/ v = v0[k];
+            let v = v0[k];
             let l = doc[k];
             if (l.every((x: fixmeAny) => !EJSON.equals(x, v))) {
               l.push(v);
@@ -538,11 +541,12 @@ let _cnt = 0;
     }
 
     public remove(query: fixmeAny, callback: fixmeAny = () => {}) {
-      var column: fixmeAny, doc: fixmeAny, key: fixmeAny;
+      let column: fixmeAny, key: fixmeAny;
       if ((column = query.column) != null) {
         let byKey = this.byColumn[column];
         if ((key = query.key) != null) {
-          if ((doc = byKey.get(key)) != null) {
+          let doc = byKey.get(key);
+          if (doc != null) {
             this.stash(doc);
             byKey["delete"](key);
           }
@@ -590,7 +594,7 @@ let _cnt = 0;
 
     constructor(public dbCells: fixmeAny) {
       //@mem = new Mongo.Collection(null)
-      this.mem = new CellsInMemory;
+      this.mem = new CellsInMemory();
     }
 
     public prefetch() {

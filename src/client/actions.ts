@@ -328,7 +328,7 @@ namespace Objsheets {
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny) => {
           let cell = this.grid[row] != null ? this.grid[row][col] : null;
           if (!cell) {
-            return <any>{};  // Would like to understand why this is needed...
+            return <fixmeAny>{};  // Would like to understand why this is needed...
           }
           return {
             className: cell.cssClasses.join(" ")
@@ -379,7 +379,7 @@ namespace Objsheets {
       // XXX It would be cleaner for traceColumnFormula to ensure "traces" was
       // created at least as an empty list on all subformulas, but more work to
       // implement.
-      var /*closure*/ varValues: fixmeAny;
+      let varValues: fixmeAny;
       let outcome: fixmeAny;
       for ([varValues, outcome] of formula.traces != null ? formula.traces.entries() : null) {
         let line = varsAndTypesList.map(([name, _]: fixmeAny) => {

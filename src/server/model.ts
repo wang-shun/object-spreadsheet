@@ -54,7 +54,7 @@ namespace Objsheets {
     }
 
     public getAllColumns(columnId: fixmeAny = rootColumnId) {
-      var _ref: fixmeAny;
+      let _ref: fixmeAny;
       let col = this.getColumn(columnId);
       // A bit of auto-repair in case some columns were deleted
       let validChildren = col.children.filter((x: fixmeAny) => this.getColumn(x) != null);
@@ -145,8 +145,8 @@ namespace Objsheets {
 
     private checkNameClash(columnId: fixmeAny, childName: fixmeAny) {
       if (columnLogicalChildrenByName(columnId, childName).length > 0) {
-        var parentName = objectNameWithFallback(this.getColumn(columnId));
-        throw new Meteor.Error("model-name-clash", 
+        let parentName = objectNameWithFallback(this.getColumn(columnId));
+        throw new Meteor.Error("model-name-clash",
           parentName ? `Object '${parentName}' already has a child named '${childName}'`
                      : `Top-level object named '${childName}' already exists.`);
       }
@@ -260,8 +260,8 @@ namespace Objsheets {
               Cells.find({
                 column: childId,
                 key: value
-              }).forEach((family: fixmeAny) => {
-                for (let subValue of family.values) {
+              }).forEach((family2: fixmeAny) => {
+                for (let subValue of family2.values) {
                   newValues.push(subValue);
                 }
               });
@@ -879,7 +879,7 @@ namespace Objsheets {
     // when we give "model" parameters a type. ~ Matt 2016-03-01
 
     public recursiveDeleteStateCellNoInvalidate(columnId: fixmeAny, cellId: fixmeAny) {
-      var ce: fixmeAny;
+      let ce: fixmeAny;
       let col = this.getColumn(columnId);
       for (let childColId of col.children) {
         let childCol = this.getColumn(childColId);
@@ -941,11 +941,11 @@ namespace Objsheets {
   }
 
   Meteor.startup(() => {
-    var tspace: fixmeAny;
+    let tspace: fixmeAny;
     Tablespace.setupModelHook = (ts: fixmeAny) => {
       console.log(`creating model of [${ts.id}]`);
-      ts.model = new Model;
-      ts.formulaEngine = new FormulaEngine;
+      ts.model = new Model();
+      ts.formulaEngine = new FormulaEngine();
       let appName = /(?:^|\.)([^.]+)$/.exec(ts.id) != null ? /(?:^|\.)([^.]+)$/.exec(ts.id)[1] : null;
       if (ts.model.wasEmpty) {
         //if appName == 'ptc' then loadPTCData(ts.model)

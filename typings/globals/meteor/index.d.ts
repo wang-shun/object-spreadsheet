@@ -801,9 +801,13 @@ declare module EJSON {
   // repeats the properties the factory accesses and their expected types.
   //
   // Hint for the factory: if the class is generic, it's probably more correct
-  // to set the type arguments to "any" than the default of the upper bound
+  // to set the type arguments to "any_ta" than the default of the upper bound
   // (https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md#4.15.2).
-  function addType(name: string, factory: (val: any) => EJSONableCustomType): void;
+  //
+  // Define aliases for common uses of "any" to ease review.
+  type any_fp = any;
+  type any_ta = any;
+  function addType(name: string, factory: (val: any_fp) => EJSONableCustomType): void;
 
   function clone < T > (val: T): T;
 
@@ -904,9 +908,13 @@ declare module "meteor/ejson" {
     // repeats the properties the factory accesses and their expected types.
     //
     // Hint for the factory: if the class is generic, it's probably more correct
-    // to set the type arguments to "any" than the default of the upper bound
+    // to set the type arguments to "any_ta" than the default of the upper bound
     // (https://github.com/Microsoft/TypeScript/blob/master/doc/spec.md#4.15.2).
-    function addType(name: string, factory: (val: any) => EJSONableCustomType): void;
+    //
+    // Define aliases for common uses of "any" to ease review.
+    type any_fp = any;
+    type any_ta = any;
+    function addType(name: string, factory: (val: any_fp) => EJSONableCustomType): void;
 
     function clone < T > (val: T): T;
 

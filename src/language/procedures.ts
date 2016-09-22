@@ -449,7 +449,7 @@ namespace Objsheets {
   //
   // Does not use dispatchStatement for the same reasons as validateSubformula.
   function validateStatement(mutableVars: fixmeAny, mutableCurrentScopeVars: fixmeAny, statement: fixmeAny) {
-    var opName: fixmeAny;
+    let opName: fixmeAny;
     valAssert(_.isArray(statement), "Statement must be an array.");
     valAssert(_.isString(opName = statement[0]), "Statement must begin with an operation name (a string).");
     valAssert(procedures_dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);

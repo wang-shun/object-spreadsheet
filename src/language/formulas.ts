@@ -91,7 +91,7 @@ namespace Objsheets {
     public compiled: fixmeAny;
 
     constructor() {
-      this.goUpMemo = new Memo;
+      this.goUpMemo = new Memo();
       this.compiled = {};
     }
 
@@ -360,7 +360,9 @@ namespace Objsheets {
         throw new EvaluationError(`Invalid reference display column for type '${stringifyType(type)}'`);
       }
       return tsetToText(model, displayTset, newRefsSeen);
-    } else     return typeof value === "string" ? value : value instanceof Date ? value.toString("yyyy-MM-dd HH:mm") : JSON.stringify(value);  // Reasonable fallback
+    } else {
+      return typeof value === "string" ? value : value instanceof Date ? value.toString("yyyy-MM-dd HH:mm") : JSON.stringify(value);  // Reasonable fallback
+    }
   }
 
   export function genericSetToText(elements: fixmeAny, formatOne: fixmeAny) {
@@ -608,9 +610,9 @@ namespace Objsheets {
     date: {
       argAdapters: [StringArg],
       typecheck: () => "date",
-      evaluate: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => new TypedSet("date", new EJSONKeyedSet([Date.parse(string)])),
-      stringify: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => ({
-          str: `d${JSON.stringify(string)}`,
+      evaluate: (model: fixmeAny, vars: fixmeAny, dateString: fixmeAny) => new TypedSet("date", new EJSONKeyedSet([Date.parse(dateString)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, dateString: fixmeAny) => ({
+          str: `d${JSON.stringify(dateString)}`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
     },
@@ -868,7 +870,7 @@ namespace Objsheets {
   // Specifically, the validate method of the operation is optional, and it
   // receives the original arguments (the adapters do not return values).
   function validateSubformula(vars: fixmeAny, formula: fixmeAny) {
-    var opName: fixmeAny;
+    let opName: fixmeAny;
     valAssert(_.isArray(formula), "Subformula must be an array.");
     valAssert(_.isString(opName = formula[0]), "Subformula must begin with an operation name (a string).");
     valAssert(dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);
@@ -955,9 +957,9 @@ namespace Objsheets {
   // reuse the rest for formulas in procedures, etc.
   export function traceColumnFormula(formula: fixmeAny, columnId: fixmeAny) {
     let tracingModel = {
-      getColumn: (columnId: fixmeAny) => getColumn(columnId),
+      getColumn: (colId: fixmeAny) => getColumn(colId),
       evaluateFamily: (qFamilyId: fixmeAny) => evaluateFamilyReadOnly(qFamilyId),
-      typecheckColumn: (columnId: fixmeAny) => getColumn(columnId).type,
+      typecheckColumn: (colId: fixmeAny) => getColumn(colId).type,
       isTracing: true
     };
     // Here we really do want to ignore erroneous families in the parent column

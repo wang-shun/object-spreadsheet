@@ -15,7 +15,7 @@ namespace Objsheets {
     // If set to a state column, then data can be added to this cell, and
     // any missing ancestors will be automatically created up to
     // ancestorQCellId.
-    public addColumnId : string;
+    public addColumnId: string;
     public isPlaceholder: fixmeAny;
 
     constructor(public value: fixmeAny = null, public rowspan: fixmeAny = 1, public colspan: fixmeAny = 1, public cssClasses: fixmeAny = []) {
@@ -72,7 +72,7 @@ namespace Objsheets {
   }
 
   export function gridBottomRow(grid: fixmeAny) {
-    var _results: fixmeAny;
+    let _results: fixmeAny;
     if (grid.length === 0) {
       return [];
     } else {

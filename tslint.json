@@ -1,0 +1,57 @@
+{
+	"rules": {
+		// Documentation: http://palantir.github.io/tslint/rules/
+
+		// The linter currently does not run on type declaration files.  The
+		// immediate problems are that (1) tslint doesn't have a way to
+		// automatically check type declaration files using tsconfig.json, (2) "var"
+		// seems to be idiomatic, (3) there are loads of "any", and (4) most of them
+		// are third-party anyway.  Not worth worrying about right now.
+		// ~ Matt 2016-09-20
+
+		// "any" is allowed, but the rationale should be documented (TODO).
+		// Uncomment this temporarily to review uses of "any" in the codebase.
+		//"no-any": true,
+
+		// The main inconsistencies that bug Matt.  (This list is pretty short now
+		// that we're using TypeScript.)
+		"arrow-parens": true,
+		"new-parens": true,
+		"semicolon": [true, "always"],
+
+		// Mechanics we should just keep consistent.
+		"eofline": true,
+		"indent": [true, "spaces"],
+		"linebreak-style": [true, "LF"],
+		"no-trailing-whitespace": true,
+		"align": [true, "statements"],
+		// This one is not a big deal but seems to be easy to maintain.
+		"quotemark": [true, "double"],
+
+		// Make semantics easier to understand.
+		"no-var-keyword": true,
+		"no-shadowed-variable": true,
+
+		// These seem like good ideas but come up pretty rarely.
+		"adjacent-overload-signatures": true,
+		"no-inferrable-types": true,
+		"no-arg": true,
+		// Note: tsc has --noFallthroughCasesInSwitch, but this appears to be better
+		// because it claims to recognize a "fall through" override comment.
+		"no-switch-case-fall-through": true,
+		"no-unsafe-finally": true,
+		"no-unused-expression": true,
+		"no-unused-new": true,
+		"use-isnan": true,
+		// Unfortunately, "check-else" gives false positives on if-else statements
+		// without curly braces. ~ Matt 2016-09-20
+		"one-line": [true, "check-catch", "check-finally", "check-open-brace", "check-whitespace"],
+		"variable-name": [true, "ban-keywords"],
+		"whitespace": [true, "check-branch", "check-decl", "check-operator", "check-module", "check-separator", "check-type"]
+
+		// I reviewed all the other un-deprecated rules and decided either I didn't
+		// want to follow them or there were existing cases I didn't want to address
+		// at this time.  I'm not taking the time to write up all the rationale
+		// here. :/ ~ Matt 2016-09-20
+	}
+}

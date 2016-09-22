@@ -29,7 +29,7 @@ namespace Objsheets {
   }
 
   export function stringifyTypeForSheet(type: fixmeAny) {
-    var col: fixmeAny, name: fixmeAny;
+    let col: fixmeAny, name: fixmeAny;
     if (type === "_unit") {
       return "X";
     } else if (!typeIsReference(type)) {
@@ -316,7 +316,7 @@ namespace Objsheets {
 
     public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: fixmeAny) {
       // Part that is always the same.
-      var fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
+      let fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
       let myDepthClass = "rsHeaderDepth" + this.colorIndexForDepth(this.col.isObject ? depth : depth - 1);
       // Currently matching-colored header cells don't depend on depth.  You could
       // argue we should generate two classes and let the CSS deal with it.
@@ -444,8 +444,9 @@ namespace Objsheets {
   // This may hold a reference to a ViewCell object from an old View.  Weird but
   // shouldn't cause any problem and not worth doing differently.
   let selectedCell: fixmeAny = null;
-  let pendingSelectionPredicate: fixmeAny = null;
-  function postSelectionPredicate(predicate: fixmeAny) {
+  type SelectionPredicate = (c: ViewCell) => boolean;
+  let pendingSelectionPredicate: SelectionPredicate = null;
+  function postSelectionPredicate(predicate: SelectionPredicate) {
     if (sheetView != null && sheetView.selectMatchingCell(predicate))
       pendingSelectionPredicate = null;
     else
@@ -477,7 +478,7 @@ namespace Objsheets {
     public static PLACEHOLDER = {};
 
     public static addCell(addColumnId: fixmeAny, ancestorQCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = (() => {}), consumePlaceholder: fixmeAny = false) {
-      var newValue: fixmeAny;
+      let newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
       } else {
@@ -506,7 +507,7 @@ namespace Objsheets {
     }
 
     public static modifyCell(qCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = () => {}) {
-      var newValue: fixmeAny;
+      let newValue: fixmeAny;
       let cel = new CellId(qCellId);
       if ((newValue = this.parseValueUi(cel.columnId, enteredValue)) != null) {
         cel.value(newValue, (() => {
@@ -594,7 +595,7 @@ namespace Objsheets {
     }
 
     public hotConfig() {
-      var _ref: fixmeAny, _results: fixmeAny;
+      let _ref: fixmeAny, _results: fixmeAny;
       let thisView = this;
       if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid started  --- `);
       // Display the root column for completeness.  However, it doesn't have a real
@@ -687,7 +688,7 @@ namespace Objsheets {
       });
 
       this.cellClasses = grid.map((dataRow: fixmeAny, row: fixmeAny) => dataRow.map((cell: fixmeAny, col: fixmeAny) => {
-        var refc: fixmeAny;
+        let refc: fixmeAny;
         let adjcol = col + cell.colspan;
         let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
@@ -707,7 +708,7 @@ namespace Objsheets {
             || (cell.addColumnId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.addColumnId))
           classes.push("editable");
         return cell.cssClasses.concat(classes);
-      }))
+      }));
 
       return {
         data: grid.map((row: fixmeAny) => row.map((cell: fixmeAny) => fallback(cell.display, cell.value))),
@@ -742,14 +743,14 @@ namespace Objsheets {
         })(),
         stretchH: "last",
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
-          var clsRow = this.cellClasses[row]; 
-          var classes = clsRow != null ? clsRow[col] : null;
+          let clsRow = this.cellClasses[row];
+          let classes = clsRow != null ? clsRow[col] : null;
           if (!classes) {
             return {};  // may occur if grid is changing
           }
 
           if (this.pending.indexOf(`${row}-${col}`) >= 0) {
-            classes = classes.concat('pending');  // must copy classes because at this point it aliases an element of this.cellClasses
+            classes = classes.concat("pending");  // must copy classes because at this point it aliases an element of this.cellClasses
           }
           return {
             renderer: col === 0 && row === 0 ? "html" : "text",
@@ -768,7 +769,7 @@ namespace Objsheets {
             // for the purpose of changing the objectName and fieldName respectively.
             //
             // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
-            readOnly: classes.indexOf("editable") == -1 
+            readOnly: classes.indexOf("editable") == -1
           };
         },
         autoColumnSize: {
@@ -817,23 +818,23 @@ namespace Objsheets {
           if (isForced) this.pending = []; // this is the best way to make sure no "dirt" is left
         },
         beforeChange: (changes: fixmeAny, source: fixmeAny) => {
-          if (!source) return;   // Run this handler only for interactive edits
+          if (!source) return true;   // Run this handler only for interactive edits
 
-          var fail = false;
+          let fail = false;
           for (let [row, col, oldVal, newVal] of changes) {
             if (oldVal === newVal) continue;
-            
+
             let cell = this.grid[row][col];
-            let revertingCallback = ((row: fixmeAny, col: fixmeAny, oldVal: fixmeAny) => (error: fixmeAny, result: fixmeAny) => {
+            let revertingCallback = (error: fixmeAny, result: fixmeAny) => {
               if (error) {
                 fail = true;  // prevent race condition in case we're still in this function
                 this.pending = [];
                 this.hot.setDataAtCell(row, col, oldVal);
               }
               standardServerCallback(error, result);
-            })(row, col, oldVal);  // enfore closure; in ES 6 we wouldn't need this anymore
+            };
             this.pending.push(`${row}-${col}`);
-            
+
             // One of these cases should apply...
             let name: string;
             if (cell.kind === "top") {
@@ -874,25 +875,25 @@ namespace Objsheets {
                   StateEdit.addCell(cell.addColumnId, cell.ancestorQCellId, newVal, revertingCallback, cell.isPlaceholder);
                 }
               }
-            }
-            catch (e) {
+            } catch (e) {
               fail = true;   // Note: this reverts all changes.
                              // The ones that have been applied will propagate back through
                              // Meteor collections.
             }
           }
-          
+
           if (fail) return false;
-          
-          
+
+
           // Don't apply the changes directly; let them come though the Meteor
           // stubs.  This ensures that they get reverted by Meteor if the server
           // call fails.
           //return false;
+          return true;
         },
         contextMenu: {
           build: (): fixmeAny => {
-            var addCommand: fixmeAny, ci: fixmeAny, coords: fixmeAny, deleteCommand: fixmeAny, demoteCommand: fixmeAny;
+            let addCommand: fixmeAny, ci: fixmeAny, coords: fixmeAny, deleteCommand: fixmeAny, demoteCommand: fixmeAny;
             if (ActionBar.hasUnsavedData()) {
               return false;
             }
@@ -1030,7 +1031,7 @@ namespace Objsheets {
     }
 
     public getSelected = () => {
-      var s: fixmeAny;
+      let s: fixmeAny;
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
         [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
@@ -1076,7 +1077,7 @@ namespace Objsheets {
     }
 
     public highlightReferent(referent: fixmeAny) {
-      var refc: fixmeAny;
+      let refc: fixmeAny;
       $(".referent").removeClass("referent");
       $(".referent-object").removeClass("referent-object");
       if ((referent != null) && ((refc = this.refId(referent)) != null)) {
@@ -1086,7 +1087,7 @@ namespace Objsheets {
     }
 
     public highlightObject(obj: fixmeAny) {
-      var refc: fixmeAny;
+      let refc: fixmeAny;
       $(".selected-object").removeClass("selected-object");
       if ((obj != null) && ((refc = this.refId(obj)) != null)) {
         $(`.ancestor-${refc}`).addClass("selected-object");
@@ -1094,7 +1095,7 @@ namespace Objsheets {
     }
 
     public onSelection() {
-      var ci: fixmeAny, _ref: fixmeAny;
+      let ci: fixmeAny, _ref: fixmeAny;
       let selection = this.hot.getSelected();
       if (EJSON.equals(selection, this.savedSelection)) {
         return;
@@ -1127,7 +1128,7 @@ namespace Objsheets {
     // just the callback, so we maintain consistency in what command is offered.
 
     public getAddCommandForCell(c: fixmeAny) {
-      var col: fixmeAny;
+      let col: fixmeAny;
       if ((c.addColumnId != null) && columnIsState(col = getColumn(c.addColumnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
@@ -1179,7 +1180,7 @@ namespace Objsheets {
     }
 
     public getDeleteCommandForCell(c: fixmeAny) {
-      var col: fixmeAny;
+      let col: fixmeAny;
       if (c.isPlaceholder) {  // Should only exist in state value columns.
         return {
           name: "Delete cell",
@@ -1224,7 +1225,7 @@ namespace Objsheets {
     }
 
     public onKeyDown(event: fixmeAny) {
-      var ci: fixmeAny, col: fixmeAny, parentCol: fixmeAny, qf: fixmeAny;
+      let ci: fixmeAny, col: fixmeAny, parentCol: fixmeAny, qf: fixmeAny;
       if (ActionBar.hasUnsavedData()) {
         return;
       }
@@ -1350,18 +1351,24 @@ namespace Objsheets {
         pendingSelectionPredicate = null;
       } else if (selectedCell != null) {
         // Try to select a cell similar to the one previously selected.
-        ((selectedCell.qCellId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
-            EJSON.equals(selectedCell.qCellId, c.qCellId) &&
-            selectedCell.isObjectCell === c.isObjectCell)) ||
-        ((selectedCell.addColumnId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
-            selectedCell.addColumnId == c.addColumnId &&
-            EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
-        ((selectedCell.addColumnId != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
-            (c.kind === "below" || c.kind === "tokenObject-below") &&
-            EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
-        ((selectedCell.kind != null) && sheetView.selectMatchingCell((c: fixmeAny) =>
-            selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
-        false;
+        let cases: [boolean, SelectionPredicate][] = [
+          [selectedCell.qCellId != null,
+          (newCell) => EJSON.equals(selectedCell.qCellId, newCell.qCellId) &&
+            selectedCell.isObjectCell === newCell.isObjectCell],
+          [selectedCell.addColumnId != null,
+          (newCell) => selectedCell.addColumnId == newCell.addColumnId &&
+            EJSON.equals(selectedCell.ancestorQCellId, newCell.ancestorQCellId)],
+          [selectedCell.addColumnId != null,
+          (newCell) => (newCell.kind === "below" || newCell.kind === "tokenObject-below") &&
+            EJSON.equals(selectedCell.addColumnId, newCell.columnId)],
+          [selectedCell.kind != null,
+          (newCell) => selectedCell.kind === newCell.kind &&
+            selectedCell.columnId === newCell.columnId],
+        ];
+        for (let [guard, predicate] of cases) {
+          if (guard && sheetView.selectMatchingCell(predicate))
+            break;
+        }
       }
       // Make sure various things are consistent with change in table data or
       // selection (view.selectMatchingCell doesn't always seem to trigger this).
@@ -1391,7 +1398,7 @@ namespace Objsheets {
   }
 
   function stamp() {
-    var d = new Date();
+    let d = new Date();
     return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
   }
 

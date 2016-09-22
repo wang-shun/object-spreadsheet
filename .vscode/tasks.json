@@ -10,17 +10,16 @@
 // Code.  Do not emit output; the Meteor build system will do that.
 // ~ Matt 2016-02-26
 
-// A task runner that calls the Typescript compiler (tsc) and
-// compiles based on a tsconfig.json file that is present in
-// the root of the folder open in VSCode
 {
 	"version": "0.1.0",
 
-	// Use the embedded copy of the TypeScript compiler.  Run "meteor" once to
-	// download it.  (Unfortunately, the semantics of "showOutput": "silent" do
-	// not appear to be such that the output window shows up when the wrapper
-	// script reports an error.) ~ Matt 2016-02-28
-	"command": "tests/tsc",
+	// This tool uses the copies of the TypeScript compiler and tslint that are
+	// referenced by the hansoft:typescript package.  Run "meteor" once to
+	// download them.  (Unfortunately, the semantics of "showOutput": "silent"
+	// do not appear to be such that the output window shows up when the wrapper
+	// script prints the error that the tools haven't been downloaded.)
+	// ~ Matt 2016-02-28
+	"command": "tests/dev-tools/check-code",
 
 	// The command is a shell script
 	"isShellCommand": true,
@@ -28,10 +27,25 @@
 	// Show the output window only if unrecognized errors occur.
 	"showOutput": "silent",
 
-	// Tell the tsc compiler to use the tsconfig.json from the open folder.
-	"args": ["-p", "."],
-
-	// use the standard tsc problem matcher to find compile problems
-	// in the output.
-	"problemMatcher": "$tsc"
+	"problemMatcher": [
+		// use the standard tsc problem matcher to find compile problems
+		// in the output.
+		"$tsc",
+		// https://marketplace.visualstudio.com/items?itemName=eg2.tslint
+		{
+			"owner": "tslint",
+			"fileLocation": [
+				"relative",
+				"${workspaceRoot}"
+			],
+			"severity": "warning",
+			"pattern": {
+				"regexp": "^(\\S.*)\\[(\\d+), (\\d+)\\]:\\s+(.*)$",
+				"file": 1,
+				"line": 2,
+				"column": 3,
+				"message": 4
+			}
+		}
+	]
 }
