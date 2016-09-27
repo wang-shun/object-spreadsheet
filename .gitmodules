@@ -1,6 +1,6 @@
 [submodule "hansoft_typescript"]
 	path = packages/hansoft_typescript
-	url = ../hansoft_typescript
+	url = https://bitbucket.org/objsheets/hansoft_typescript
 [submodule "handsontable"]
 	path = tests/handsontable
-	url = ../handsontable
+	url = https://bitbucket.org/objsheets/handsontable
