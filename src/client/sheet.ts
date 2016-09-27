@@ -1,13 +1,13 @@
 namespace Objsheets {
 
-  Router.route("/:sheet", function() {
+  Router.route("/:sheet", function(this: fixmeAny) {
     this.render("Spreadsheet", {
       data: {
         sheet: this.params.sheet
       }
     });
   });
-  Router.route("/:sheet/views/:_id", function() {
+  Router.route("/:sheet/views/:_id", function(this: fixmeAny) {
     this.render("Spreadsheet", {
       data: {
         sheet: this.params.sheet,
@@ -29,7 +29,7 @@ namespace Objsheets {
   }
 
   export function stringifyTypeForSheet(type: fixmeAny) {
-    var col: fixmeAny, name: fixmeAny;
+    let col: fixmeAny, name: fixmeAny;
     if (type === "_unit") {
       return "X";
     } else if (!typeIsReference(type)) {
@@ -110,7 +110,7 @@ namespace Objsheets {
       this.width += this.layoutTree.root.spareColumns + this.layoutTree.root.separatorColumns;
       this.headerMinHeight = (this.col.isObject ? this.layoutTree.root.topHeaderMargin : 0) + this.headerHeightBelow;
       if (this.col.isObject) {
-        // Affects empty sheet when @options.separateTables = true.
+        // Affects empty sheet.
         this.headerMinHeight = Math.max(this.headerMinHeight, 3);
       }
     }
@@ -344,14 +344,12 @@ namespace Objsheets {
       else return null;
     }
     
-    // As long as siblings are always separated by a separator, we can color just
-    // based on depth.
     // If !expanded, then the requested height should always be 3.  Leaves render
     // at height 2 anyway.
 
     public renderHeader(expanded: fixmeAny, height: fixmeAny, depth: fixmeAny, typeColors: EJSONKeyedMap<string, string>) {
       // Part that is always the same.
-      var fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
+      let fieldMatchIdx: fixmeAny, matchIdx: fixmeAny;
       let myDepthClass = "rsHeaderDepth" + this.colorIndexForDepth(this.col.isObject ? depth : depth - 1);
       // Currently matching-colored header cells don't depend on depth.  You could
       // argue we should generate two classes and let the CSS deal with it.
@@ -405,7 +403,10 @@ namespace Objsheets {
       // "Corner" here is the upper left corner cell, which actually spans all the
       // way across in some cases (indicated by isFinal).
       let makeCorner = (isFinal: fixmeAny) => {
-        let classes = ["rsHeaderCorner"];
+        let classes = ["bottomAtObjectName"];
+        if (depth > (this.options.separateTables ? 1 : 0)) {
+          classes.push("hasOutsideLeftBorder");
+        }
         if (!isFinal) {
           classes.push("rsHeaderNonfinal");
         }
@@ -421,6 +422,19 @@ namespace Objsheets {
         return corner;
       };
 
+      if (this.columnId === rootColumnId) {
+        // Close off the corner unconditionally.  If the first column is a
+        // global value column, letting the corner span across it would
+        // introduce a corner case (ha ha) we'd just rather not deal with, but
+        // we still suppress the border between the corner and the padding cell
+        // by marking the corner non-final.
+        //
+        // This is adequate for now but isn't the last word on the rendering of
+        // the root column.  We may be able to get rid of it altogether if the
+        // spare columns can replace all of its functionality. ~ Matt 2016-09-15
+        grid = makeCorner(this.subsections.length == 0 || this.subsections[0].col.isObject);
+      }
+
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         let subHeight = expanded ? this.headerHeightBelow : 3;
         let subsectionGrid = subsection.renderHeader(expanded, subHeight, depth + 1, typeColors);
@@ -429,6 +443,11 @@ namespace Objsheets {
         }
         if (subsectionGrid.length < currentHeight) {
           let cssClasses = [colorClass];
+          if (subsectionGrid.length == 2) {
+            cssClasses.push("bottomAtObjectName");
+          }
+          // If this.columnId === rootColumnId, then the padding cell should
+          // have a right border because there will be a table separator column.
           if (i < this.subsections.length - 1) {
             cssClasses.push("rsHeaderNonfinal");
           }
@@ -471,9 +490,10 @@ namespace Objsheets {
   // This may hold a reference to a ViewCell object from an old View.  Weird but
   // shouldn't cause any problem and not worth doing differently.
   let selectedCell: fixmeAny = null;
-  let pendingSelectionPredicate: fixmeAny = null;
-  function postSelectionPredicate(predicate: fixmeAny) {
-    if (view != null && view.selectMatchingCell(predicate))
+  type SelectionPredicate = (c: ViewCell) => boolean;
+  let pendingSelectionPredicate: SelectionPredicate = null;
+  function postSelectionPredicate(predicate: SelectionPredicate) {
+    if (sheetView != null && sheetView.selectMatchingCell(predicate))
       pendingSelectionPredicate = null;
     else
       pendingSelectionPredicate = predicate;
@@ -503,7 +523,7 @@ namespace Objsheets {
      * See doc of Model.addCellRecursive for a description of the parameters.
      */
     public static addCell(addColumnId: ColumnId, ancestorQCellId: QCellId, enteredValue: string | {}, consumePlaceholder: boolean = false, newType?: OSType, callback: fixmeAny = (() => {})) {
-      var newValue: fixmeAny;
+      let newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
       }
@@ -532,7 +552,7 @@ namespace Objsheets {
     }
 
     public static modifyCell(qCellId: fixmeAny, enteredValue: fixmeAny, callback: fixmeAny = () => {}) {
-      var newValue: fixmeAny;
+      let newValue: fixmeAny;
       let cel = new CellId(qCellId);
       if ((newValue = this.parseValueUi(this.typeOf(cel.columnId), enteredValue)) != null) {
         cel.value(newValue, (() => {
@@ -594,15 +614,24 @@ namespace Objsheets {
         // for object types with no children (for UI prototyping; not all functionality
         // works in this mode).
         showBullets: true,
+        rootSpareRows: 10,
+        // Developers only (print some logs with timestamps)
+        profile: false,
+
+        // We've stopped maintaining these options because they weren't worth
+        // the complexity they added to the already very complex rendering code.
+        // They are now fixed at the values shown below.
+
         // Separator column between every pair of adjacent incomparable columns
         // (except ones that are in separate tables when separateTables is on).
-        // Consider turning back on once we have column plurality data. ~ Matt 2015-12-04
+        //
+        // Will be more workable once we have column plurality data.  I still
+        // feel that separator columns have merit and we should consider turning
+        // them back on the future if we don't come up with something better.
+        // ~ Matt 2016-09-15
         sepcols: false,
         // Show children of the root as separate tables.
         separateTables: true,
-        rootSpareRows: 10,
-        // Developers only (print some logs with timestamps)
-        profile: false
       };
 
     constructor(public view: fixmeAny) {
@@ -638,7 +667,7 @@ namespace Objsheets {
     }
 
     public hotConfig() {
-      var _ref: fixmeAny, _results: fixmeAny;
+      let _ref: fixmeAny, _results: fixmeAny;
       let thisView = this;
       if (this.options.profile) console.log(`[${stamp()}]  ---  preparing grid started  --- `);
       // Display the root column for completeness.  However, it doesn't have a real
@@ -724,7 +753,7 @@ namespace Objsheets {
         let colCls: fixmeAny = null;
         for (let row = 0; row < grid.length; row++) {
           for (let cls of (grid[row][col] || {}).cssClasses || []) {
-            if (cls === "rsCaption" || cls === "rsRoot" || cls === "separator" || cls === "tableSeparator") {
+            if (cls === "rsCaption" || cls === "rsRoot" || cls === "tableSeparator") {
               // assert (!colCls? || colCls == cls)
               colCls = cls;
             }
@@ -734,9 +763,9 @@ namespace Objsheets {
       });
 
       this.cellClasses = grid.map((dataRow: fixmeAny, row: fixmeAny) => dataRow.map((cell: fixmeAny, col: fixmeAny) => {
-        var refc: fixmeAny;
+        let refc: fixmeAny;
         let adjcol = col + cell.colspan;
-        let classes = this.colClasses[adjcol] === "separator" ? ["incomparable"] : [];
+        let classes: string[] = [];
         if ((cell.qCellId != null) && cell.isObjectCell && ((refc = this.refId(cell.qCellId)) != null)) {
           classes.push(`ref-${refc}`);
         }
@@ -756,7 +785,7 @@ namespace Objsheets {
             || (cell.addColumnId != null) && !cell.isObjectCell && StateEdit.canEdit(cell.addColumnId))
           classes.push("editable");
         return cell.cssClasses.concat(classes);
-      }))
+      }));
 
       return {
         data: grid.map((row: fixmeAny) => row.map((cell: fixmeAny) => fallback(cell.display, cell.value))),
@@ -764,13 +793,10 @@ namespace Objsheets {
         // clever, though with carefully designed individual views, we may never
         // need it.  We may also want to fix the header for large data sets.
         //fixedColumnsLeft: 1  # Caption removed
-        // Separator columns are 8 pixels wide.  Others use default width.
         colWidths: _.range(0, this.grid[0].length).map((i) => {  // no way grid can be empty
           switch (this.colClasses[i]) {
             case "tableSeparator":
               return 20;
-            case "separator":
-              return 10;
             case "rsRoot":
               return 18;
             default:
@@ -778,30 +804,35 @@ namespace Objsheets {
               return undefined;
           }
         }),
-        rowHeights: ((function() {
+        rowHeights: (() => {
           // Specify all the row heights (24 pixels is the Handsontable default),
           // otherwise the fixed clone of the left column sometimes reduced the
           // objectName row to zero height because it wasn't constrained by the
           // content of the real table.  We can look out for any similar glitches.
-          if (this.headerExpanded.get()) {
-            return _.range(0, this.grid.length).map((i) => i < headerHeight - (2 + this.options.showTypes) ? 11 : 24);
-          } else {
-            return _.range(0, this.grid.length).map((i) => 24);
-          }
-        }).call(this)),
+          let fieldNameRow = headerHeight - (1 + this.options.showTypes);
+          let objectNameRow = fieldNameRow - 1;
+          return _.range(0, this.grid.length).map((i) =>
+            i < objectNameRow ? 11 :
+            i == objectNameRow ? 23 :  // Remove a pixel for the missing bottom border.
+            i == fieldNameRow ? 25 :  // Add a pixel for the top border.
+            24);
+        })(),
         // stretchH: "last",
         cells: (row: fixmeAny, col: fixmeAny, prop: fixmeAny): fixmeAny => {
-          var clsRow = this.cellClasses[row]; 
-          var classes = clsRow != null ? clsRow[col] : null;
+          let clsRow = this.cellClasses[row];
+          let classes = clsRow != null ? clsRow[col] : null;
           if (!classes) {
             return {};  // may occur if grid is changing
           }
 
           if (this.pending.indexOf(`${row}-${col}`) >= 0) {
-            classes = classes.concat('pending');  // must copy classes because at this point it aliases an element of this.cellClasses
+            classes = classes.concat("pending");  // must copy classes because at this point it aliases an element of this.cellClasses
           }
           return {
-            renderer: col === 0 && row === 0 ? "html" : "text",
+            renderer:
+              col === 0 && row === 0 ? "html" :
+              _.contains(classes, "hasOutsideLeftBorder") ? this.textWithOutsideLeftBorderRenderer.bind(this) :
+              "text",
             className: classes.join(" "),
             // Edge case: renaming the column whose formula is currently being edited could change
             // the string representation of the original formula, which would trigger a reactive
@@ -817,7 +848,7 @@ namespace Objsheets {
             // for the purpose of changing the objectName and fieldName respectively.
             //
             // qFamilyId is the add case.  For a state keyed object, you add by typing the key in the padding cell.
-            readOnly: classes.indexOf("editable") == -1 
+            readOnly: classes.indexOf("editable") == -1
           };
         },
         autoColumnSize: {
@@ -866,27 +897,28 @@ namespace Objsheets {
           if (isForced) this.pending = []; // this is the best way to make sure no "dirt" is left
         },
         beforeChange: (changes: fixmeAny, source: fixmeAny) => {
-          if (!source) return;   // Run this handler only for interactive edits
+          if (!source) return true;   // Run this handler only for interactive edits
 
-          var fail = false;
+          let fail = false;
           for (let [row, col, oldVal, newVal] of changes) {
             if (oldVal === newVal) continue;
-            
+
             let cell = this.grid[row][col];
-            let revertingCallback = ((row: fixmeAny, col: fixmeAny, oldVal: fixmeAny) => (error: fixmeAny, result: fixmeAny) => {
+            let revertingCallback = (error: fixmeAny, result: fixmeAny) => {
               if (error) {
                 fail = true;  // prevent race condition in case we're still in this function
                 this.pending = [];
                 this.hot.setDataAtCell(row, col, oldVal);
               }
               standardServerCallback(error, result);
-            })(row, col, oldVal);  // enfore closure; in ES 6 we wouldn't need this anymore
+            };
             this.pending.push(`${row}-${col}`);
-            
+
             try {
               // One of these cases should apply...
+              let name: string;
               if (cell.kind === "top") {
-                let name = newVal === "" ? null : newVal;
+                name = newVal === "" ? null : newVal;
                 Meteor.call("changeColumnObjectName", $$, cell.columnId, name, revertingCallback);
               }
               else if (cell.kind === "below") {
@@ -939,19 +971,19 @@ namespace Objsheets {
                 }
                 StateEdit.addCell(columnId, obj, newVal, cell.isPlaceholder, newType, revertingCallback);
               }
-            }
-            catch (e) {
+            } catch (e) {
               console.error(e.stack);
               fail = true;   // Note: this reverts all changes to Handsontable.
                              // The ones that have been applied will propagate back through
             }                // Meteor collections.
           }
-          
+
           if (fail) return false;
+          return true;
         },
         contextMenu: {
           build: (): fixmeAny => {
-            var addCommand: fixmeAny, ci: fixmeAny, coords: fixmeAny, deleteCommand: fixmeAny, demoteCommand: fixmeAny;
+            let addCommand: fixmeAny, ci: fixmeAny, coords: fixmeAny, deleteCommand: fixmeAny, demoteCommand: fixmeAny;
             if (ActionBar.hasUnsavedData()) {
               return false;
             }
@@ -1052,6 +1084,26 @@ namespace Objsheets {
       };   // Handsontable config object
     }
 
+    // https://docs.handsontable.com/0.20.1/demo-custom-renderers.html
+    textWithOutsideLeftBorderRenderer(hot: fixmeAny, td: HTMLTableDataCellElement,
+        row: number, col: number /* , ... */) {
+      Handsontable.renderers.TextRenderer.apply(this, arguments);
+      let markerDiv = document.createElement("div");
+      markerDiv.className = "outsideLeftBorderMarker";
+      td.insertBefore(markerDiv, td.firstChild);
+      let borderDiv = document.createElement("div");
+      borderDiv.className = "outsideLeftBorder";
+      // Chrome rounds the heights of table cells in a special way when the zoom
+      // is not 100%, and using "height: 100%;" on the divs is the only way to
+      // pick up the rounded height.  But then we need to set td.style.height in
+      // order for "height: 100%;" to work in Firefox.
+      //
+      // Note: td.rowSpan is not set yet; mergeCells.applySpanProperties is
+      // called in an afterRenderer hook.
+      td.style.height = (11 * (this.grid[row][col].rowspan - 1) + 23) + "px";
+      markerDiv.appendChild(borderDiv);
+    }
+
     public hotCreate(domElement: fixmeAny) {
       let cfg = this.hotConfig();
       this.hot = new Handsontable(domElement, cfg);
@@ -1089,7 +1141,7 @@ namespace Objsheets {
     }
 
     public getSelected = () => {
-      var s: number[];
+      let s: number[];
       if ((s = this.hot.getSelected()) != null) {
         let [r1, c1, r2, c2] = s;
         [r1, r2] = [Math.min(r1, r2), Math.max(r1, r2)];
@@ -1144,7 +1196,7 @@ namespace Objsheets {
     }
 
     public highlightReferent(referent: fixmeAny) {
-      var refc: fixmeAny;
+      let refc: fixmeAny;
       $(".referent").removeClass("referent");
       $(".referent-object").removeClass("referent-object");
       if ((referent != null) && ((refc = this.refId(referent)) != null)) {
@@ -1154,7 +1206,7 @@ namespace Objsheets {
     }
 
     public highlightObject(obj: fixmeAny) {
-      var refc: fixmeAny;
+      let refc: fixmeAny;
       $(".selected-object").removeClass("selected-object");
       if ((obj != null) && ((refc = this.refId(obj)) != null)) {
         $(`.ancestor-${refc}`).addClass("selected-object");
@@ -1162,7 +1214,7 @@ namespace Objsheets {
     }
 
     public onSelection() {
-      var ci: fixmeAny, _ref: fixmeAny;
+      let ci: fixmeAny, _ref: fixmeAny;
       let selection = this.hot.getSelected();
       if (EJSON.equals(selection, this.savedSelection)) {
         return;
@@ -1195,7 +1247,7 @@ namespace Objsheets {
     // just the callback, so we maintain consistency in what command is offered.
 
     public getAddCommandForCell(c: fixmeAny) {
-      var col: fixmeAny;
+      let col: fixmeAny;
       if ((c.addColumnId != null) && columnIsState(col = getColumn(c.addColumnId))) {
         let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
         if (col.type === "_token") {
@@ -1247,7 +1299,7 @@ namespace Objsheets {
     }
 
     public getDeleteCommandForCell(c: fixmeAny) {
-      var col: fixmeAny;
+      let col: fixmeAny;
       if (c.isPlaceholder) {  // Should only exist in state value columns.
         return {
           name: "Delete cell",
@@ -1292,7 +1344,7 @@ namespace Objsheets {
     }
 
     public onKeyDown(event: fixmeAny) {
-      var ci: fixmeAny, col: fixmeAny, parentCol: fixmeAny, qf: fixmeAny;
+      let ci: fixmeAny, col: fixmeAny, parentCol: fixmeAny, qf: fixmeAny;
       if (ActionBar.hasUnsavedData()) {
         return;
       }
@@ -1395,49 +1447,58 @@ namespace Objsheets {
 
   }
 
-  let view: fixmeAny = null;
+  export let sheetView: fixmeAny = null;
 
   export function rebuildView(viewId: fixmeAny) {
-    if (!view || !view.hot) {
-      if ((view != null ? view.hot : null) != null) {
-        view.hot.destroy();
+    if (!sheetView || !sheetView.hot) {
+      if ((sheetView != null ? sheetView.hot : null) != null) {
+        sheetView.hot.destroy();
       }
-      view = new ClientView(new View(viewId));
-      view.hotCreate($("#View")[0]);  //View')[0]
+      sheetView = new ClientView(new View(viewId));
+      sheetView.hotCreate($("#View")[0]);  //View')[0]
     } else {
-      view.reload();  //viewDef
-      view.hotReconfig();
+      sheetView.reload();  //viewDef
+      sheetView.hotReconfig();
     }
-    this.view = view;  // for debugging
 
     Tracker.nonreactive(() => {
       // Nothing below should trigger rebuilding of the view if it reads reactive
       // data sources.  (Ouch!)
 
       if (pendingSelectionPredicate != null &&
-          view.selectMatchingCell(pendingSelectionPredicate)) {
+          sheetView.selectMatchingCell(pendingSelectionPredicate)) {
         pendingSelectionPredicate = null;
       } else if (selectedCell != null) {
         // Try to select a cell similar to the one previously selected.
-        ((selectedCell.qCellId != null) && view.selectMatchingCell((c: fixmeAny) =>
-            EJSON.equals(selectedCell.qCellId, c.qCellId) &&
-            selectedCell.isObjectCell === c.isObjectCell)) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
-            selectedCell.addColumnId == c.addColumnId &&
-            EJSON.equals(selectedCell.ancestorQCellId, c.ancestorQCellId))) ||
-        ((selectedCell.addColumnId != null) && view.selectMatchingCell((c: fixmeAny) =>
-            (c.kind === "below" || c.kind === "tokenObject-below") &&
-            EJSON.equals(selectedCell.addColumnId, c.columnId))) ||
-        ((selectedCell.kind != null) && view.selectMatchingCell((c: fixmeAny) =>
-            selectedCell.kind === c.kind && selectedCell.columnId === c.columnId)) ||
-        false;
+        let cases: [boolean, SelectionPredicate][] = [
+          [selectedCell.qCellId != null,
+          (newCell) => EJSON.equals(selectedCell.qCellId, newCell.qCellId) &&
+            selectedCell.isObjectCell === newCell.isObjectCell],
+          [selectedCell.addColumnId != null,
+          (newCell) => selectedCell.addColumnId == newCell.addColumnId &&
+            EJSON.equals(selectedCell.ancestorQCellId, newCell.ancestorQCellId)],
+          [selectedCell.addColumnId != null,
+          (newCell) => (newCell.kind === "below" || newCell.kind === "tokenObject-below") &&
+            EJSON.equals(selectedCell.addColumnId, newCell.columnId)],
+          [selectedCell.kind != null,
+          (newCell) => selectedCell.kind === newCell.kind &&
+            selectedCell.columnId === newCell.columnId],
+        ];
+        for (let [guard, predicate] of cases) {
+          if (guard && sheetView.selectMatchingCell(predicate))
+            break;
+        }
       }
       // Make sure various things are consistent with change in table data or
       // selection (view.selectMatchingCell doesn't always seem to trigger this).
-      view.onSelection();
+      sheetView.onSelection();
       ActionBar.isLoading.set(false);
     });
   }
+
+  // Hm, using the pre-makeErrorType class as the TypeScript type is a little
+  // awkward but the best way I can think of. ~ Matt 2016-09-19
+  export let whyNotReady: NotReadyError_ = null;
 
   // Helper decorator for use with Tracker.autorun
   export function guarded(op: fixmeAny) {
@@ -1446,22 +1507,22 @@ namespace Objsheets {
         op.apply(null, args);
       } catch (e) {
         if (e instanceof NotReadyError) {
-          this.why = e;
+          whyNotReady = e;
           return;  // Let the autorun run again once we have the data.
         }
         console.error(e.stack);
         throw e;
       }
-      this.why = null;
+      whyNotReady = null;
     };
   }
 
   function stamp() {
-    var d = new Date();
+    let d = new Date();
     return d.toString("HH:mm:ss.") + ("000" + d.getMilliseconds()).slice(-3);
   }
 
-  Template["Spreadsheet"].rendered = function() {
+  Template["Spreadsheet"].rendered = function(this: fixmeAny) {
     let sheet = (this.data != null ? this.data.sheet : null) || "";
     let viewId = this.data != null ? this.data.viewId : null;
     // $('body').addClass("present")   # uncomment for presentation mode (read from query string?)
@@ -1476,7 +1537,7 @@ namespace Objsheets {
 
   Template["Spreadsheet"].events = {
     "click .toggleHeaderExpanded": () => {
-      view.toggleHeaderExpanded();
+      sheetView.toggleHeaderExpanded();
     }
   };
 

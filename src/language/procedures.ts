@@ -410,20 +410,20 @@ namespace Objsheets {
     // so we can interpret navigations correctly.
     parser.yy.varsStack = [];
     parser.yy.varsPreviousBranch = null;
-    parser.yy.pushVars = function() {
+    parser.yy.pushVars = function(this: fixmeAny) {
       this.varsStack.push([this.varsPreviousBranch, this.vars]);
       this.varsPreviousBranch = null;
       this.vars = this.vars.shallowClone();
     };
-    parser.yy.rollbackVars = function() {
+    parser.yy.rollbackVars = function(this: fixmeAny) {
       [this.varsPreviousBranch, this.vars] = this.varsStack.pop();
     };
-    parser.yy.nextBranch = function() {
+    parser.yy.nextBranch = function(this: fixmeAny) {
       // assert !this.varsPreviousBranch?
       this.varsPreviousBranch = this.vars;
       this.vars = this.varsStack[this.varsStack.length - 1][1].shallowClone();
     };
-    parser.yy.commitVars = function() {
+    parser.yy.commitVars = function(this: fixmeAny) {
       let newVars = mergeTypeMaps(this.varsPreviousBranch, this.vars);
       this.varsPreviousBranch = this.varsStack.pop()[0];
       this.vars = newVars;
@@ -449,7 +449,7 @@ namespace Objsheets {
   //
   // Does not use dispatchStatement for the same reasons as validateSubformula.
   function validateStatement(mutableVars: fixmeAny, mutableCurrentScopeVars: fixmeAny, statement: fixmeAny) {
-    var opName: fixmeAny;
+    let opName: fixmeAny;
     valAssert(_.isArray(statement), "Statement must be an array.");
     valAssert(_.isString(opName = statement[0]), "Statement must begin with an operation name (a string).");
     valAssert(procedures_dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);

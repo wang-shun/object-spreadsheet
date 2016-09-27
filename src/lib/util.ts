@@ -74,8 +74,9 @@ namespace Objsheets {
       return EJSON.toJSONValue(this.obj);
     }
 
-    public static fromJSONValue(json: any): EJSONKeyedMap<any, any> {
-      let m = new EJSONKeyedMap<any, any>();
+    public static fromJSONValue(json: EJSON.any_fp):
+        EJSONKeyedMap<EJSON.any_ta, EJSON.any_ta> {
+      let m = new EJSONKeyedMap<EJSON.any_ta, EJSON.any_ta>();
       m.obj = EJSON.fromJSONValue(json);
       return m;
     }
@@ -128,8 +129,8 @@ namespace Objsheets {
       return this.map.toJSONValue();
     }
 
-    public static fromJSONValue(json: any): EJSONKeyedSet<any> {
-      let s = new EJSONKeyedSet<any>();
+    public static fromJSONValue(json: EJSON.any_fp): EJSONKeyedSet<EJSON.any_ta> {
+      let s = new EJSONKeyedSet<EJSON.any_ta>();
       s.map = EJSONKeyedMap.fromJSONValue(json);
       return s;
     }
@@ -173,6 +174,7 @@ namespace Objsheets {
             return n;
           }
         }
+        return null;
       }
     }
 
@@ -194,8 +196,8 @@ namespace Objsheets {
       };
     }
 
-    public static fromJSONValue(json: any) {
-      return new Tree(json.root, json.subtrees.map((s: any) => Tree.fromJSONValue(s)));
+    public static fromJSONValue(json: EJSON.any_fp) {
+      return new Tree(json.root, json.subtrees.map((s: EJSON.any_fp) => Tree.fromJSONValue(s)));
     }
   }
   EJSON.addType("Tree", Tree.fromJSONValue);

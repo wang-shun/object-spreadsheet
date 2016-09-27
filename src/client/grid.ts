@@ -14,7 +14,7 @@ namespace Objsheets {
     // If set to a state column, then data can be added to this cell, and
     // any missing ancestors will be automatically created up to
     // ancestorQCellId.
-    public addColumnId : ColumnId;
+    public addColumnId: ColumnId;
     public isPlaceholder: boolean;
     // For spare columns: set to object column id where the new column should
     // be added as a child. 
@@ -93,7 +93,7 @@ namespace Objsheets {
   }
 
   export function gridBottomRow(grid: ViewCell[][]) {
-    var _results: ViewCell[];
+    let _results: ViewCell[];
     if (grid.length === 0) {
       return [];
     } else {

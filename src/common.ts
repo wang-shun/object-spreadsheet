@@ -39,30 +39,42 @@ namespace Objsheets {
   // N.B. Meteor.makeErrorType is the way to make a subclass of Error so that both
   // instanceof and stack traces work.
 
+  // Factor out the "message" thing.  But Meteor.makeErrorType doesn't support
+  // further subclassing (quick test in the Meteor shell ~ Matt 2016-09-19), so
+  // it has to be done for each concrete subclass.
+  abstract class ObjsheetsError_ extends Error {
+    constructor(public message: string) {
+      // When the super call is compiled by TypeScript with a target of ES5, it
+      // becomes Error.call(this), which has the idiosyncratic behavior of
+      // creating a new Error instead of filling in the current Error.  Raising
+      // the target to ES6 might fix this, but we aren't prepared to do so just
+      // yet.  So make the useless super call to appease TypeScript, but we have
+      // to be responsible for filling the "message" field ourselves.
+      // ~ Matt 2016-09-19
+      super();
+    }
+  }
+
   // Careful: with "class EvaluationError", the original class gets assigned to a
   // file-scope variable that shadows the exported wrapped class seen by the rest
   // of the application, and instanceof breaks.
-  class EvaluationError_ {
-    constructor(public message: string) {}
-  }
+  class EvaluationError_ extends ObjsheetsError_ {}
   export var EvaluationError = Meteor.makeErrorType("EvaluationError", EvaluationError_);
 
   // Used also for typechecking.
-  class FormulaValidationError_ {
-    constructor(public message: string) {}
-  }
+  class FormulaValidationError_ extends ObjsheetsError_ {}
   export var FormulaValidationError = Meteor.makeErrorType("FormulaValidationError", FormulaValidationError_);
 
-  class SyntaxError_ {
+  class SyntaxError_ extends ObjsheetsError_ {
     // details: Jison "hash"?
     // (https://github.com/zaach/jison/blob/5e13d8563c306c66cc00b9fe22ff6da74617e792/lib/jison.js#L1046)
-    constructor(public message: string, public details: fixmeAny) {}
+    constructor(message: string, public details: fixmeAny) {
+      super(message);
+    }
   }
   export var SyntaxError = Meteor.makeErrorType("SyntaxError", SyntaxError_);
 
-  class SemanticError_ {
-    constructor(public message: string) {}
-  }
+  class SemanticError_ extends ObjsheetsError_ {}
   export var SemanticError = Meteor.makeErrorType("SemanticError", SemanticError_);
 
   // Model data structures and parameters the client needs to be aware of:
@@ -173,7 +185,7 @@ namespace Objsheets {
       // override this behavior. :/
       throw new SemanticError("We currently do not support references to the root column.");
     }
-    let colId2 : ColumnRef = [rootColumnId, false];
+    let colId2: ColumnRef = [rootColumnId, false];
     for (let n of s.split(":")) {
       if (colId2[1]) {
         throw new SemanticError(`Looking up child '${n}' of a value column.`);
@@ -310,7 +322,7 @@ namespace Objsheets {
       };
     }
 
-    public static fromJSONValue(json: any): TypedSet {
+    public static fromJSONValue(json: EJSON.any_fp): TypedSet {
       return new TypedSet(json.type, EJSONKeyedSet.fromJSONValue(json.set));
     }
   }
@@ -382,9 +394,14 @@ namespace Objsheets {
       // unprivileged users, we probably want the server to generate it, but we
       // may not reuse this code for unprivileged users anyway.
       return Random.id();
-    } else     return type === "text" ? text : type === "date" ? Date.parse(text) || (() => {
-      throw new Error(`Invalid date: '${text}'`);
-    })() : JSON.parse(text);
+    } else {
+      return type === "text" ? text : type === "date" ? Date.parse(text) || (() => {
+        throw new Error(`Invalid date: '${text}'`);
+      })() : JSON.parse(text);
+    }
   }
 
 }
+
+// Attach to the global object for debugging.
+(global || window).Objsheets = Objsheets;
