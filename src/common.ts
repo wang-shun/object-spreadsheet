@@ -1,5 +1,3 @@
-// check-implicit-any magic comment: noImplicitAny
-
 // Relational Spreadsheets definitions needed by both client and server that
 // don't fall into a more specific file such as formulas.coffee.
 

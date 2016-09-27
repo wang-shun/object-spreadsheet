@@ -1,5 +1,3 @@
-// check-implicit-any magic comment: noImplicitAny
-
 // Utility definitions not specific to Relational Spreadsheets.
 
 // Now that we're no longer using custom classes, we might be able to use plain
