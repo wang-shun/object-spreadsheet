@@ -35,7 +35,7 @@ namespace Objsheets {
   // Mutate "orig" by adding "extension" at the bottom.
   // This would be a good place to add some assertions...
   export function gridVertExtend(orig: fixmeAny, extension: fixmeAny[][]) {
-    if (orig.length > 0) assert(() => extension.every((x) => x.length == orig[0].length))
+    if (orig.length > 0) assert(() => extension.every((x) => x.length == orig[0].length));
     for (let row of extension) {
       orig.push(row);
     }
@@ -49,12 +49,12 @@ namespace Objsheets {
       }
     }
   }
-  
+
   export function gridVertStretch(orig: ViewCell[][], height: number) {
     assert(() => 0 < orig.length && orig.length <= height);
     if (orig.length < height) {
-      var width = orig[0].length;
-      var deltaHeight = height - orig.length;
+      let width = orig[0].length;
+      let deltaHeight = height - orig.length;
       gridBottomRow(orig).forEach((cell) => cell.rowspan += deltaHeight);
       for (let i = orig.length; i < height; i++) {
         orig.push(_.range(0, width).map(() => new ViewCell(null)));
@@ -76,7 +76,7 @@ namespace Objsheets {
     return grid;
   }
 
-  export function gridMatrix(height: number, width: number, value: any = "", cssClasses: string[] = [], attrs: {} = {}): ViewCell[][] {
+  export function gridMatrix(height: number, width: number, value: fixmeAny = "", cssClasses: string[] = [], attrs: {} = {}): ViewCell[][] {
     return _.range(0, height).map((i) => _.range(0, width).map((j) => _.extend(new ViewCell(value, 1, 1, cssClasses), attrs)));
   }
 

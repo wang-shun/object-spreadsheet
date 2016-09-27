@@ -141,14 +141,14 @@ namespace Objsheets {
     constructor(public root: T, public subtrees: Tree<T>[] = []) {}
 
     public size(): number {
-      return this.subtrees.reduce((x,y) => x+y.size(), 1);
+      return this.subtrees.reduce((x, y) => x + y.size(), 1);
     }
-    
+
     public forEach(op: (x: T) => void) {
       op(this.root);
       this.subtrees.forEach((s) => s.forEach(op));
     }
-    
+
     /**
      * applies op to the root of each subtree
      */
@@ -180,11 +180,11 @@ namespace Objsheets {
 
     public toString(): string {
       if (this.subtrees.length > 0)
-        return `${this.root.toString()}{${this.subtrees.map((s) => s.toString()).join(", ")}}`
+        return `${this.root.toString()}{${this.subtrees.map((s) => s.toString()).join(", ")}}`;
       else
-       return this.root.toString()
+       return this.root.toString();
     }
-    
+
     public typeName(): string {
       return "Tree";
     }

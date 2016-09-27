@@ -963,11 +963,11 @@ namespace Objsheets {
      * and adjusts the id to point to the object.
      */
     private promoteCellId(cellId: QCellId) {
-      var base = cellIdParent(cellId.cellId);
-      var value = cellIdLastStep(cellId.cellId);
-      var keyColumnId = this.getColumn(cellId.columnId).children[0];
+      let base = cellIdParent(cellId.cellId);
+      let value = cellIdLastStep(cellId.cellId);
+      let keyColumnId = this.getColumn(cellId.columnId).children[0];
       assert(() => keyColumnId);
-      var familyRec = Cells.findOne({column: keyColumnId, values: [value]});
+      let familyRec = Cells.findOne({column: keyColumnId, values: [value]});
       assert(() => familyRec);
       return {
         columnId: cellId.columnId,

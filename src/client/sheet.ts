@@ -46,13 +46,13 @@ namespace Objsheets {
     return type === "_unit" ? ["centered"] : [];
   }
 
-  class LayoutNode implements EJSON.CustomType {
+  class LayoutNode implements EJSONableCustomType {
     public spareColumns = 0;       // Additional columns to the right that will be part of this layout node
     public separatorColumns = 0;   // Space between current layout node and its right sibling
     public topHeaderMargin = 1;
     public stretchV = true;
     public paddingCssClass = "dataPadding";
-    
+
     constructor(public columnId: string) { }
     // Not actually going to serialize this, but I want to use it in a tree,
     // which unfortunately requires it to be EJSONable.  ~ Shachar 04-05-2016
@@ -201,7 +201,7 @@ namespace Objsheets {
         }
       }
       // Add separator columns if needed
-      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]));
       return grid;
     }
 
@@ -298,16 +298,16 @@ namespace Objsheets {
       gridHorizExtend(grid, this.renderSpareColumns(height, grid, qCellId));
       return grid;
     }
-    
+
     private renderSpareColumns(height: number, grid: ViewCell[][], cellId: QCellId) {
-      var spare = gridMatrix(grid.length, this.layoutTree.root.spareColumns, "", 
+      let spare = gridMatrix(grid.length, this.layoutTree.root.spareColumns, "",
         ["spareColumn", "editable"]);
-      var ancestorType = this.spareAncestorType() || this.columnId;
-      var isLoneValue = (cell: ViewCell) => 
-        cell.qCellId != null && cell.qCellId.columnId == ancestorType /* a value that will be promoted to an object when extending rightwards */ 
+      let ancestorType = this.spareAncestorType() || this.columnId;
+      let isLoneValue = (cell: ViewCell) =>
+        cell.qCellId != null && cell.qCellId.columnId == ancestorType; /* a value that will be promoted to an object when extending rightwards */
       spare.forEach((row, i) => row.forEach((cell) => {
         let adj = grid[i][grid[i].length - 1]; /* consult adjacent cell to the left: */
-        cell.ancestorQCellId = 
+        cell.ancestorQCellId =
             (adj.isObjectCell ||               /* - object cell (meaning: it's an object without fields) */
              isLoneValue(adj))                 /* - will become an object (and the new value will be a child) */
                 ? adj.qCellId
@@ -318,13 +318,13 @@ namespace Objsheets {
     }
 
     private renderSpareRows(height: number, grid: ViewCell[][], cellId: QCellId) {
-      var spare = _.range(0,height).map(() =>
+      let spare = _.range(0, height).map(() =>
         this.renderHlist(null, cellId, 1, this.layoutTree.root.paddingCssClass)[0]);
       // First spare row can be used to add values to the families right above it
       if (grid.length > 0 && spare.length > 0)
         gridBottomRow(grid).forEach((cell, j) => {
-          if (cell.qCellId != null) 
-            spare[0][j].ancestorQCellId = cell.ancestorQCellId; 
+          if (cell.qCellId != null)
+            spare[0][j].ancestorQCellId = cell.ancestorQCellId;
         });
       return spare;
     }
@@ -337,13 +337,13 @@ namespace Objsheets {
      */
     private spareAncestorType(): ColumnId {
       if (this.col.isObject) {
-        var last = this.subsections[this.subsections.length - 1];
-        return (last && last.layoutTree.root.separatorColumns == 0 
+        let last = this.subsections[this.subsections.length - 1];
+        return (last && last.layoutTree.root.separatorColumns == 0
                   && last.spareAncestorType()) || this.columnId;
       }
       else return null;
     }
-    
+
     // If !expanded, then the requested height should always be 3.  Leaves render
     // at height 2 anyway.
 
@@ -392,12 +392,12 @@ namespace Objsheets {
       if (this.col.isObject) {
         grid = this.renderFieldHeaders(grid, expanded, height, depth, typeColors, myColorClass);
       }
-      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["spareColumn"]))
-      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]))
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.spareColumns, "", ["spareColumn"]));
+      gridHorizExtend(grid, gridMergedCell(grid.length, this.layoutTree.root.separatorColumns, "", ["tableSeparator"]));
       return grid;
     }
-  
-    private renderFieldHeaders(grid: any, expanded: boolean, height: number, depth: number, typeColors: EJSONKeyedMap<string,string>, colorClass: string) {
+
+    private renderFieldHeaders(grid: fixmeAny, expanded: boolean, height: number, depth: number, typeColors: EJSONKeyedMap<string, string>, colorClass: string) {
       // At this point, height should be at least 3.
       let currentHeight = 2;  // should always be 2 or height
       // "Corner" here is the upper left corner cell, which actually spans all the
@@ -522,7 +522,7 @@ namespace Objsheets {
      * cell to the model having that value.
      * See doc of Model.addCellRecursive for a description of the parameters.
      */
-    public static addCell(addColumnId: ColumnId, ancestorQCellId: QCellId, enteredValue: string | {}, consumePlaceholder: boolean = false, newType?: OSType, callback: fixmeAny = (() => {})) {
+    public static addCell(addColumnId: ColumnId, ancestorQCellId: QCellId, enteredValue: string | {}, consumePlaceholder = false, newType?: OSType, callback: fixmeAny = (() => {})) {
       let newValue: fixmeAny;
       if (enteredValue == StateEdit.PLACEHOLDER) {
         newValue = null;
@@ -540,10 +540,10 @@ namespace Objsheets {
             if (enteredValue == StateEdit.PLACEHOLDER) {
               predicate = (c: fixmeAny) =>
                 c.isPlaceholder && c.addColumnId == addColumnId &&
-                EJSON.equals(c.ancestorQCellId, <any>ancestorQCellId); //.cellId, result.cellId);
+                EJSON.equals(c.ancestorQCellId, <fixmeAny>ancestorQCellId); //.cellId, result.cellId);
             } else {
               let child = result.child(newValue);
-              predicate = (c: ViewCell) => EJSON.equals(c.qCellId, <any>child); 
+              predicate = (c: ViewCell) => EJSON.equals(c.qCellId, <fixmeAny>child);
             }
             postSelectionPredicate(predicate);
           }
@@ -584,7 +584,7 @@ namespace Objsheets {
       $$.call("defineColumn", parentId, index, nextAvailableColumnName("value"), formula != null ? null : DEFAULT_STATE_FIELD_TYPE, isObject, null, formula, view != null ? view.id : null, standardServerCallback);  // specifiedType  // isObject  // objectName: when it is applicable, [fieldName] is OK  // formula
     }
   }
-  
+
   export class ClientView {
     //public options: fixmeAny;
     public hot: fixmeAny;
@@ -647,9 +647,9 @@ namespace Objsheets {
       this.layoutTree = this.buildLayoutTree(this.view.def().layout);
       this.mainSection = new ViewSection(this.layoutTree, this.options);
     }
-    
+
     private buildLayoutTree(columnIds: Tree<string>): Tree<LayoutNode> {
-      var t = columnIds.map((columnId) => new LayoutNode(columnId));
+      let t = columnIds.map((columnId) => new LayoutNode(columnId));
       t.root.topHeaderMargin = 0;
       t.root.spareColumns = 10;   // magic number?
       t.subtrees.forEach((s, i) => {
@@ -660,7 +660,7 @@ namespace Objsheets {
         s.root.paddingCssClass = "spareRow";
       });
       t.forEach((s) => {
-        var col = getColumn(s.columnId);
+        let col = getColumn(s.columnId);
         if (col && col.isObject) s.stretchV = false;
       });
       return t;
@@ -675,7 +675,7 @@ namespace Objsheets {
       let hlist = this.mainSection.prerenderHlist([], "");
       // XXX This is in addition to any placeholders.  Desirable?
       hlist.minHeight += this.options.rootSpareRows;
-      let typeColors = new EJSONKeyedMap<string,string>();
+      let typeColors = new EJSONKeyedMap<string, string>();
       if (this.options.colorReferences) {
         this.mainSection.findTypesToColor(typeColors);
         this.mainSection.assignTypeColors(0, typeColors);
@@ -809,7 +809,7 @@ namespace Objsheets {
           // otherwise the fixed clone of the left column sometimes reduced the
           // objectName row to zero height because it wasn't constrained by the
           // content of the real table.  We can look out for any similar glitches.
-          let fieldNameRow = headerHeight - (1 + this.options.showTypes);
+          let fieldNameRow = headerHeight - (1 + (this.options.showTypes ? 1 : 0));
           let objectNameRow = fieldNameRow - 1;
           return _.range(0, this.grid.length).map((i) =>
             i < objectNameRow ? 11 :
@@ -954,7 +954,7 @@ namespace Objsheets {
                 // Placeholder or in spare row / column 
                 let columnId: ColumnId = cell.addColumnId;
                 let obj = cell.ancestorQCellId;
-                /**/ assert(() => obj != null, `selection (${row}, ${col}) is not inside any object`); /**/
+                assert(() => obj != null, `selection (${row}, ${col}) is not inside any object`);
                 let newType: string = null;
                 if (columnId != null) {        // placeholder or spare row with existing column (add to family)
                   // Adding a value cell in the *first* field of an object in a spare row
@@ -967,7 +967,7 @@ namespace Objsheets {
                 else {                         // spare column (create value field)
                   columnId = cell.ancestorType;
                   newType = "text";
-                  /**/ assert(() => columnId != null, `selection (${row}, ${col}) is not in any object type`); /**/
+                  assert(() => columnId != null, `selection (${row}, ${col}) is not in any object type`);
                 }
                 StateEdit.addCell(columnId, obj, newVal, cell.isPlaceholder, newType, revertingCallback);
               }
@@ -1077,7 +1077,7 @@ namespace Objsheets {
             }
 
             return {
-              items: items  
+              items: items
             };
           }    // end of build callback
         }    // contextMenu
@@ -1182,7 +1182,7 @@ namespace Objsheets {
      * Looks like this should go into ViewCell? But how to name it?
      */
     private columnIdOf(cell: ViewCell) {
-      var cellId: any;
+      let cellId: fixmeAny;
       return cell.columnId || cell.addColumnId ||
         ((cellId = cell.qCellId) ? cellId.columnId : null);
     }

@@ -23,7 +23,7 @@ namespace Objsheets {
   export interface CellId1 extends Array<OSValue> {}
 
   // Qualified cell id
-  export type QCellId = { columnId: ColumnId, cellId: CellId1 }; 
+  export type QCellId = { columnId: ColumnId, cellId: CellId1 };
 
   export var rootCellId: CellId1 = [];
   export function cellIdParent(cellId: CellId1): CellId1 {

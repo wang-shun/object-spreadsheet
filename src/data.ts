@@ -240,7 +240,7 @@ namespace Objsheets {
       return new TypedSet(this.columnId, set([this.cellId]));
     }
 
-    public static root = new CellId({columnId: rootColumnId, cellId: []})
+    public static root = new CellId({columnId: rootColumnId, cellId: []});
   }
 
   export class FamilyId {
