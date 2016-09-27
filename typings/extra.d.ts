@@ -34,4 +34,7 @@ declare interface HandsontableStatic {
   Dom: {
     stopImmediatePropagation(event: fixmeAny): void;
   };
+  renderers: {
+    TextRenderer: fixmeAny;
+  };
 }

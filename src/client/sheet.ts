@@ -354,7 +354,10 @@ namespace Objsheets {
       // "Corner" here is the upper left corner cell, which actually spans all the
       // way across in some cases (indicated by isFinal).
       let makeCorner = (isFinal: fixmeAny) => {
-        let classes = ["rsHeaderCorner"];
+        let classes = ["bottomAtObjectName"];
+        if (depth > (this.options.separateTables ? 1 : 0)) {
+          classes.push("hasOutsideLeftBorder");
+        }
         if (!isFinal) {
           classes.push("rsHeaderNonfinal");
         }
@@ -370,13 +373,21 @@ namespace Objsheets {
         currentHeight = height;
       };
 
+      if (this.columnId === rootColumnId) {
+        // Close off the corner unconditionally.  If the first column is a
+        // global value column, letting the corner span across it would
+        // introduce a corner case (ha ha) we'd just rather not deal with, but
+        // we still suppress the border between the corner and the padding cell
+        // by marking the corner non-final.
+        //
+        // This is adequate for now but isn't the last word on the rendering of
+        // the root column.  We may be able to get rid of it altogether if the
+        // spare columns can replace all of its functionality. ~ Matt 2016-09-15
+        makeCorner(this.subsections.length == 0 || this.subsections[0].col.isObject);
+      }
+
       this.subsections.forEach((subsection: fixmeAny, i: fixmeAny) => {
         if (this.haveTableSeparatorBefore[i]) {
-          if (currentHeight === 2) {
-            // Close off the corner for the root object so we can draw a complete
-            // table separator column.
-            makeCorner(true);
-          }
           let gridExtraCol = gridMergedCell(currentHeight, 1, "", ["tableSeparator"]);
           gridHorizExtend(grid, gridExtraCol);
         }
@@ -387,6 +398,9 @@ namespace Objsheets {
         }
         if (subsectionGrid.length < currentHeight) {
           let cssClasses = [myColorClass];
+          if (subsectionGrid.length == 2) {
+            cssClasses.push("bottomAtObjectName");
+          }
           // If this.columnId === rootColumnId, then the padding cell should
           // have a right border because there will be a table separator column.
           if (i < this.subsections.length - 1 && this.columnId !== rootColumnId) {
@@ -748,7 +762,10 @@ namespace Objsheets {
             classes = classes.concat("pending");  // must copy classes because at this point it aliases an element of this.cellClasses
           }
           return {
-            renderer: col === 0 && row === 0 ? "html" : "text",
+            renderer:
+              col === 0 && row === 0 ? "html" :
+              _.contains(classes, "hasOutsideLeftBorder") ? this.textWithOutsideLeftBorderRenderer.bind(this) :
+              "text",
             className: classes.join(" "),
             // Edge case: renaming the column whose formula is currently being edited could change
             // the string representation of the original formula, which would trigger a reactive
@@ -987,6 +1004,26 @@ namespace Objsheets {
           }
         }
       };
+    }
+
+    // https://docs.handsontable.com/0.20.1/demo-custom-renderers.html
+    textWithOutsideLeftBorderRenderer(hot: fixmeAny, td: HTMLTableDataCellElement,
+        row: number, col: number /* , ... */) {
+      Handsontable.renderers.TextRenderer.apply(this, arguments);
+      let markerDiv = document.createElement("div");
+      markerDiv.className = "outsideLeftBorderMarker";
+      td.insertBefore(markerDiv, td.firstChild);
+      let borderDiv = document.createElement("div");
+      borderDiv.className = "outsideLeftBorder";
+      // Chrome rounds the heights of table cells in a special way when the zoom
+      // is not 100%, and using "height: 100%;" on the divs is the only way to
+      // pick up the rounded height.  But then we need to set td.style.height in
+      // order for "height: 100%;" to work in Firefox.
+      //
+      // Note: td.rowSpan is not set yet; mergeCells.applySpanProperties is
+      // called in an afterRenderer hook.
+      td.style.height = (11 * (this.grid[row][col].rowspan - 1) + 23) + "px";
+      markerDiv.appendChild(borderDiv);
     }
 
     public hotCreate(domElement: fixmeAny) {
