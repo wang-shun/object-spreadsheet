@@ -57,7 +57,7 @@ namespace Objsheets {
     }
 
     public getAllColumns(columnId: fixmeAny = rootColumnId) {
-      var _ref: fixmeAny;
+      let _ref: fixmeAny;
       let col = this.getColumn(columnId);
       // A bit of auto-repair in case some columns were deleted
       let validChildren = col.children.filter((x: fixmeAny) => this.getColumn(x) != null);
@@ -153,8 +153,8 @@ namespace Objsheets {
 
     private checkNameClash(columnId: fixmeAny, childName: fixmeAny) {
       if (columnLogicalChildrenByName(columnId, childName).length > 0) {
-        var parentName = objectNameWithFallback(this.getColumn(columnId));
-        throw new Meteor.Error("model-name-clash", 
+        let parentName = objectNameWithFallback(this.getColumn(columnId));
+        throw new Meteor.Error("model-name-clash",
           parentName ? `Object '${parentName}' already has a child named '${childName}'`
                      : `Top-level object named '${childName}' already exists.`);
       }
@@ -268,8 +268,8 @@ namespace Objsheets {
               Cells.find({
                 column: childId,
                 key: value
-              }).forEach((family: fixmeAny) => {
-                for (let subValue of family.values) {
+              }).forEach((family2: fixmeAny) => {
+                for (let subValue of family2.values) {
                   newValues.push(subValue);
                 }
               });
@@ -889,7 +889,7 @@ namespace Objsheets {
     // when we give "model" parameters a type. ~ Matt 2016-03-01
 
     public recursiveDeleteStateCellNoInvalidate(columnId: fixmeAny, cellId: fixmeAny) {
-      var ce: fixmeAny;
+      let ce: fixmeAny;
       let col = this.getColumn(columnId);
       for (let childColId of col.children) {
         let childCol = this.getColumn(childColId);
@@ -968,11 +968,11 @@ namespace Objsheets {
      * and adjusts the id to point to the object.
      */
     private promoteCellId(cellId: QCellId) {
-      var base = cellIdParent(cellId.cellId);
-      var value = cellIdLastStep(cellId.cellId);
-      var keyColumnId = this.getColumn(cellId.columnId).children[0];
+      let base = cellIdParent(cellId.cellId);
+      let value = cellIdLastStep(cellId.cellId);
+      let keyColumnId = this.getColumn(cellId.columnId).children[0];
       assert(() => keyColumnId);
-      var familyRec = Cells.findOne({column: keyColumnId, values: [value]});
+      let familyRec = Cells.findOne({column: keyColumnId, values: [value]});
       assert(() => familyRec);
       return {
         columnId: cellId.columnId,
@@ -982,11 +982,11 @@ namespace Objsheets {
   }
 
   Meteor.startup(() => {
-    var tspace: fixmeAny;
+    let tspace: fixmeAny;
     Tablespace.setupModelHook = (ts: fixmeAny) => {
       console.log(`creating model of [${ts.id}]`);
-      ts.model = new Model;
-      ts.formulaEngine = new FormulaEngine;
+      ts.model = new Model();
+      ts.formulaEngine = new FormulaEngine();
       let appName = /(?:^|\.)([^.]+)$/.exec(ts.id) != null ? /(?:^|\.)([^.]+)$/.exec(ts.id)[1] : null;
       if (ts.model.wasEmpty) {
         //if appName == 'ptc' then loadPTCData(ts.model)
@@ -1016,7 +1016,7 @@ namespace Objsheets {
       cc.run();
     },
     defineColumn: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, isObject: fixmeAny, objectName: fixmeAny, formula: fixmeAny, viewId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         //attrs = if viewId? then {view: viewId} else {}
         let id = this.model.defineColumn(parentId, index, fieldName, specifiedType, isObject, objectName, formula);
         if (viewId != null) {
@@ -1026,7 +1026,7 @@ namespace Objsheets {
       });
     },
     insertUnkeyedStateObjectTypeWithField: (cc: fixmeAny, parentId: fixmeAny, index: fixmeAny, objectName: fixmeAny, fieldName: fixmeAny, specifiedType: fixmeAny, viewId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         //attrs = if viewId? then {view: viewId} else {}
         let [objectColId, fieldColId] = this.model.insertUnkeyedStateObjectTypeWithField(parentId, index, objectName, fieldName, specifiedType);
         if (viewId != null) {
@@ -1038,69 +1038,69 @@ namespace Objsheets {
       });
     },
     changeColumnFieldName: (cc: fixmeAny, columnId: fixmeAny, fieldName: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnFieldName(columnId, fieldName);
       });
     },
     changeColumnIsObject: (cc: fixmeAny, columnId: fixmeAny, isObject: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnIsObject(columnId, isObject);
         // For the case where a token object is converted to or from a field.
         this.model.evaluateAll();
       });
     },
     changeColumnObjectName: (cc: fixmeAny, columnId: fixmeAny, objectName: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnObjectName(columnId, objectName);
       });
     },
     changeColumnSpecifiedType: (cc: fixmeAny, columnId: fixmeAny, specifiedType: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnSpecifiedType(columnId, specifiedType);
         this.model.evaluateAll();
       });
     },
     changeColumnFormula: (cc: fixmeAny, columnId: fixmeAny, formula: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnFormula(columnId, formula);
         this.model.evaluateAll();
       });
     },
     changeColumnReferenceDisplayColumn: (cc: fixmeAny, columnId: fixmeAny, referenceDisplayColumn: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.changeColumnReferenceDisplayColumn(columnId, referenceDisplayColumn);
       });
     },
     reorderColumn: (cc: fixmeAny, columnId: fixmeAny, newIndex: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.reorderColumn(columnId, newIndex);
       });
     },
     deleteColumn: (cc: fixmeAny, columnId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.deleteColumn(columnId);
         View.removeColumnFromAll(columnId);
         this.model.evaluateAll();
       });
     },
     recursiveDeleteStateCellNoInvalidate: (cc: fixmeAny, columnId: fixmeAny, cellId: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.recursiveDeleteStateCellNoInvalidate(columnId, cellId);
       });
     },
     addCellRecursive: (cc: Tablespace, columnId: ColumnId, ancestorQCellId: fixmeAny, value: fixmeAny, consumePlaceholder: boolean, newColumnType?: string) => {
-      return cc.run(function() {
+      return cc.run(function(this: fixmeAny) {
         return this.model.addCellRecursive(columnId, ancestorQCellId, value, consumePlaceholder, newColumnType);
       });
     },
     notify: (cc: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.invalidateDataCache();
         this.model.evaluateAll();
       });
     },
     executeCannedTransaction: (cc: fixmeAny, name: fixmeAny, argsObj: fixmeAny) => {
-      cc.run(function() {
+      cc.run(function(this: fixmeAny) {
         this.model.executeCannedTransaction(name, argsObj);
       });
     }

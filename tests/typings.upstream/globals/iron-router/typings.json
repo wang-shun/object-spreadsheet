@@ -1,0 +1,11 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "https://raw.githubusercontent.com/meteor-typings/iron-router/c6fcb905c526fceb10f842400d754e6ad9583860/typings.json",
+    "raw": "github:meteor-typings/iron-router#c6fcb905c526fceb10f842400d754e6ad9583860",
+    "main": "main.d.ts",
+    "version": "1.0.12",
+    "name": "iron:router",
+    "type": "typings"
+  }
+}

@@ -1,7 +1,18 @@
 {
+    // The TypeScript build plugin reads these options, but it does no change
+    // detection, so you have to restart "meteor" manually. :( :(
     "compilerOptions": {
-        "sourceMap": true,
-        "noImplicitAny": true
+        // The Meteor build system is responsible for emitting the code actually
+        // used.  We expect other tools to run tsc to check for errors without
+        // emitting, but not to emit using the default settings, so turn
+        // emitting off by default and let tools that want to emit with custom
+        // settings specify "noEmit": false.
+        "noEmit": true,
+
+        "target": "es5",
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true
     },
     "exclude": [
         "tests",

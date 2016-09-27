@@ -1,3 +1,6 @@
 [submodule "hansoft_typescript"]
 	path = packages/hansoft_typescript
 	url = ../hansoft_typescript
+[submodule "handsontable"]
+	path = tests/handsontable
+	url = ../handsontable

@@ -295,9 +295,9 @@ namespace Objsheets {
     // Note, this only covers the constraints that can be broken by the
     // transactions we support.
     // XXX Change to universal quantification when available.
-    defineParsedFormulaColumn("", 3, "valid", null, false, null, '{e : $Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&\
+    defineParsedFormulaColumn("", 3, "valid", null, false, null, "{e : $Class.Section.Enrollment | count(e.scheduledMeeting) > 1} = {} &&\
      {s : $Person.Teacher.Slot | count(s.[scheduledMeeting].scheduledMeeting) > 1} = {} &&\
-     {m : $Meeting | !m.valid} = {}');
+     {m : $Meeting | !m.valid} = {}");
 
     // Create a spreadsheet view, which we use to hold data for a web application
     // view.

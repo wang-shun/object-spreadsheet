@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+#
+# merge-typings: Merges any changes in the upstream TypeScript declaration files
+# in tests/typings.upstream/ into the live files in typings/, which may have
+# modifications specific to Object Spreadsheets.
+#
+# This script is based on merge-from-coffeescript.  The main difference is that
+# the "typings install" step is not included since I envision that users will
+# prefer to do it manually. ~ Matt 2016-09-19
+#
+# The snapshot of the upstream files on which the live files are currently based
+# is saved in tests/typings.base/.  The basic approach is:
+#
+# 1. Merge the differences from tests/typings.base/ to tests/typings.upstream/
+#    into typings/.
+# 2. Copy tests/typings.upstream/ to tests/typings.base/.
+#
+# Naturally, this script is idempotent.
+#
+# We do step 1 using git, because people working on this project are more likely
+# to have a satisfactory configuration for git merges than to have (and like)
+# any other tool we might pick.  The coupling between this script and the git
+# version control of the working tree could be considered poor design, but it's
+# also convenient in some ways.  We set up the merge using "git read-tree -m"
+# because it has all the right safety checks, even though it's a little more
+# work to prepare the input in the form of trees rather than an index.
+# "git read-tree -m" is all-or-nothing, so it's convenient to do steps 1 and 2
+# in a single command to help prevent failures from leaving the directories in
+# an inconsistent state.  This means:
+#
+# - The initial state of typings/ and tests/typings.base/ is read from the
+#   index, and the result of the merge is placed in the index, ready to be
+#   committed.
+# - If the working tree has unstaged changes to any of the affected files, this
+#   script will fail without making any changes.
+# - If the index contains any unmerged files, even ones completely unrelated to
+#   the conversion, this script will fail without making any changes.  This is
+#   unfortunate but not expected to be a common enough problem in practice to
+#   prefer a different approach.
+# - To undo a merging pass, you have to undo the changes to _both_ typings/ and
+#   tests/typings.base/.  If you undo only the changes to typings/ and keep the
+#   changes to tests/typings.base/, the script will consider that the changes
+#   were successfully merged but you manually reversed them, and it will not
+#   merge them again.
+#
+# Can I (Matt) really be the first one to think of this approach?  I didn't have
+# any luck finding prior art on the web, but I'm not sure what terms to search
+# for.
+
+import errno
+import os
+import subprocess
+import sys
+
+# Don't make a total mess if someone runs this from a subdirectory.
+os.chdir(os.path.dirname(sys.argv[0]))
+
+# No arguments accepted.
+assert len(sys.argv) == 1
+
+pfx_live = 'typings/'
+pfx_save = 'tests/typings.base/'
+pfx_new = 'tests/typings.upstream/'
+
+def replace_prefix(pfx_old, pfx_new, path):
+  assert path.startswith(pfx_old)
+  return pfx_new + path[len(pfx_old):]
+
+# Returns: list of (mode-hash-stage (unparsed), path).
+def git_ls_files(*args):
+  output = subprocess.check_output(('git', 'ls-files', '--stage') + args)
+  # We don't need to manipulate the mode, hash, or stage fields (this script
+  # only uses stage-0 entries), so just separate all of them from the path.
+  return [tuple(l.split('\t')) for l in output.splitlines()]
+
+def delete_if_exists(path):
+  try:
+    os.unlink(path)
+  except OSError, e:
+    if e.errno != errno.ENOENT:
+      raise
+
+class TemporaryIndexFile:
+  def __enter__(self):
+    self.path = 'index.tmp'
+    os.environ['GIT_INDEX_FILE'] = self.path
+  def __exit__(self, exc_type, exc_value, exc_traceback):
+    delete_if_exists(self.path)
+    del os.environ['GIT_INDEX_FILE']
+    return False  # Re-raise exception, if any
+
+def subprocess_check_input(cmd, input):
+  p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+  p.communicate(input)
+  retcode = p.poll()
+  if retcode:
+    raise CalledProcessError(retcode, cmd)
+
+def make_tree(ls):
+  with TemporaryIndexFile():
+    subprocess_check_input(
+      ('git', 'update-index', '--index-info'),
+      ''.join('\t'.join(e) + '\n' for e in ls))
+    return subprocess.check_output(('git', 'write-tree')).rstrip()
+
+# Our goal is to construct trees with content as shown at each path:
+#
+# Path:     pfx_save  pfx_live  other
+# ---------------------------------------
+# tree1     save      save
+# tree2     save      live      other
+# tree3     new       new
+# ---------------------------------------
+# merge     new       merged    other
+#
+# "git read-tree -m" appears to require that tree2 match the entire index.
+
+# Since we have to include everything, don't bother with a temporary index.
+tree2 = subprocess.check_output(('git', 'write-tree')).rstrip()
+
+ls_save = git_ls_files(pfx_save)
+
+ls_tree1 = []
+for e in git_ls_files(pfx_save):
+  ls_tree1.append(e)
+  ls_tree1.append((e[0], replace_prefix(pfx_save, pfx_live, e[1])))
+tree1 = make_tree(ls_tree1)
+
+with TemporaryIndexFile():
+  subprocess.check_call(('git', 'add', pfx_new))
+  ls_new = git_ls_files()
+
+ls_tree3 = []
+for e in ls_new:
+  for pfx in pfx_save, pfx_live:
+    ls_tree3.append((e[0], replace_prefix(pfx_new, pfx, e[1])))
+tree3 = make_tree(ls_tree3)
+
+# Looks like the -u option checks out only the files that "git read-tree" is not
+# leaving unmerged.  "git merge-index" will check out the rest of the files with
+# either the textual merge result or the conflict markup.
+subprocess.check_call(('git', 'read-tree', '-mu', tree1, tree2, tree3))
+subprocess.call(('git', 'merge-index', '-o', 'git-merge-one-file', '-a'))

@@ -84,7 +84,7 @@ namespace Objsheets {
       if (d != null) {
         d = d.apply(null, [this.engine, {}].concat(formula.slice(1)));
         return forall((() => {
-          var _results: fixmeAny;
+          let _results: fixmeAny;
           _results = [];
           for (let k in d.tsets) {
             let v = d.tsets[k];
@@ -121,13 +121,13 @@ namespace Objsheets {
         if (around == null) {
           throw Error(`IR error: no tset named '${tset}'`);
         }
-        let s = around.replace(/yield\s+(\w+)\s*;?/g, (_: fixmeAny, yield_va: fixmeAny) => body.replace(/\b\w+\b/g, (va: fixmeAny) => va === tset_va ? yield_va : va));
+        let s = around.replace(/yield\s+(\w+)\s*;?/g, (_2: fixmeAny, yield_va: fixmeAny) => body.replace(/\b\w+\b/g, (va: fixmeAny) => va === tset_va ? yield_va : va));
         return this.compileIr(s, tsets);
       });
     }
 
     public alpha(ir: fixmeAny, locals: fixmeAny) {
-      var idx: fixmeAny;
+      let idx: fixmeAny;
       let mn = <fixmeAny>{};
       for (let va of locals) {
         this.mnemonics[va] = idx = (fallback(this.mnemonics[va], -1)) + 1;

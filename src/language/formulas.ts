@@ -97,7 +97,7 @@ namespace Objsheets {
     public compiled: fixmeAny;
 
     constructor() {
-      this.goUpMemo = new Memo;
+      this.goUpMemo = new Memo();
       this.compiled = {};
     }
 
@@ -204,12 +204,12 @@ namespace Objsheets {
       newVars.add(varName);
       validateSubformula(newVars, body);
     },
-    typecheck: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
+    typecheck: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return typecheckFormula(model, newVars, body);
       },
-    evaluate: (model: fixmeAny, vars: fixmeAny, [varName, body]) => {
+    evaluate: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => {
       // he he he!
       return (arg: fixmeAny) => {
         let newVars = vars.shallowClone();
@@ -217,12 +217,12 @@ namespace Objsheets {
         return evaluateFormula(model, newVars, body);
       };
     },
-    stringify: (model: fixmeAny, vars: fixmeAny, [varName, body]) => (argType: fixmeAny) => {
+    stringify: (model: fixmeAny, vars: fixmeAny, [varName, body]: fixmeAny) => (argType: fixmeAny) => {
         let newVars = vars.shallowClone();
         newVars.set(varName, argType);
         return [stringifyIdent(varName), stringifySubformula(model, newVars, body)];
       },
-    getSubformulas: ([varName, body]) => [body]
+    getSubformulas: ([varName, body]: fixmeAny) => [body]
   };
   let ColumnId = {
     validate: (vars: fixmeAny, arg: fixmeAny) => {
@@ -366,7 +366,9 @@ namespace Objsheets {
         throw new EvaluationError(`Invalid reference display column for type '${stringifyType(type)}'`);
       }
       return tsetToText(model, displayTset, newRefsSeen);
-    } else     return typeof value === "string" ? value : value instanceof Date ? value.toString("yyyy-MM-dd HH:mm") : JSON.stringify(value);  // Reasonable fallback
+    } else {
+      return typeof value === "string" ? value : value instanceof Date ? value.toString("yyyy-MM-dd HH:mm") : JSON.stringify(value);  // Reasonable fallback
+    }
   }
 
   export function genericSetToText(elements: fixmeAny, formatOne: fixmeAny) {
@@ -614,9 +616,9 @@ namespace Objsheets {
     date: {
       argAdapters: [StringArg],
       typecheck: () => "date",
-      evaluate: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => new TypedSet("date", new EJSONKeyedSet([Date.parse(string)])),
-      stringify: (model: fixmeAny, vars: fixmeAny, string: fixmeAny) => ({
-          str: `d${JSON.stringify(string)}`,
+      evaluate: (model: fixmeAny, vars: fixmeAny, dateString: fixmeAny) => new TypedSet("date", new EJSONKeyedSet([Date.parse(dateString)])),
+      stringify: (model: fixmeAny, vars: fixmeAny, dateString: fixmeAny) => ({
+          str: `d${JSON.stringify(dateString)}`,
           outerPrecedence: PRECEDENCE_ATOMIC
         })
     },
@@ -921,7 +923,7 @@ namespace Objsheets {
   // Specifically, the validate method of the operation is optional, and it
   // receives the original arguments (the adapters do not return values).
   function validateSubformula(vars: fixmeAny, formula: fixmeAny) {
-    var opName: fixmeAny;
+    let opName: fixmeAny;
     valAssert(_.isArray(formula), "Subformula must be an array.");
     valAssert(_.isString(opName = formula[0]), "Subformula must begin with an operation name (a string).");
     valAssert(dispatch.hasOwnProperty(opName), `Unknown operation '${opName}'`);
@@ -1008,9 +1010,9 @@ namespace Objsheets {
   // reuse the rest for formulas in procedures, etc.
   export function traceColumnFormula(formula: fixmeAny, columnId: fixmeAny) {
     let tracingModel = {
-      getColumn: (columnId: fixmeAny) => getColumn(columnId),
+      getColumn: (colId: fixmeAny) => getColumn(colId),
       evaluateFamily: (qFamilyId: fixmeAny) => evaluateFamilyReadOnly(qFamilyId),
-      typecheckColumn: (columnId: fixmeAny) => getColumn(columnId).type,
+      typecheckColumn: (colId: fixmeAny) => getColumn(colId).type,
       isTracing: true
     };
     // Here we really do want to ignore erroneous families in the parent column
@@ -1133,15 +1135,15 @@ namespace Objsheets {
     let parser = new Jison.Parsers.language.Parser();
     parser.yy.vars = vars.shallowClone();
     parser.yy.startToken = startToken;
-    parser.yy.bindVar = function(varName: fixmeAny, formula: fixmeAny) {
+    parser.yy.bindVar = function(this: fixmeAny, varName: fixmeAny, formula: fixmeAny) {
       // Don't check shadowing here, because the rules for procedures are
       // complicated.  It will be done later by the validate method.
       this.vars.set(varName, validateAndTypecheckFormula(liteModel, this.vars, formula));
     };
-    parser.yy.unbindVar = function(varName: fixmeAny) {
+    parser.yy.unbindVar = function(this: fixmeAny, varName: fixmeAny) {
       this.vars["delete"](varName);
     };
-    parser.yy.navigate = function(startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
+    parser.yy.navigate = function(this: fixmeAny, startCellsFmla: fixmeAny, targetName: fixmeAny, keysFmla: fixmeAny) {
       return resolveNavigation(liteModel, this.vars, startCellsFmla, targetName, keysFmla);
     };
     parser.yy.parseError = (err: fixmeAny, hash: fixmeAny) => {

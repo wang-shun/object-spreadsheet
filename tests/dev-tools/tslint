@@ -1,0 +1,11 @@
+#!/bin/bash
+# Same idea as tsc wrapper.
+
+tslint="$(dirname -- "$0")/../../packages/hansoft_typescript/.npm/plugin/compileTypescript/node_modules/.bin/tslint"
+if [ -x "$tslint" ]; then
+  exec "$tslint" "$@"
+else
+  echo >&2 'The embedded copy of tslint has not been downloaded.'
+  echo >&2 'Please run "meteor" once and try again.'
+  exit 127
+fi

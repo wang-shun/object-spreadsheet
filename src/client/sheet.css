@@ -80,19 +80,6 @@ will always match, just to get higher priority.
   /* Allow height to be determined by settings. */
   height: auto;
 }
-.handsontable div.wtHolder table.htCore {
-  /*
-  Allows the right border of a cell to be used interchangeably with the left
-  border of the next cell to the right, and similarly for horizontal borders;
-  otherwise, the borders would be slightly misaligned.  This is used for
-  rsHeaderCorner.
-  */
-  /*
-  This solution has severe drawbacks as it conflicts with assumptions in Handsontable
-  (see handsontable.full.css), so a better one should be found. ~~~~
-  */
-  /*border-collapse: collapse;*/
-}
 .handsontable table.htCore {
   /* Adding div.htContainer to the above selector results in incorrect column widths
      (Handsontable uses a ghost element to compute the width). TODO */
@@ -101,24 +88,32 @@ will always match, just to get higher priority.
 }
 
 @media print {
-  .handsontable div.wtHolder table.htCore {
-    border-collapse: collapse;  
-  }
   .handsontable * {
     box-shadow: none !important;
   }
 }
 
 /*
-Deviations in the header from the Handsontable standard of each cell having a
-right and a bottom border:
+Handsontable assumes "border-collapse: separate" and standardizes on each
+horizontal border belonging to the cell above (as a bottom border) and each
+vertical border belonging to the cell to the left (as a right border).  We
+currently deviate in the following ways:
 
-- rsHeaderCorner has no bottom border.  Instead, all child leaves draw a top
-  border.  For child leaves which are under padding cells rather than the
-  corner, this is redundant with the padding cell's bottom border.
+- The border between the object name and field name rows belongs to the field
+  name row so we can draw it under part of an object-type corner cell.
+
+"border-collapse: collapse" would make life easier, especially if we re-add the
+"sepcols" option, but causes various problems:
+
+- The cell selection rectangle was misaligned in Handsontable 0.20.1.
+- https://bugzilla.mozilla.org/show_bug.cgi?id=332740
+
+We could tolerate or work around these and any future problems, but for now we
+prefer to use "border-collapse: separate" and manually draw a left border in the
+one place we really need it. ~ Matt 2016-09-15
 */
 
-.handsontable td.rsHeader.rsHeaderCorner {
+.handsontable td.rsHeader.bottomAtObjectName {
   border-bottom: none;
 }
 
@@ -160,12 +155,38 @@ right and a bottom border:
   border-right: none;
 }
 
-.handsontable td.rsHeader.rsHeaderCorner,
-.handsontable td.rsHeaderFieldNameLeaf,
-.handsontable td.rsHeaderFieldNameObject,
-.handsontable td.rsHeaderTypeLeaf,
-.handsontable td.rsHeaderTypeObject {
+/* Outside left borders for header corner cells for nested object types.  (In
+   the separate-tables style, table separator columns draw a right border, so
+   top-level object types don't need this treatment.)
+
+   Firefox and Chrome both round border sizes in special ways when the zoom is
+   not 100%.  This code is delicately written to generate borders that match up
+   in the presence of this rounding.  I hope it keeps working! ~ Matt 2016-09-14
+*/
+.handsontable td.hasOutsideLeftBorder {
+  /* Allow the border to be visible.  If in the future we need to clip other
+     content of cells with outside borders, we'll have to find another solution. */
+  overflow: visible;
+  padding-left: 0;
+}
+.outsideLeftBorderMarker {
+  display: inline-block;
+  vertical-align: bottom;
+  height: 100%;
+  pointer-events: none;
+  position: relative;
+  /*  Reimplement the default padding-left of Handsontable cells. */
+  margin-right: 4px;
+}
+.outsideLeftBorder {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 100%;
   border-left: 1px solid #CCC;
+  /* Fill in the corner with the bottom border of the padding cell above. */
+  border-top: 1px solid #CCC;
 }
 
 /* Dotted border between object and key columns in header.  Control from the object side. */
@@ -258,10 +279,6 @@ I tried this and it didn't look good. ~ Matt 2015-12-04
 .handsontable td.rsCaption:not(.area) {
   background-color: #DDD;
   color: #222;
-}
-
-.handsontable td.rsRowNum {
-  text-align: center;
 }
 
 .handsontable td.centered {

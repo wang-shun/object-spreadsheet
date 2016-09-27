@@ -1,6 +1,6 @@
 namespace Objsheets {
 
-  Router.route("/:sheet/apps/ptc-study-solution", function() {
+  Router.route("/:sheet/apps/ptc-study-solution", function(this: fixmeAny) {
     this.render("PTC_study_solution_login", {
       data: {
         sheet: this.params.sheet
@@ -8,7 +8,7 @@ namespace Objsheets {
     });
   });
 
-  Template["PTC_study_solution_login"].created = function() {
+  Template["PTC_study_solution_login"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null);  // no procedures
   };
 
@@ -24,7 +24,7 @@ namespace Objsheets {
     JSON_stringify: JSON.stringify
   });
 
-  Router.route("/:sheet/apps/ptc-study-solution/:familyPage", function() {
+  Router.route("/:sheet/apps/ptc-study-solution/:familyPage", function(this: fixmeAny) {
     this.render("PTC_study_solution_FamilyPage", {
       data: {
         sheet: this.params.sheet,
@@ -33,12 +33,12 @@ namespace Objsheets {
     });
   });
 
-  Template["PTC_study_solution_FamilyPage"].created = function() {
+  Template["PTC_study_solution_FamilyPage"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null, "ptc-study-solution");
   };
 
   Template["PTC_study_solution_FamilyPage"].helpers({
-    FamilyPage: function() {
+    FamilyPage: function(this: fixmeAny) {
       return RelsheetsClient.readSubtree("FamilyPage", this.familyPage);
     },
     formatDate: (d: fixmeAny) => valueToTextIgnoreErrors("date", d)
@@ -50,7 +50,7 @@ namespace Objsheets {
   }
 
   Template["PTC_study_solution_FamilyPage"].events({
-    "click .schedule": function(ev: fixmeAny) {
+    "click .schedule": function(this: fixmeAny, ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentScheduleMeeting", {
         block: this
@@ -58,7 +58,7 @@ namespace Objsheets {
         $(ev.target).text("Schedule");
       });
     },
-    "click .cancel": function(ev: fixmeAny) {
+    "click .cancel": function(this: fixmeAny, ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCancelMeeting", {
         block: this

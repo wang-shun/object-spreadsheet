@@ -15,7 +15,7 @@ namespace Objsheets {
   // Meteor, so retest after we upgrade. ~ Matt 2015-12-15
   let indexMultiuser = Meteor.settings != null ? Meteor.settings["public"] != null ? Meteor.settings["public"].indexMultiuser : null : null;
 
-  Router.route("/", (function() {
+  Router.route("/", (function(this: fixmeAny) {
     let examplesNamePrefix = this.params.query.examplesNamePrefix;
     // Only redirect if examplesNamePrefix was unset.  Don't go wild if the user just
     // clears the input field.

@@ -1,6 +1,6 @@
 namespace Objsheets {
 
-  Router.route("/:sheet/apps/ptc/parent", function() {
+  Router.route("/:sheet/apps/ptc/parent", function(this: fixmeAny) {
     this.render("PTC_Parent_login", {
       data: {
         sheet: this.params.sheet
@@ -11,7 +11,7 @@ namespace Objsheets {
   // /ptc/apps/ptc/parent/5
   // which means that the Person id is ["5"].
   // Future: Hacks to get prettier URLs?
-  Router.route("/:sheet/apps/ptc/parent/:clientUser", function() {
+  Router.route("/:sheet/apps/ptc/parent/:clientUser", function(this: fixmeAny) {
     this.render("PTC_Parent", {
       data: {
         sheet: this.params.sheet,
@@ -20,7 +20,7 @@ namespace Objsheets {
       }
     });
   });
-  Router.route("/:sheet/apps/split-view/ptc", function() {
+  Router.route("/:sheet/apps/split-view/ptc", function(this: fixmeAny) {
     this.render("PTC_Demo", {
       data: {
         sheet: this.params.sheet
@@ -40,17 +40,17 @@ namespace Objsheets {
     }
   });
 
-  Template["PTC_Parent"].created = function() {
+  Template["PTC_Parent"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null, "ptc");
   };
 
   Template["PTC_Parent"].helpers({
-    viewData: function() {
+    viewData: function(this: fixmeAny) {
       return RelsheetsClient.readSubtree("ParentView", [this.clientUser]);
     }
   });
 
-  Template["PTC_Parent_login"].created = function() {
+  Template["PTC_Parent_login"].created = function(this: fixmeAny) {
     RelsheetsClient.open(this.data != null ? this.data.sheet : null);
   };
 
@@ -72,7 +72,7 @@ namespace Objsheets {
     // integrity constraints, it definitely seems preferable to define them
     // directly and infer the valid choices to show in the view from them (if
     // possible).  Further experience should inform the design here.
-    "click .schedule": function(ev: fixmeAny) {
+    "click .schedule": function(this: fixmeAny, ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCreateMeeting", {
         clientUser: [this.clientUser],
@@ -82,7 +82,7 @@ namespace Objsheets {
         $(ev.target).text("Schedule");
       });
     },
-    "click .cancel": function(ev: fixmeAny) {
+    "click .cancel": function(this: fixmeAny, ev: fixmeAny) {
       blur($(ev.target));
       RelsheetsClient.call("parentCancelMeeting", {
         clientUser: [this.clientUser],
