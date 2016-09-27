@@ -9,8 +9,9 @@
 		// are third-party anyway.  Not worth worrying about right now.
 		// ~ Matt 2016-09-20
 
-		// "any" is allowed, but the rationale should be documented (TODO).
-		// Uncomment this temporarily to review uses of "any" in the codebase.
+		// "any" is allowed, but the rationale should be documented as described in
+		// CODING_GUIDELINES.md.  Uncomment this temporarily to review uses of "any"
+		// in the codebase.
 		//"no-any": true,
 
 		// The main inconsistencies that bug Matt.  (This list is pretty short now
