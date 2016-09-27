@@ -633,7 +633,7 @@ namespace Objsheets {
       },
       typecheck: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => vars.get(varName),
       evaluate: (model: fixmeAny, vars: fixmeAny, varName: fixmeAny) => {
-        let v = vars.get(varName)
+        let v = vars.get(varName);
         // Allows formulas to depend on reactive values (e.g., state of certain UI controls);
         // this is useful for playing around, though eventually such values would better be
         // placed in transient spreadsheet cells and accessed as such.
@@ -787,9 +787,9 @@ namespace Objsheets {
     sort: {
       paramNames: ["set", "function", null],
       argAdapters: [EagerSubformula, Lambda, {}],
-      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny, keyLambda: fixmeAny, order: any) => {
+      typecheck: (model: fixmeAny, vars: fixmeAny, domainType: fixmeAny, keyLambda: fixmeAny, order: fixmeAny) => {
         if (order)
-          valAssert(order === '+' || order === '-', `sort order must be '+' or '-', got '${order}'`);
+          valAssert(order === "+" || order === "-", `sort order must be '+' or '-', got '${order}'`);
         // TODO: force domainType to be an object?
         return domainType;
       },
@@ -800,22 +800,22 @@ namespace Objsheets {
           return [x, singleElementOpt(keyLambda(tset).set)];
         });
         // _.sortBy only does ascending for some reason. So, implementing my own.
-        let cmp = (a:any,b:any) => (a<b) ? -1 : ((a>b) ? 1 : 0);
-        let asc = (a:[any,any], b:[any,any]) => cmp(a[1], b[1]);
-        let desc = (a:[any,any], b:[any,any]) => -cmp(a[1], b[1]);
-        elementsWithKeys.sort( (order === '-') ? desc : asc );
+        let cmp = (a: fixmeAny, b: fixmeAny) => (a < b) ? -1 : ((a > b) ? 1 : 0);
+        let asc = (a: [fixmeAny, fixmeAny], b: [fixmeAny, fixmeAny]) => cmp(a[1], b[1]);
+        let desc = (a: [fixmeAny, fixmeAny], b: [fixmeAny, fixmeAny]) => -cmp(a[1], b[1]);
+        elementsWithKeys.sort( (order === "-") ? desc : asc );
         // XXX Strictly speaking, EJSONKeyedSet is not ordered.
         // but all existing JavaScript implementations preserve the order of keys in an object;
         // this is not likely to change since many libraries depend on this behavior.
         // If we support lists in the future, this will have to return one, but in the meantime
         // it's not supposed to break.  ~ Shachar 2016-05-30
-        return new TypedSet(domainTset.type, new EJSONKeyedSet(elementsWithKeys.map((x) => x[0])))
+        return new TypedSet(domainTset.type, new EJSONKeyedSet(elementsWithKeys.map((x) => x[0])));
       },
       stringify: (model: fixmeAny, vars: fixmeAny, domainSinfo: fixmeAny, keyLambda: fixmeAny, order: string) => {
         // XXX Wasteful
         let keySinfo = keyLambda(tryTypecheckFormula(model, vars, domainSinfo.formula));
         return {
-          str: `sort${order || ''}(${keySinfo[0]} : ${domainSinfo.strFor(PRECEDENCE_LOWEST)} ` + `| ${keySinfo[1].strFor(PRECEDENCE_LOWEST)})`,
+          str: `sort${order || ""}(${keySinfo[0]} : ${domainSinfo.strFor(PRECEDENCE_LOWEST)} ` + `| ${keySinfo[1].strFor(PRECEDENCE_LOWEST)})`,
           outerPrecedence: PRECEDENCE_ATOMIC
         };
       }

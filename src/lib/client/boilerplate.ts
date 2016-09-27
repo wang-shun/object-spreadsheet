@@ -48,7 +48,7 @@ namespace Objsheets {
             columnId: x.root
           }).values();
           if (c.isObject) {
-            let fam = vals.map((v2: fixmeAny) => this.readObj(x, cellIdChild(rootCellId, v2), expandRefs, c.fieldName, visited));
+            let fam: fixmeAny = vals.map((v2: fixmeAny) => this.readObj(x, cellIdChild(rootCellId, v2), expandRefs, c.fieldName, visited));
             fam.qFamilyId = {
               columnId: x.root,
               cellId: rootCellId

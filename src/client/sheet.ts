@@ -997,7 +997,7 @@ namespace Objsheets {
               let objectName = fallback(objectNameWithFallback(col), "(unnamed)");
               let fieldName = fallback(col.fieldName, "(unnamed)");
               if (!col.isObject) {
-                let fieldDesc = desc(fieldName, 'values');
+                let fieldDesc = desc(fieldName, "values");
                 items.promote = {
                   name: columnIsState(col) ? `Wrap ${fieldDesc} in objects` : `Generate objects for ${fieldDesc}`,
                   callback: () => {
@@ -1040,8 +1040,8 @@ namespace Objsheets {
               // object column.
               if (ci !== rootColumnId && col.children.length === 0 && (!col.isObject || col.type === "_token")) {
                 items["delete"] = {
-                  name: `Delete ${col.isObject ? desc(objectName, 'object')
-                                               : desc(fieldName, 'value')} column`,
+                  name: `Delete ${col.isObject ? desc(objectName, "object")
+                                               : desc(fieldName, "value")} column`,
                   callback: () => {
                     this.hot.deselectCell();  // <- Otherwise changeColumn form gets hosed.
                     Meteor.call("deleteColumn", $$, ci, standardServerCallback);
@@ -1257,7 +1257,7 @@ namespace Objsheets {
           // A token column has only the object UI-column, though we don't set
           // isObjectCell on family padding cells.  So don't check it.
           return {
-            name: `Add ${desc(objectName, 'object')} here`,
+            name: `Add ${desc(objectName, "object")} here`,
             allowEnter: true,
             callback: () => {
               StateEdit.addCell(c.addColumnId, c.ancestorQCellId, null, false, null, standardServerCallback);

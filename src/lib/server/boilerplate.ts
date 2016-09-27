@@ -5,7 +5,7 @@ namespace Objsheets {
     procedures: function(this: fixmeAny, appName: fixmeAny, defs: fixmeAny) {
       this._procedures[appName] = defs;
     },
-    compile: function(this: fixmeAny, appName: fixmeAny, errCallback: (msg: string, stack: any) => void = (m, s) => console.warn(m, s)) {
+    compile: function(this: fixmeAny, appName: fixmeAny, errCallback: (msg: string, stack: fixmeAny) => void = (m, s) => console.warn(m, s)) {
       // This may run multiple times; it should overwrite and not cause any problems.
       for (let name in this._procedures[appName]) {
         let preProc = this._procedures[appName][name];

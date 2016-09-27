@@ -568,16 +568,16 @@ namespace Objsheets {
 
   export type Param = {name: string, type: string};
 
-  export function makeArguments(params: Param[], argsObj: any) {
-    var argsMap = new EJSONKeyedMap<string, TypedSet>();
+  export function makeArguments(params: Param[], argsObj: fixmeAny) {
+    let argsMap = new EJSONKeyedMap<string, TypedSet>();
     for (let param of params)
       argsMap.set(param.name, makeArgumentValue(param, argsObj[param.name]));
     return argsMap;
   }
 
-  function makeArgumentValue(param: Param, value: any): TypedSet {
+  function makeArgumentValue(param: Param, value: fixmeAny): TypedSet {
     if (value instanceof Array)
-      value = new TypedSet(param.type, set<any>(value));   // Future: Validate type!
+      value = new TypedSet(param.type, set<fixmeAny>(value));   // Future: Validate type!
     else if (value instanceof EJSONKeyedSet)
       value = new TypedSet(param.type, value);             // Future: here too!
     else if (value instanceof TypedSet)
